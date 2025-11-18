@@ -3,6 +3,6 @@ frontend/build/
 frontend/.env
 backend/.env
 backend/venv
-README.md
 SETUP.md
 .DS_Store
+.claude/
