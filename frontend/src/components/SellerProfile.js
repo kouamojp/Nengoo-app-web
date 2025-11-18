@@ -1,0 +1,309 @@
+
+import React, { useState } from 'react';
+import { mockSellerData, openWhatsApp } from './common';
+import Header from './Header';
+import Footer from './Footer';
+import SellerSidebar from './SellerSidebar';
+import SellerHeader from './SellerHeader';
+
+// Seller Profile Component
+export const SellerProfile = (props) => {
+  const { language } = props;
+  const [profileData, setProfileData] = useState(mockSellerData.profile);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    setIsEditing(false);
+    // Here you would save to backend
+    alert('Profil mis à jour avec succès!');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Header {...props} />
+      
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <SellerSidebar currentPage="profile" language={language} />
+          </div>
+          
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            <SellerHeader title="Profil Vendeur" language={language} />
+            
+            {/* Profile Card */}
+            <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold">Informations du Profil</h2>
+                <button
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                >
+                  {isEditing ? 'Annuler' : '✏️ Modifier'}
+                </button>
+              </div>
+
+              <form onSubmit={handleSave} className="space-y-6">
+                <div className="flex items-center space-x-6 mb-8">
+                  <img
+                    src={profileData.logo}
+                    alt="Logo"
+                    className="w-24 h-24 rounded-full object-cover border-4 border-purple-200"
+                  />
+                  {isEditing && (
+                    <div>
+                      <label className="block text-sm font-medium mb-2">URL du Logo</label>
+                      <input
+                        type="url"
+                        value={profileData.logo}
+                        onChange={(e) => setProfileData({ ...profileData, logo: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Nom de la Boutique</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.name}
+                        onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <p className="text-lg font-semibold text-gray-800">{profileData.name}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Email</label>
+                    {isEditing ? (
+                      <input
+                        type="email"
+                        value={profileData.email}
+                        onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <p className="text-lg text-gray-800">{profileData.email}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Téléphone</label>
+                    {isEditing ? (
+                      <input
+                        type="tel"
+                        value={profileData.phone}
+                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <p className="text-lg text-gray-800">{profileData.phone}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Adresse</label>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={profileData.address}
+                        onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <p className="text-lg text-gray-800">{profileData.address}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Description de la Boutique</label>
+                  {isEditing ? (
+                    <textarea
+                      value={profileData.description}
+                      onChange={(e) => setProfileData({ ...profileData, description: e.target.value })}
+                      rows={4}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  ) : (
+                    <p className="text-lg text-gray-800">{profileData.description}</p>
+                  )}
+                </div>
+
+                {/* Social Media Links */}
+                <div>
+                  <label className="block text-sm font-medium mb-4">Réseaux Sociaux</label>
+                  {isEditing ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">WhatsApp</label>
+                        <input
+                          type="tel"
+                          value={profileData.socialMedia?.whatsapp || ''}
+                          onChange={(e) => setProfileData({
+                            ...profileData,
+                            socialMedia: { ...profileData.socialMedia, whatsapp: e.target.value }
+                          })}
+                          placeholder="+237 6XX XXX XXX"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Facebook</label>
+                        <input
+                          type="url"
+                          value={profileData.socialMedia?.facebook || ''}
+                          onChange={(e) => setProfileData({
+                            ...profileData,
+                            socialMedia: { ...profileData.socialMedia, facebook: e.target.value }
+                          })}
+                          placeholder="https://facebook.com/..."
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Instagram</label>
+                        <input
+                          type="url"
+                          value={profileData.socialMedia?.instagram || ''}
+                          onChange={(e) => setProfileData({
+                            ...profileData,
+                            socialMedia: { ...profileData.socialMedia, instagram: e.target.value }
+                          })}
+                          placeholder="https://instagram.com/..."
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Telegram</label>
+                        <input
+                          type="url"
+                          value={profileData.socialMedia?.telegram || ''}
+                          onChange={(e) => setProfileData({
+                            ...profileData,
+                            socialMedia: { ...profileData.socialMedia, telegram: e.target.value }
+                          })}
+                          placeholder="https://t.me/..."
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex space-x-4">
+                      {profileData.socialMedia?.whatsapp && (
+                        <button
+                          onClick={() => openWhatsApp(profileData.socialMedia.whatsapp)}
+                          className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                        >
+                          <span>📱</span>
+                          <span>WhatsApp</span>
+                        </button>
+                      )}
+                      {profileData.socialMedia?.facebook && (
+                        <a
+                          href={profileData.socialMedia.facebook}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <span>📘</span>
+                          <span>Facebook</span>
+                        </a>
+                      )}
+                      {profileData.socialMedia?.instagram && (
+                        <a
+                          href={profileData.socialMedia.instagram}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600 transition-colors"
+                        >
+                          <span>📷</span>
+                          <span>Instagram</span>
+                        </a>
+                      )}
+                      {profileData.socialMedia?.telegram && (
+                        <a
+                          href={profileData.socialMedia.telegram}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                        >
+                          <span>✈️</span>
+                          <span>Telegram</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {isEditing && (
+                  <div className="pt-6">
+                    <button
+                      type="submit"
+                      className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      Sauvegarder les Modifications
+                    </button>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-lg p-6 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm opacity-90">Note Moyenne</p>
+                    <p className="text-3xl font-bold">{profileData.rating} ⭐</p>
+                    <p className="text-sm opacity-75">Très bon vendeur</p>
+                  </div>
+                  <div className="text-4xl">📊</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-green-400 to-green-600 text-white rounded-lg p-6 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm opacity-90">Total Ventes</p>
+                    <p className="text-3xl font-bold">{profileData.totalSales}</p>
+                    <p className="text-sm opacity-75">Commandes livrées</p>
+                  </div>
+                  <div className="text-4xl">📦</div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-purple-400 to-purple-600 text-white rounded-lg p-6 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm opacity-90">Membre Depuis</p>
+                    <p className="text-2xl font-bold">
+                      {new Date(profileData.joinDate).toLocaleDateString('fr-FR', { 
+                        year: 'numeric', 
+                        month: 'short' 
+                      })}
+                    </p>
+                    <p className="text-sm opacity-75">Vendeur actif</p>
+                  </div>
+                  <div className="text-4xl">🕐</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <Footer language={language} />
+    </div>
+  );
+};
+
+export default SellerProfile;

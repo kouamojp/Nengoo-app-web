@@ -1,0 +1,76 @@
+{
+  "name": "nengoo-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nengoo - Marketplace camerounaise mobile",
+  "author": "Nengoo Team",
+  "homepage": "https://nengoo.com",
+  "dependencies": {
+    "axios": "^1.8.4",
+    "cra-template": "1.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.5.1",
+    "react-scripts": "5.0.1"
+  },
+  "scripts": {
+    "start": "craco start",
+    "build": "craco build && npm run build:mobile",
+    "build:mobile": "npx cap copy && npx cap open ios && npx cap open android",
+    "build:pwa": "craco build",
+    "test": "craco test",
+    "eject": "react-scripts eject",
+    "cap:init": "npx cap init",
+    "cap:add:ios": "npx cap add ios",
+    "cap:add:android": "npx cap add android", 
+    "cap:sync": "npx cap sync",
+    "cap:copy": "npx cap copy",
+    "cap:run:ios": "npx cap run ios",
+    "cap:run:android": "npx cap run android",
+    "cap:open:ios": "npx cap open ios",
+    "cap:open:android": "npx cap open android",
+    "deploy:ios": "npm run build && npx cap copy ios && npx cap open ios",
+    "deploy:android": "npm run build && npx cap copy android && npx cap open android"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all",
+      "iOS >= 11",
+      "Android >= 7"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version",
+      "iOS >= 11",
+      "Android >= 7"
+    ]
+  },
+  "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
+    "@capacitor/push-notifications": "^6.0.0",
+    "@capacitor/splash-screen": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0",
+    "@craco/craco": "^7.1.0",
+    "@eslint/js": "9.23.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "9.23.0",
+    "eslint-plugin-import": "2.31.0",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react": "7.37.4",
+    "globals": "15.15.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "workbox-webpack-plugin": "^7.0.0"
+  },
+  "capacitor": {
+    "appId": "com.nengoo.cameroon",
+    "appName": "Nengoo"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}
