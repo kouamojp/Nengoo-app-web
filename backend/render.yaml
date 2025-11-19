@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: nengoo-backend
+    runtime: python
+    plan: free  # Changez en 'starter' ou autre plan si nécessaire
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URL
+        sync: false  # Vous devrez définir cette variable dans le dashboard Render
+      - key: DB_NAME
+        value: nengoo
+      - key: JWT_SECRET_KEY
+        generateValue: true  # Render générera automatiquement une clé sécurisée
+      - key: ENVIRONMENT
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.12.3

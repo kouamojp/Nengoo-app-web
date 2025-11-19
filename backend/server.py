@@ -20,10 +20,12 @@ import uuid
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+# MongoDB connection - Support both local and production environments
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
+db_name = os.environ.get('DB_NAME', 'nengoo')
+
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[db_name]
 
 # Create uploads directory if it doesn't exist
 UPLOAD_DIR = ROOT_DIR / "uploads" / "products"
