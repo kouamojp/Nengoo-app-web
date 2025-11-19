@@ -26,7 +26,7 @@ export const About = (props) => {
               <img
                 src="https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg"
                 alt="About Nengoo"
-                className="rounded-lg shadow-lg"
+                className="rounded-lg shadow-lg h-80 w-full object-cover object-bottom"
               />
             </div>
             <div>

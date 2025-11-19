@@ -157,7 +157,7 @@ export const ProductDetail = (props) => {
                 <img
                   src={images[selectedImage]}
                   alt={product.name[language]}
-                  className="w-full h-96 object-cover rounded-lg"
+                  className="w-full h-96 md:h-[38.75rem] object-cover rounded-lg"
                 />
               </div>
               {images.length > 1 && (
@@ -279,7 +279,7 @@ export const ProductDetail = (props) => {
                       )}
 
                       {/* WhatsApp Contact */}
-                      {product.seller.whatsapp && (
+                      {/* {product.seller.whatsapp && (
                         <div className="flex space-x-3 mt-3">
                           <button
                             onClick={() => openWhatsApp(product.seller.whatsapp)}
@@ -290,7 +290,7 @@ export const ProductDetail = (props) => {
                             <span>Contacter sur WhatsApp</span>
                           </button>
                         </div>
-                      )}
+                      )} */}
                     </div>
                   </div>
                 </div>
