@@ -13,7 +13,7 @@ const Footer = ({ language }) => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Company Info */}
           <div>
-            <div className="flex items-center space-x-3 mb-4">
+            <div className="flex items-center space-x-3 mb-4 max-md:justify-center">
               <div className="bg-purple-600 rounded-lg p-2">
                 <span className="text-2xl font-bold">🛍️</span>
               </div>
@@ -22,10 +22,10 @@ const Footer = ({ language }) => {
                 <p className="text-sm opacity-75">nengoo.com</p>
               </div>
             </div>
-            <p className="text-gray-300 mb-4">
+            <p className="text-gray-300 mb-4 md:text-left">
               {t.footerText}
             </p>
-            <div className="flex space-x-4">
+            <div className="flex space-x-4 max-md:justify-center">
               <a href="#" className="text-2xl hover:text-purple-400 transition-colors">📘</a>
               <a href="#" className="text-2xl hover:text-purple-400 transition-colors">📧</a>
               <a href="#" className="text-2xl hover:text-purple-400 transition-colors">📷</a>

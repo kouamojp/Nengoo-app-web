@@ -157,7 +157,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
       </div>
 
       {/* Categories Navigation - Desktop */}
-      <nav className="hidden md:block bg-purple-600 border-t border-purple-500">
+      {/* <nav className="hidden md:block bg-purple-600 border-t border-purple-500">
         <div className="container mx-auto px-4">
           <div className="flex space-x-6 overflow-x-auto py-3">
             {categories.map(cat => (
@@ -172,7 +172,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
             ))}
           </div>
         </div>
-      </nav>
+      </nav> */}
 
       {/* Mobile Menu */}
       {showMobileMenu && (
