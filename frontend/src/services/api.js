@@ -112,6 +112,20 @@ export const createSellerByAdmin = async (sellerData) => {
   });
 };
 
+export const updateSellerByAdmin = async (sellerId, sellerData) => {
+  return apiCall(`/admin/sellers/${sellerId}`, {
+    method: 'PUT',
+    body: JSON.stringify(sellerData),
+  });
+};
+
+export const updateSellerPasswordByAdmin = async (sellerId, password) => {
+  return apiCall(`/admin/sellers/${sellerId}/password`, {
+    method: 'PUT',
+    body: JSON.stringify({ password }),
+  });
+};
+
 export const getAllBuyers = async () => {
   return apiCall('/admin/buyers');
 };
@@ -119,6 +133,20 @@ export const getAllBuyers = async () => {
 export const deleteBuyer = async (buyerId) => {
   return apiCall(`/admin/buyers/${buyerId}`, {
     method: 'DELETE',
+  });
+};
+
+export const updateBuyerByAdmin = async (buyerId, buyerData) => {
+  return apiCall(`/admin/buyers/${buyerId}`, {
+    method: 'PUT',
+    body: JSON.stringify(buyerData),
+  });
+};
+
+export const updateBuyerPasswordByAdmin = async (buyerId, password) => {
+  return apiCall(`/admin/buyers/${buyerId}/password`, {
+    method: 'PUT',
+    body: JSON.stringify({ password }),
   });
 };
 

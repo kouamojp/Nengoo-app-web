@@ -142,6 +142,26 @@ class ProductUpdate(BaseModel):
     status: Optional[str] = None
 
 
+class AdminSellerUpdate(BaseModel):
+    whatsapp: Optional[str] = None
+    name: Optional[str] = None
+    businessName: Optional[str] = None
+    email: Optional[EmailStr] = None
+    city: Optional[str] = None
+    categories: Optional[List[str]] = None
+    status: Optional[str] = None
+
+
+class AdminBuyerUpdate(BaseModel):
+    whatsapp: Optional[str] = None
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
+class AdminPasswordUpdate(BaseModel):
+    password: str
+
+
 # ==================== HELPER FUNCTIONS ====================
 
 def validate_password(password: str) -> None:
@@ -161,25 +181,52 @@ def validate_password(password: str) -> None:
             detail="Le mot de passe ne peut pas dépasser 1000 caractères"
         )
 
+def sha256_preprocess(password: str) -> str:
+    """
+    Pre-hashes a password with SHA-256 and encodes it to avoid bcrypt's 72-byte limit.
+    """
+    password_bytes = password.encode('utf-8')
+    sha256_hash = hashlib.sha256(password_bytes).digest()
+    # Use base64 encoding to get a predictable, URL-safe string.
+    return base64.urlsafe_b64encode(sha256_hash).decode('ascii')
+
+
 def hash_password(password: str) -> str:
     """
-    Hash a password using bcrypt, truncating to 72 bytes.
+    Hashes a password using SHA-256 pre-processing followed by bcrypt.
+    This approach avoids bcrypt's 72-byte limit.
     """
     validate_password(password)
+    pre_hashed_password = sha256_preprocess(password)
+    return pwd_context.hash(pre_hashed_password)
 
-    # Truncate password to 72 bytes to avoid bcrypt error
-    password_bytes = password.encode('utf-8')[:72]
-    
-    return pwd_context.hash(password_bytes)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verify a password against a bcrypt hash, truncating to 72 bytes.
+    Verifies a password against a hash.
+    It first attempts to verify using the new SHA-256 + bcrypt method.
+    If that fails, it falls back to the old, direct bcrypt method for backward
+    compatibility with old passwords.
     """
-    # Truncate password to 72 bytes before verification
-    password_bytes = plain_password.encode('utf-8')[:72]
+    # 1. Try the new method (SHA-256 pre-hash + bcrypt)
+    pre_hashed_password = sha256_preprocess(plain_password)
+    try:
+        # Passlib's verify automatically handles matching the hash scheme.
+        # If the new method works, we're done.
+        if pwd_context.verify(pre_hashed_password, hashed_password):
+            return True
+    except Exception:
+        # This exception could be due to a malformed hash or, more likely,
+        # a hash from the old method. We'll fall through to the legacy check.
+        pass
 
-    return pwd_context.verify(password_bytes, hashed_password)
+    # 2. Fallback for legacy passwords (direct bcrypt with flawed truncation)
+    try:
+        password_bytes_legacy = plain_password.encode('utf-8')[:72]
+        return pwd_context.verify(password_bytes_legacy, hashed_password)
+    except Exception:
+        # If both new and legacy verification fail, the password is incorrect.
+        return False
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -303,11 +350,18 @@ async def login(login_data: LoginRequest):
     # Find user
     user = await collection.find_one({"whatsapp": login_data.whatsapp})
 
-    if not user:
+    if not user or "password" not in user or not user["password"]:
         raise HTTPException(status_code=401, detail="Numéro WhatsApp ou mot de passe incorrect")
 
     # Verify password
-    if not verify_password(login_data.password, user["password"]):
+    try:
+        is_valid_password = verify_password(login_data.password, user["password"])
+    except Exception as e:
+        logger.error(f"Erreur inattendue lors de la vérification du mot de passe pour {login_data.whatsapp}: {str(e)}")
+        # Return a generic error to avoid leaking implementation details
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur lors de l'authentification.")
+
+    if not is_valid_password:
         raise HTTPException(status_code=401, detail="Numéro WhatsApp ou mot de passe incorrect")
 
     # Check if seller is approved
@@ -455,6 +509,119 @@ async def delete_buyer(buyer_id: str, current_user: dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Client non trouvé")
 
     return {"message": "Client supprimé avec succès"}
+
+
+@api_router.put("/admin/sellers/{seller_id}", response_model=dict)
+async def update_seller_by_admin(seller_id: str, seller_data: AdminSellerUpdate, current_user: dict = Depends(get_current_user)):
+    if current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    update_data = seller_data.dict(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+
+    # Check for uniqueness constraints if whatsapp or email are being updated
+    if "whatsapp" in update_data:
+        existing = await db.sellers.find_one({"whatsapp": update_data["whatsapp"], "_id": {"$ne": ObjectId(seller_id)}})
+        if existing:
+            raise HTTPException(status_code=400, detail="Ce numéro WhatsApp est déjà utilisé par un autre vendeur.")
+    
+    if "email" in update_data:
+        existing = await db.sellers.find_one({"email": update_data["email"], "_id": {"$ne": ObjectId(seller_id)}})
+        if existing:
+            raise HTTPException(status_code=400, detail="Cet email est déjà utilisé par un autre vendeur.")
+
+    update_data["updatedDate"] = datetime.now(timezone.utc).isoformat()
+
+    result = await db.sellers.update_one(
+        {"_id": ObjectId(seller_id)},
+        {"$set": update_data}
+    )
+
+    if result.modified_count == 0:
+        seller_exists = await db.sellers.find_one({"_id": ObjectId(seller_id)})
+        if not seller_exists:
+            raise HTTPException(status_code=404, detail="Vendeur non trouvé")
+        return {"message": "Aucune modification détectée."}
+
+    return {"message": "Vendeur mis à jour avec succès"}
+
+
+@api_router.put("/admin/buyers/{buyer_id}", response_model=dict)
+async def update_buyer_by_admin(buyer_id: str, buyer_data: AdminBuyerUpdate, current_user: dict = Depends(get_current_user)):
+    if current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    update_data = buyer_data.dict(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+
+    # Check for uniqueness constraints if whatsapp or email are being updated
+    if "whatsapp" in update_data:
+        existing = await db.buyers.find_one({"whatsapp": update_data["whatsapp"], "_id": {"$ne": ObjectId(buyer_id)}})
+        if existing:
+            raise HTTPException(status_code=400, detail="Ce numéro WhatsApp est déjà utilisé par un autre client.")
+
+    if "email" in update_data:
+        existing = await db.buyers.find_one({"email": update_data["email"], "_id": {"$ne": ObjectId(buyer_id)}})
+        if existing:
+            raise HTTPException(status_code=400, detail="Cet email est déjà utilisé par un autre client.")
+
+    update_data["updatedDate"] = datetime.now(timezone.utc).isoformat()
+
+    result = await db.buyers.update_one(
+        {"_id": ObjectId(buyer_id)},
+        {"$set": update_data}
+    )
+
+    if result.modified_count == 0:
+        buyer_exists = await db.buyers.find_one({"_id": ObjectId(buyer_id)})
+        if not buyer_exists:
+            raise HTTPException(status_code=404, detail="Client non trouvé")
+        return {"message": "Aucune modification détectée."}
+
+    return {"message": "Client mis à jour avec succès"}
+
+
+@api_router.put("/admin/sellers/{seller_id}/password", response_model=dict)
+async def update_seller_password_by_admin(seller_id: str, data: AdminPasswordUpdate, current_user: dict = Depends(get_current_user)):
+    if current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    validate_password(data.password)
+    hashed_password = hash_password(data.password)
+
+    result = await db.sellers.update_one(
+        {"_id": ObjectId(seller_id)},
+        {"$set": {"password": hashed_password, "updatedDate": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    if result.modified_count == 0:
+        # This also handles the case where the seller is not found
+        raise HTTPException(status_code=404, detail="Vendeur non trouvé ou le mot de passe est identique.")
+
+    return {"message": "Mot de passe du vendeur mis à jour avec succès"}
+
+
+@api_router.put("/admin/buyers/{buyer_id}/password", response_model=dict)
+async def update_buyer_password_by_admin(buyer_id: str, data: AdminPasswordUpdate, current_user: dict = Depends(get_current_user)):
+    if current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    validate_password(data.password)
+    hashed_password = hash_password(data.password)
+
+    result = await db.buyers.update_one(
+        {"_id": ObjectId(buyer_id)},
+        {"$set": {"password": hashed_password, "updatedDate": datetime.now(timezone.utc).isoformat()}}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Client non trouvé ou le mot de passe est identique.")
+
+    return {"message": "Mot de passe du client mis à jour avec succès"}
 
 
 @api_router.delete("/admin/sellers/{seller_id}")
