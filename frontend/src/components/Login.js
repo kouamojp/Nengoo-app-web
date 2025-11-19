@@ -25,7 +25,7 @@ export const Login = (props) => {
 
             <div className="space-y-4">
               <Link
-                to="/signup/buyer"
+                to="/login/buyer"
                 className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-lg font-semibold text-center block hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-center justify-center space-x-3">
@@ -38,7 +38,7 @@ export const Login = (props) => {
               </Link>
 
               <Link
-                to="/signup/seller"
+                to="/login/seller"
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white py-4 px-6 rounded-lg font-semibold text-center block hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-center justify-center space-x-3">
@@ -49,6 +49,25 @@ export const Login = (props) => {
                   </div>
                 </div>
               </Link>
+            </div>
+
+            <div className="mt-6 text-center">
+              <p className="text-gray-600 text-sm mb-3">Pas encore de compte ?</p>
+              <div className="flex gap-3 justify-center">
+                <Link
+                  to="/signup/buyer"
+                  className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                >
+                  S'inscrire comme acheteur
+                </Link>
+                <span className="text-gray-400">•</span>
+                <Link
+                  to="/signup/seller"
+                  className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                >
+                  Devenir vendeur
+                </Link>
+              </div>
             </div>
 
             <div className="text-center mt-8">

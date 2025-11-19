@@ -17,6 +17,8 @@ import SellerAnalytics from './components/SellerAnalytics';
 import SellerProfile from './components/SellerProfile';
 import SellerMessages from './components/SellerMessages';
 import Login from './components/Login';
+import BuyerLogin from './components/BuyerLogin';
+import SellerLogin from './components/SellerLogin';
 import BuyerSignup from './components/BuyerSignup';
 import SellerSignup from './components/SellerSignup';
 import PendingApproval from './components/PendingApproval';
@@ -131,6 +133,8 @@ function App() {
           
           {/* Authentication Routes */}
           <Route path="/login" element={<Login {...appProps} />} />
+          <Route path="/login/buyer" element={<BuyerLogin {...appProps} />} />
+          <Route path="/login/seller" element={<SellerLogin {...appProps} />} />
           <Route path="/signup/buyer" element={<BuyerSignup {...appProps} />} />
           <Route path="/signup/seller" element={<SellerSignup {...appProps} />} />
           <Route path="/pending-approval" element={<PendingApproval {...appProps} />} />
