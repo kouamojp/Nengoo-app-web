@@ -10,7 +10,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
+import bcrypt
 import jwt
 from bson import ObjectId
 import shutil
@@ -21,6 +21,13 @@ import base64
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Configure logging early
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # MongoDB connection - Support both local and production environments
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/')
@@ -34,7 +41,7 @@ UPLOAD_DIR = ROOT_DIR / "uploads" / "products"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto") # Removed due to bcrypt compatibility issues
 
 # JWT settings
 SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your-secret-key-change-this-in-production")
@@ -198,7 +205,10 @@ def hash_password(password: str) -> str:
     """
     validate_password(password)
     pre_hashed_password = sha256_preprocess(password)
-    return pwd_context.hash(pre_hashed_password)
+    password_bytes = pre_hashed_password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed_bytes = bcrypt.hashpw(password_bytes, salt)
+    return hashed_bytes.decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -208,24 +218,22 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     If that fails, it falls back to the old, direct bcrypt method for backward
     compatibility with old passwords.
     """
-    # 1. Try the new method (SHA-256 pre-hash + bcrypt)
-    pre_hashed_password = sha256_preprocess(plain_password)
     try:
-        # Passlib's verify automatically handles matching the hash scheme.
-        # If the new method works, we're done.
-        if pwd_context.verify(pre_hashed_password, hashed_password):
+        # 1. Try the new method (SHA-256 pre-hash + bcrypt)
+        pre_hashed_plain = sha256_preprocess(plain_password)
+        plain_bytes = pre_hashed_plain.encode('utf-8')
+        hashed_bytes = hashed_password.encode('utf-8')
+        if bcrypt.checkpw(plain_bytes, hashed_bytes):
             return True
-    except Exception:
-        # This exception could be due to a malformed hash or, more likely,
-        # a hash from the old method. We'll fall through to the legacy check.
-        pass
+    except (ValueError, TypeError):
+        pass  # Fall through to legacy check
 
-    # 2. Fallback for legacy passwords (direct bcrypt with flawed truncation)
     try:
-        password_bytes_legacy = plain_password.encode('utf-8')[:72]
-        return pwd_context.verify(password_bytes_legacy, hashed_password)
-    except Exception:
-        # If both new and legacy verification fail, the password is incorrect.
+        # 2. Fallback for legacy passwords (direct bcrypt with flawed truncation)
+        legacy_plain_bytes = plain_password.encode('utf-8')[:72]
+        hashed_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(legacy_plain_bytes, hashed_bytes)
+    except (ValueError, TypeError):
         return False
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -380,6 +388,7 @@ async def login(login_data: LoginRequest):
     # Prepare user response
     user_dict = convert_objectid_to_str(user)
     del user_dict["password"]
+    user_dict["type"] = login_data.userType
 
     return {
         "access_token": access_token,
@@ -1349,13 +1358,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
