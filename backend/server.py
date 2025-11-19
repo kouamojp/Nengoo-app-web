@@ -163,40 +163,23 @@ def validate_password(password: str) -> None:
 
 def hash_password(password: str) -> str:
     """
-    Hash a password using SHA-256 preprocessing + bcrypt.
-
-    This approach:
-    1. First hashes the password with SHA-256 to get a fixed 32-byte output
-    2. Encodes it in base64 to ensure it's bcrypt-compatible
-    3. Then applies bcrypt for secure password storage
-
-    Benefits:
-    - Accepts passwords of any length (no 72-byte bcrypt limit)
-    - Maintains bcrypt security (slow hashing, salting)
-    - Deterministic: same password always produces same SHA-256 hash
+    Hash a password using bcrypt, truncating to 72 bytes.
     """
     validate_password(password)
 
-    # Step 1: SHA-256 hash the password to get fixed 32 bytes
-    sha256_hash = hashlib.sha256(password.encode('utf-8')).digest()
-
-    # Step 2: Encode to base64 for bcrypt compatibility (bcrypt expects string)
-    # base64 encoding of 32 bytes = 44 characters (well under 72 byte limit)
-    password_hash_b64 = base64.b64encode(sha256_hash).decode('utf-8')
-
-    # Step 3: Apply bcrypt to the SHA-256 hash
-    return pwd_context.hash(password_hash_b64)
+    # Truncate password to 72 bytes to avoid bcrypt error
+    password_bytes = password.encode('utf-8')[:72]
+    
+    return pwd_context.hash(password_bytes)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verify a password against a bcrypt hash.
-    Uses the same SHA-256 preprocessing as hash_password.
+    Verify a password against a bcrypt hash, truncating to 72 bytes.
     """
-    # Apply same SHA-256 preprocessing
-    sha256_hash = hashlib.sha256(plain_password.encode('utf-8')).digest()
-    password_hash_b64 = base64.b64encode(sha256_hash).decode('utf-8')
+    # Truncate password to 72 bytes before verification
+    password_bytes = plain_password.encode('utf-8')[:72]
 
-    return pwd_context.verify(password_hash_b64, hashed_password)
+    return pwd_context.verify(password_bytes, hashed_password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
