@@ -142,7 +142,24 @@ class ProductUpdate(BaseModel):
 
 # ==================== HELPER FUNCTIONS ====================
 
+def validate_password(password: str) -> None:
+    """
+    Validate password meets security requirements.
+    bcrypt has a maximum password length of 72 bytes.
+    """
+    if len(password.encode('utf-8')) > 72:
+        raise HTTPException(
+            status_code=400,
+            detail="Le mot de passe ne peut pas dépasser 72 caractères (bytes)"
+        )
+    if len(password) < 6:
+        raise HTTPException(
+            status_code=400,
+            detail="Le mot de passe doit contenir au moins 6 caractères"
+        )
+
 def hash_password(password: str) -> str:
+    validate_password(password)
     return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

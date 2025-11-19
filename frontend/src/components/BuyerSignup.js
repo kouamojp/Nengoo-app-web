@@ -37,6 +37,11 @@ export const BuyerSignup = (props) => {
         setPasswordError('Le mot de passe doit contenir au moins 6 caractères');
         return false;
       }
+      // bcrypt limit: 72 bytes
+      if (new Blob([formData.password]).size > 72) {
+        setPasswordError('Le mot de passe ne peut pas dépasser 72 caractères (bytes)');
+        return false;
+      }
       if (formData.password !== formData.confirmPassword) {
         setPasswordError('Les mots de passe ne correspondent pas');
         return false;
