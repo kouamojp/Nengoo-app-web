@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import AdminSidebar from './AdminSidebar';
-import { getAllBuyers, getAllSellers, getPendingSellers } from '../services/api';
+import { getAllBuyers, getAllSellers, getPendingSellers, getAllProducts, getAllOrders } from '../services/api';
 
 export const AdminDashboard = (props) => {
   const { setUser } = props;
@@ -21,10 +21,12 @@ export const AdminDashboard = (props) => {
 
   const loadStats = async () => {
     try {
-      const [buyers, sellers, pending] = await Promise.all([
+      const [buyers, sellers, pending, products, orders] = await Promise.all([
         getAllBuyers(),
         getAllSellers(),
-        getPendingSellers()
+        getPendingSellers(),
+        getAllProducts(),
+        getAllOrders()
       ]);
 
       const approvedSellers = sellers.filter(s => s.status === 'approved').length;
@@ -34,8 +36,8 @@ export const AdminDashboard = (props) => {
         totalSellers: sellers.length,
         pendingSellers: pending.length,
         approvedSellers: approvedSellers,
-        totalProducts: 0, // TODO: Implement products count
-        totalOrders: 0 // TODO: Implement orders count
+        totalProducts: products.length,
+        totalOrders: orders.length
       });
     } catch (error) {
       console.error('Error loading stats:', error);

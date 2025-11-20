@@ -161,8 +161,22 @@ export const AdminOrders = (props) => {
                 {filteredOrders.map(order => (
                   <div key={order.id} className="bg-white rounded-lg shadow-lg p-6">
                     {/* Order Header */}
-                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
-                      <div className="flex-1">
+                    <div className="flex flex-col justify-between items-start lg:items-center mb-6 space-y-4 lg:space-y-0">
+                      <div className="flex space-x-2">
+                        <select
+                          value={order.status}
+                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="pending">En attente</option>
+                          <option value="confirmed">Confirmée</option>
+                          <option value="shipped">Expédiée</option>
+                          <option value="delivered">Livrée</option>
+                          <option value="cancelled">Annulée</option>
+                        </select>
+                      </div>
+
+                      <div className="flex-1 w-full">
                         <div className="flex items-center space-x-4 mb-3">
                           <h3 className="text-lg font-bold">Commande #{order.id.slice(-6)}</h3>
                           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
@@ -184,26 +198,39 @@ export const AdminOrders = (props) => {
                           )}
                         </div>
 
+                        {/* Sellers Summary */}
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-3">
+                          <h4 className="font-semibold text-purple-900 mb-2">🏪 Vendeurs impliqués ({
+                            [...new Set(order.items.map(item => item.sellerName).filter(name => name))].length
+                          })</h4>
+                          <div className="space-y-2 text-sm">
+                            {[...new Set(order.items.map(item => JSON.stringify({
+                              name: item.sellerName,
+                              businessName: item.sellerBusinessName,
+                              whatsapp: item.sellerWhatsapp
+                            })))].map((sellerStr, idx) => {
+                              const seller = JSON.parse(sellerStr);
+                              return (
+                                <div key={idx} className="flex items-center gap-4 p-2 bg-white rounded border border-purple-100">
+                                  <div className="flex-1">
+                                    <div className="font-medium text-purple-900">{seller.name || 'N/A'}</div>
+                                    <div className="text-xs text-gray-600">{seller.businessName || 'N/A'}</div>
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="font-medium">📱</span> {seller.whatsapp || 'N/A'}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
                         <div className="flex items-center space-x-6 text-sm text-gray-600">
                           <span>📅 {new Date(order.createdDate).toLocaleDateString('fr-FR')}</span>
                           <span className="font-semibold text-green-600">
                             {formatPrice(order.total)}
                           </span>
                         </div>
-                      </div>
-
-                      <div className="flex space-x-2">
-                        <select
-                          value={order.status}
-                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="pending">En attente</option>
-                          <option value="confirmed">Confirmée</option>
-                          <option value="shipped">Expédiée</option>
-                          <option value="delivered">Livrée</option>
-                          <option value="cancelled">Annulée</option>
-                        </select>
                       </div>
                     </div>
 

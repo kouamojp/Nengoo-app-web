@@ -215,6 +215,12 @@ export const deleteProduct = async (productId) => {
   });
 };
 
+// ==================== ORDERS APIs ====================
+
+export const getAllOrders = async () => {
+  return apiCall('/admin/orders');
+};
+
 // ==================== SELLER PRODUCTS APIs ====================
 
 export const getSellerOwnProducts = async () => {
@@ -331,6 +337,7 @@ export default {
   createProduct,
   updateProduct,
   deleteProduct,
+  getAllOrders,
   uploadProductImage,
   deleteProductImage,
   getSellerOwnProducts,
