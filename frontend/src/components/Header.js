@@ -1,35 +1,35 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { translations } from './common';
+import { getPublicCategories } from '../services/api';
 
 // Header Component
 const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQuery, user, setUser }) => {
   const navigate = useNavigate();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [categories, setCategories] = useState([]);
   const t = translations[language];
-  
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      const data = await getPublicCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
-
-  const categories = [
-    { key: 'clothing_accessories', icon: '👗' },
-    { key: 'food_drinks', icon: '🍽️' },
-    { key: 'electronics', icon: '📱' },
-    { key: 'home_garden', icon: '🏠' },
-    { key: 'handicrafts', icon: '🎨' },
-    { key: 'beauty_care', icon: '💄' },
-    { key: 'sports_articles', icon: '⚽' },
-    { key: 'toys', icon: '🧸' },
-    { key: 'medical_equipment', icon: '🏥' },
-    { key: 'professional_equipment', icon: '🔧' },
-    { key: 'services', icon: '🛠️' },
-    { key: 'travel_tickets', icon: '✈️' }
-  ];
 
   return (
     <header className="bg-gradient-to-r from-purple-700 to-red-600 text-white shadow-lg sticky top-0 z-50">
@@ -162,12 +162,13 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
           <div className="flex space-x-6 overflow-x-auto py-3">
             {categories.map(cat => (
               <Link
-                key={cat.key}
-                to={`/catalog/${cat.key}`}
+                key={cat.id}
+                to={`/catalog`}
+                state={{ category: cat.name }}
                 className="flex items-center space-x-2 hover:text-yellow-300 transition-colors whitespace-nowrap"
               >
-                <span className="text-lg">{cat.icon}</span>
-                <span className="font-medium">{t[cat.key]}</span>
+                <span className="text-lg">{cat.icon || '📦'}</span>
+                <span className="font-medium">{cat.name}</span>
               </Link>
             ))}
           </div>
@@ -180,16 +181,17 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
           <div className="container mx-auto px-4 py-4">
             {/* Mobile Categories */}
             <div className="space-y-3 mb-6">
-              <h3 className="font-bold text-yellow-300">Catégories</h3>
+              <h3 className="font-bold text-yellow-300 text-left">Catégories</h3>
               {categories.map(cat => (
                 <Link
-                  key={cat.key}
-                  to={`/catalog/${cat.key}`}
+                  key={cat.id}
+                  to={`/catalog`}
+                  state={{ category: cat.name }}
                   onClick={() => setShowMobileMenu(false)}
                   className="flex items-center space-x-3 py-2 hover:text-yellow-300 transition-colors"
                 >
-                  <span className="text-xl">{cat.icon}</span>
-                  <span>{t[cat.key]}</span>
+                  <span className="text-xl">{cat.icon || '📦'}</span>
+                  <span>{cat.name}</span>
                 </Link>
               ))}
             </div>
