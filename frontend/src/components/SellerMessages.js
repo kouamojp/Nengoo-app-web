@@ -1,31 +1,58 @@
 
-import React, { useState } from 'react';
-import { mockSellerData } from './common';
+import React, { useState, useEffect } from 'react';
 import Header from './Header';
 import Footer from './Footer';
 import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
+import { getSellerMessages, markMessageAsRead, replyToMessage } from '../services/api';
 
 // Seller Messages Component
 export const SellerMessages = (props) => {
   const { language } = props;
-  const [messages, setMessages] = useState(mockSellerData.messages);
+  const [messages, setMessages] = useState([]);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [reply, setReply] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const markAsRead = (messageId) => {
-    setMessages(messages.map(msg => 
-      msg.id === messageId ? { ...msg, read: true } : msg
-    ));
+  useEffect(() => {
+    loadMessages();
+  }, []);
+
+  const loadMessages = async () => {
+    try {
+      const data = await getSellerMessages();
+      setMessages(data);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const sendReply = (e) => {
+  const markAsRead = async (messageId) => {
+    try {
+      await markMessageAsRead(messageId);
+      setMessages(messages.map(msg =>
+        msg.id === messageId ? { ...msg, read: true } : msg
+      ));
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  };
+
+  const sendReply = async (e) => {
     e.preventDefault();
     if (reply.trim() && selectedMessage) {
-      // Mock sending reply
-      alert('Réponse envoyée avec succès!');
-      setReply('');
-      setSelectedMessage(null);
+      try {
+        await replyToMessage(selectedMessage.id, { message: reply });
+        alert('Réponse envoyée avec succès!');
+        setReply('');
+        setSelectedMessage(null);
+        loadMessages(); // Reload messages
+      } catch (error) {
+        console.error('Error sending reply:', error);
+        alert('Erreur lors de l\'envoi de la réponse');
+      }
     }
   };
 
@@ -63,9 +90,17 @@ export const SellerMessages = (props) => {
               </div>
             </div>
 
-            {/* Messages List */}
-            <div className="space-y-4">
-              {messages.map(message => (
+            {/* Loading State */}
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="text-4xl mb-4">⏳</div>
+                <p className="text-gray-600">Chargement des messages...</p>
+              </div>
+            ) : (
+              <>
+                {/* Messages List */}
+                <div className="space-y-4">
+                  {messages.map(message => (
                 <div 
                   key={message.id} 
                   className={`bg-white rounded-lg shadow-lg p-6 cursor-pointer transition-all hover:shadow-xl ${
@@ -79,15 +114,17 @@ export const SellerMessages = (props) => {
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
-                        {message.from.split(' ').map(name => name[0]).join('')}
+                        {message.senderName.split(' ').map(name => name[0]).join('')}
                       </div>
                       <div>
-                        <h3 className="font-bold text-lg">{message.from}</h3>
+                        <h3 className="font-bold text-lg">{message.senderName}</h3>
                         <p className="text-gray-600">{message.subject}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-500">{message.date}</p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(message.createdDate).toLocaleDateString('fr-FR')}
+                      </p>
                       {!message.read && (
                         <span className="inline-block w-3 h-3 bg-red-500 rounded-full mt-2"></span>
                       )}
@@ -115,12 +152,14 @@ export const SellerMessages = (props) => {
               ))}
             </div>
 
-            {messages.length === 0 && (
-              <div className="text-center py-16">
-                <div className="text-6xl mb-4">💬</div>
-                <h3 className="text-xl font-semibold mb-2">Aucun message</h3>
-                <p className="text-gray-600">Vous n'avez pas encore reçu de messages.</p>
-              </div>
+                {messages.length === 0 && (
+                  <div className="text-center py-16">
+                    <div className="text-6xl mb-4">💬</div>
+                    <h3 className="text-xl font-semibold mb-2">Aucun message</h3>
+                    <p className="text-gray-600">Vous n'avez pas encore reçu de messages.</p>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -132,7 +171,7 @@ export const SellerMessages = (props) => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold">Répondre à {selectedMessage.from}</h3>
+                <h3 className="text-xl font-bold">Répondre à {selectedMessage.senderName}</h3>
                 <button
                   onClick={() => setSelectedMessage(null)}
                   className="text-gray-400 hover:text-gray-600 text-2xl"
@@ -147,7 +186,9 @@ export const SellerMessages = (props) => {
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
                 <p className="text-sm text-gray-600 mb-2">Message original:</p>
                 <p className="text-gray-800">{selectedMessage.message}</p>
-                <p className="text-xs text-gray-500 mt-2">{selectedMessage.date}</p>
+                <p className="text-xs text-gray-500 mt-2">
+                  {new Date(selectedMessage.createdDate).toLocaleDateString('fr-FR')}
+                </p>
               </div>
               
               <form onSubmit={sendReply}>

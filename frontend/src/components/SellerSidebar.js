@@ -9,14 +9,14 @@ const SellerSidebar = ({ currentPage, language }) => {
     { key: 'dashboard', path: '/seller', icon: '📊', label: 'Tableau de Bord' },
     { key: 'products', path: '/seller/products', icon: '📦', label: 'Produits' },
     { key: 'orders', path: '/seller/orders', icon: '📋', label: 'Commandes' },
-    { key: 'analytics', path: '/seller/analytics', icon: '📈', label: 'Analyses' },
+    /* { key: 'analytics', path: '/seller/analytics', icon: '📈', label: 'Analyses' }, */
     { key: 'messages', path: '/seller/messages', icon: '💬', label: 'Messages' },
     { key: 'profile', path: '/seller/profile', icon: '⚙️', label: 'Profil' }
   ];
 
   return (
     <div className="bg-white shadow-lg rounded-lg p-6 sticky top-24">
-      <div className="flex items-center mb-8">
+     {/*  <div className="flex items-center mb-8">
         <img
           src={mockSellerData.profile.logo}
           alt="Logo"
@@ -29,7 +29,7 @@ const SellerSidebar = ({ currentPage, language }) => {
             {mockSellerData.profile.rating}
           </div>
         </div>
-      </div>
+      </div> */}
       
       <nav className="space-y-2">
         {menuItems.map(item => (

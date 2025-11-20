@@ -247,6 +247,10 @@ export const deleteSellerProduct = async (productId) => {
   });
 };
 
+export const getSellerOrders = async () => {
+  return apiCall('/seller/orders');
+};
+
 // ==================== PUBLIC APIs (No Auth Required) ====================
 
 export const getPublicCategories = async () => {
@@ -274,6 +278,52 @@ export const getPublicProduct = async (productId) => {
 
 export const getSellerProducts = async (sellerId) => {
   return apiCall(`/sellers/${sellerId}/products`, { auth: false });
+};
+
+// ==================== MESSAGES APIs ====================
+
+export const createMessage = async (messageData) => {
+  return apiCall('/messages', {
+    method: 'POST',
+    body: JSON.stringify(messageData),
+  });
+};
+
+export const getSellerMessages = async () => {
+  return apiCall('/seller/messages');
+};
+
+export const getBuyerMessages = async () => {
+  return apiCall('/buyer/messages');
+};
+
+export const markMessageAsRead = async (messageId) => {
+  return apiCall(`/messages/${messageId}/read`, {
+    method: 'PUT',
+  });
+};
+
+export const replyToMessage = async (messageId, replyData) => {
+  return apiCall(`/messages/${messageId}/reply`, {
+    method: 'POST',
+    body: JSON.stringify(replyData),
+  });
+};
+
+// ==================== PROFILE APIs ====================
+
+export const updateSellerProfile = async (profileData) => {
+  return apiCall('/seller/profile', {
+    method: 'PUT',
+    body: JSON.stringify(profileData),
+  });
+};
+
+export const updateBuyerProfile = async (profileData) => {
+  return apiCall('/buyer/profile', {
+    method: 'PUT',
+    body: JSON.stringify(profileData),
+  });
 };
 
 // ==================== UPLOAD APIs ====================
@@ -344,8 +394,16 @@ export default {
   createProductBySeller,
   updateSellerProduct,
   deleteSellerProduct,
+  getSellerOrders,
   getPublicCategories,
   getPublicProducts,
   getPublicProduct,
   getSellerProducts,
+  createMessage,
+  getSellerMessages,
+  getBuyerMessages,
+  markMessageAsRead,
+  replyToMessage,
+  updateSellerProfile,
+  updateBuyerProfile,
 };

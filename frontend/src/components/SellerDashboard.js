@@ -1,48 +1,93 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { mockSellerData } from './common';
 import Header from './Header';
 import Footer from './Footer';
 import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
+import { getSellerOwnProducts, getSellerOrders } from '../services/api';
 
 // Seller Dashboard Component
 export const SellerDashboard = (props) => {
   const { language } = props;
-  
-  const stats = [
-    { 
-      title: "Ventes Totales", 
-      value: "1,250", 
-      icon: "💰", 
-      color: "from-green-400 to-green-600",
-      change: "+12%" 
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalOrders: 0,
+    pendingOrders: 0,
+    monthRevenue: 0,
+    activeProducts: 0
+  });
+  const [recentOrders, setRecentOrders] = useState([]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      const [products, orders] = await Promise.all([
+        getSellerOwnProducts(),
+        getSellerOrders()
+      ]);
+
+      // Calculate stats
+      const activeProducts = products.filter(p => p.status === 'active').length;
+      const pendingOrders = orders.filter(o => o.status === 'pending' || o.status === 'confirmed').length;
+
+      // Calculate monthly revenue
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthlyOrders = orders.filter(o => {
+        const orderDate = new Date(o.createdDate);
+        return orderDate >= firstDayOfMonth && (o.status === 'delivered' || o.status === 'shipped');
+      });
+      const monthRevenue = monthlyOrders.reduce((sum, order) => sum + (order.sellerTotal || 0), 0);
+
+      setStats({
+        totalOrders: orders.length,
+        pendingOrders,
+        monthRevenue,
+        activeProducts
+      });
+
+      // Get recent 5 orders
+      const sortedOrders = [...orders].sort((a, b) =>
+        new Date(b.createdDate) - new Date(a.createdDate)
+      );
+      setRecentOrders(sortedOrders.slice(0, 5));
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statsCards = [
+    {
+      title: "Commandes Totales",
+      value: stats.totalOrders,
+      icon: "💰",
+      color: "from-green-400 to-green-600"
     },
-    { 
-      title: "Commandes en Attente", 
-      value: "8", 
-      icon: "📋", 
-      color: "from-yellow-400 to-orange-500",
-      change: "+3" 
+    {
+      title: "Commandes en Attente",
+      value: stats.pendingOrders,
+      icon: "📋",
+      color: "from-yellow-400 to-orange-500"
     },
-    { 
-      title: "Revenus du Mois", 
-      value: "2,450,000 XAF", 
-      icon: "📈", 
-      color: "from-blue-400 to-blue-600",
-      change: "+18%" 
+    {
+      title: "Revenus du Mois",
+      value: `${stats.monthRevenue.toLocaleString()} XAF`,
+      icon: "📈",
+      color: "from-blue-400 to-blue-600"
     },
-    { 
-      title: "Produits Actifs", 
-      value: "24", 
-      icon: "📦", 
-      color: "from-purple-400 to-purple-600",
-      change: "+2" 
+    {
+      title: "Produits Actifs",
+      value: stats.activeProducts,
+      icon: "📦",
+      color: "from-purple-400 to-purple-600"
     }
   ];
-
-  const recentOrders = mockSellerData.orders.slice(0, 5);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -60,24 +105,26 @@ export const SellerDashboard = (props) => {
             <SellerHeader title="Tableau de Bord Vendeur" language={language} />
             
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, index) => (
-                <div key={index} className={`bg-gradient-to-r ${stat.color} text-white rounded-lg p-6 shadow-lg`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm opacity-90">{stat.title}</p>
-                      <p className="text-2xl font-bold">{stat.value}</p>
-                      <p className="text-sm mt-1">
-                        <span className="bg-white bg-opacity-20 px-2 py-1 rounded">
-                          {stat.change}
-                        </span>
-                      </p>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="text-4xl mb-4">⏳</div>
+                <p className="text-gray-600">Chargement des statistiques...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {statsCards.map((stat, index) => (
+                  <div key={index} className={`bg-gradient-to-r ${stat.color} text-white rounded-lg p-6 shadow-lg`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm opacity-90">{stat.title}</p>
+                        <p className="text-2xl font-bold">{stat.value}</p>
+                      </div>
+                      <div className="text-3xl">{stat.icon}</div>
                     </div>
-                    <div className="text-3xl">{stat.icon}</div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
             
             {/* Recent Activity */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -91,30 +138,40 @@ export const SellerDashboard = (props) => {
                 </div>
                 
                 <div className="space-y-4">
-                  {recentOrders.map(order => (
-                    <div key={order.id} className="border-l-4 border-purple-500 pl-4 py-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-semibold">{order.id}</p>
-                          <p className="text-gray-600 text-sm">{order.customer}</p>
-                          <p className="text-xs text-gray-500">{order.date}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-bold text-purple-600">
-                            {order.total.toLocaleString()} XAF
-                          </p>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {order.status === 'pending' ? '⏳ En attente' :
-                             order.status === 'shipped' ? '🚚 Expédiée' : '✅ Livrée'}
-                          </span>
+                  {recentOrders.length > 0 ? (
+                    recentOrders.map(order => (
+                      <div key={order.id} className="border-l-4 border-purple-500 pl-4 py-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold">#{order.id.slice(-6)}</p>
+                            <p className="text-gray-600 text-sm">{order.buyerName || 'Client'}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(order.createdDate).toLocaleDateString('fr-FR')}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-purple-600">
+                              {(order.sellerTotal || order.total || 0).toLocaleString()} XAF
+                            </p>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' :
+                              order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
+                              order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {order.status === 'pending' ? '⏳ En attente' :
+                               order.status === 'confirmed' ? '✅ Confirmée' :
+                               order.status === 'shipped' ? '🚚 Expédiée' :
+                               order.status === 'delivered' ? '📦 Livrée' : '❌ Annulée'}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">Aucune commande récente</p>
+                  )}
                 </div>
               </div>
               
@@ -159,7 +216,7 @@ export const SellerDashboard = (props) => {
             </div>
             
             {/* Performance Chart */}
-            <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
+           {/*  <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
               <h2 className="text-xl font-bold mb-6">Évolution des Ventes (7 derniers jours)</h2>
               <div className="h-64 bg-gradient-to-t from-purple-50 to-transparent rounded-lg flex items-end justify-around p-4">
                 {[120, 150, 80, 200, 180, 250, 300].map((value, index) => (
@@ -174,7 +231,7 @@ export const SellerDashboard = (props) => {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

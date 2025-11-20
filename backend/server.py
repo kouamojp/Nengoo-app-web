@@ -186,6 +186,50 @@ class AdminPasswordUpdate(BaseModel):
     password: str
 
 
+class SellerProfileUpdate(BaseModel):
+    """Update seller profile by the seller themselves"""
+    name: Optional[str] = None
+    businessName: Optional[str] = None
+    email: Optional[EmailStr] = None
+    whatsapp: Optional[str] = None
+    city: Optional[str] = None
+
+
+class BuyerProfileUpdate(BaseModel):
+    """Update buyer profile by the buyer themselves"""
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    whatsapp: Optional[str] = None
+
+
+class MessageCreate(BaseModel):
+    """Create a new message from buyer to seller"""
+    sellerId: str
+    subject: str
+    message: str
+
+
+class MessageReply(BaseModel):
+    """Reply to a message"""
+    message: str
+
+
+class MessageResponse(BaseModel):
+    """Message response model"""
+    id: str
+    senderId: str
+    senderName: str
+    senderType: str  # "buyer" or "seller"
+    receiverId: str
+    receiverName: str
+    sellerId: str
+    subject: str
+    message: str
+    createdDate: str
+    read: bool
+    parentMessageId: Optional[str] = None
+
+
 # ==================== HELPER FUNCTIONS ====================
 
 def validate_password(password: str) -> None:
@@ -1255,6 +1299,114 @@ async def get_seller_orders(current_user: dict = Depends(get_current_user)):
     return enriched_orders
 
 
+# ==================== PROFILE ROUTES ====================
+
+@api_router.put("/seller/profile")
+async def update_seller_profile(profile_data: SellerProfileUpdate, current_user: dict = Depends(get_current_user)):
+    """Update seller's own profile"""
+    if current_user["type"] != "seller":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # Build update dict with only provided fields
+    update_data = {}
+    if profile_data.name is not None:
+        update_data["name"] = profile_data.name
+    if profile_data.businessName is not None:
+        update_data["businessName"] = profile_data.businessName
+    if profile_data.email is not None:
+        # Check if email already exists for another seller
+        existing = await db.sellers.find_one({
+            "email": profile_data.email,
+            "_id": {"$ne": ObjectId(current_user["id"])}
+        })
+        if existing:
+            raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+        update_data["email"] = profile_data.email
+    if profile_data.whatsapp is not None:
+        # Check if whatsapp already exists for another seller
+        existing = await db.sellers.find_one({
+            "whatsapp": profile_data.whatsapp,
+            "_id": {"$ne": ObjectId(current_user["id"])}
+        })
+        if existing:
+            raise HTTPException(status_code=400, detail="Ce numéro WhatsApp est déjà utilisé")
+        update_data["whatsapp"] = profile_data.whatsapp
+    if profile_data.city is not None:
+        update_data["city"] = profile_data.city
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+
+    # Update seller
+    result = await db.sellers.update_one(
+        {"_id": ObjectId(current_user["id"])},
+        {"$set": update_data}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Vendeur non trouvé ou aucune modification")
+
+    # Return updated seller
+    updated_seller = await db.sellers.find_one({"_id": ObjectId(current_user["id"])})
+    seller_dict = convert_objectid_to_str(updated_seller)
+    if "password" in seller_dict:
+        del seller_dict["password"]
+
+    return seller_dict
+
+
+@api_router.put("/buyer/profile")
+async def update_buyer_profile(profile_data: BuyerProfileUpdate, current_user: dict = Depends(get_current_user)):
+    """Update buyer's own profile"""
+    if current_user["type"] != "buyer":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # Build update dict with only provided fields
+    update_data = {}
+    if profile_data.name is not None:
+        update_data["name"] = profile_data.name
+    if profile_data.email is not None:
+        # Check if email already exists for another buyer
+        existing = await db.buyers.find_one({
+            "email": profile_data.email,
+            "_id": {"$ne": ObjectId(current_user["id"])}
+        })
+        if existing:
+            raise HTTPException(status_code=400, detail="Cet email est déjà utilisé")
+        update_data["email"] = profile_data.email
+    if profile_data.whatsapp is not None:
+        # Check if whatsapp already exists for another buyer
+        existing = await db.buyers.find_one({
+            "whatsapp": profile_data.whatsapp,
+            "_id": {"$ne": ObjectId(current_user["id"])}
+        })
+        if existing:
+            raise HTTPException(status_code=400, detail="Ce numéro WhatsApp est déjà utilisé")
+        update_data["whatsapp"] = profile_data.whatsapp
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+
+    # Update buyer
+    result = await db.buyers.update_one(
+        {"_id": ObjectId(current_user["id"])},
+        {"$set": update_data}
+    )
+
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Acheteur non trouvé ou aucune modification")
+
+    # Return updated buyer
+    updated_buyer = await db.buyers.find_one({"_id": ObjectId(current_user["id"])})
+    buyer_dict = convert_objectid_to_str(updated_buyer)
+    if "password" in buyer_dict:
+        del buyer_dict["password"]
+
+    return buyer_dict
+
+
+# ==================== ADMIN ORDERS ROUTES ====================
+
 @api_router.get("/admin/orders")
 async def get_all_orders(current_user: dict = Depends(get_current_user)):
     """Get all orders with buyer and seller information (admin only)"""
@@ -1581,6 +1733,135 @@ async def get_seller_products(seller_id: str):
         "products": enriched_products,
         "count": len(enriched_products)
     }
+
+
+# ==================== MESSAGES ROUTES ====================
+
+@api_router.post("/messages")
+async def create_message(message_data: MessageCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new message from buyer to seller"""
+    if current_user["type"] != "buyer":
+        raise HTTPException(status_code=403, detail="Seuls les acheteurs peuvent envoyer des messages")
+
+    # Verify seller exists
+    seller = await db.sellers.find_one({"_id": ObjectId(message_data.sellerId)})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Vendeur non trouvé")
+
+    # Get sender info
+    buyer = await db.buyers.find_one({"_id": ObjectId(current_user["id"])})
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Acheteur non trouvé")
+
+    message = {
+        "senderId": current_user["id"],
+        "senderName": buyer.get("name"),
+        "senderType": "buyer",
+        "receiverId": message_data.sellerId,
+        "receiverName": seller.get("name"),
+        "sellerId": message_data.sellerId,
+        "subject": message_data.subject,
+        "message": message_data.message,
+        "createdDate": datetime.now(timezone.utc).isoformat(),
+        "read": False,
+        "parentMessageId": None
+    }
+
+    result = await db.messages.insert_one(message)
+    message["id"] = str(result.inserted_id)
+    del message["_id"]
+
+    return message
+
+
+@api_router.get("/seller/messages")
+async def get_seller_messages(current_user: dict = Depends(get_current_user)):
+    """Get all messages for current seller"""
+    if current_user["type"] != "seller":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # Find all messages where seller is the receiver
+    messages = await db.messages.find({
+        "sellerId": current_user["id"]
+    }).sort("createdDate", -1).to_list(1000)
+
+    return [convert_objectid_to_str(msg) for msg in messages]
+
+
+@api_router.get("/buyer/messages")
+async def get_buyer_messages(current_user: dict = Depends(get_current_user)):
+    """Get all messages for current buyer"""
+    if current_user["type"] != "buyer":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # Find all messages where buyer is the sender
+    messages = await db.messages.find({
+        "senderId": current_user["id"],
+        "senderType": "buyer"
+    }).sort("createdDate", -1).to_list(1000)
+
+    return [convert_objectid_to_str(msg) for msg in messages]
+
+
+@api_router.put("/messages/{message_id}/read")
+async def mark_message_as_read(message_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark a message as read"""
+    message = await db.messages.find_one({"_id": ObjectId(message_id)})
+    if not message:
+        raise HTTPException(status_code=404, detail="Message non trouvé")
+
+    # Check if user is the receiver
+    if message["receiverId"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    await db.messages.update_one(
+        {"_id": ObjectId(message_id)},
+        {"$set": {"read": True}}
+    )
+
+    return {"success": True}
+
+
+@api_router.post("/messages/{message_id}/reply")
+async def reply_to_message(message_id: str, reply_data: MessageReply, current_user: dict = Depends(get_current_user)):
+    """Reply to a message (seller to buyer)"""
+    if current_user["type"] != "seller":
+        raise HTTPException(status_code=403, detail="Seuls les vendeurs peuvent répondre aux messages")
+
+    # Get original message
+    original_message = await db.messages.find_one({"_id": ObjectId(message_id)})
+    if not original_message:
+        raise HTTPException(status_code=404, detail="Message non trouvé")
+
+    # Verify seller is the receiver of the original message
+    if original_message["receiverId"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # Get seller info
+    seller = await db.sellers.find_one({"_id": ObjectId(current_user["id"])})
+    if not seller:
+        raise HTTPException(status_code=404, detail="Vendeur non trouvé")
+
+    # Create reply message (seller to buyer)
+    reply_message = {
+        "senderId": current_user["id"],
+        "senderName": seller.get("name"),
+        "senderType": "seller",
+        "receiverId": original_message["senderId"],
+        "receiverName": original_message["senderName"],
+        "sellerId": current_user["id"],
+        "subject": f"RE: {original_message['subject']}",
+        "message": reply_data.message,
+        "createdDate": datetime.now(timezone.utc).isoformat(),
+        "read": False,
+        "parentMessageId": message_id
+    }
+
+    result = await db.messages.insert_one(reply_message)
+    reply_message["id"] = str(result.inserted_id)
+    del reply_message["_id"]
+
+    return reply_message
 
 
 # ==================== GENERAL ROUTES ====================
