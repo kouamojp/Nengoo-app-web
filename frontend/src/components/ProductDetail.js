@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { translations, mockProducts, mockSellerData, openWhatsApp, generateProductWhatsAppMessage } from './common';
+import { translations, mockProducts, mockSellerData, openWhatsApp, generateProductWhatsAppMessage, getImageUrl } from './common';
 import { getPublicProduct, getPublicProducts } from '../services/api';
 import Header from './Header';
 import Footer from './Footer';
@@ -42,10 +42,10 @@ export const ProductDetail = (props) => {
         price: productData.price,
         category: productData.category,
         images: productData.images?.map(img =>
-          `${API_BASE_URL.replace('/api', '')}${img}`
+          getImageUrl(img)
         ) || [],
         image: productData.images?.[0]
-          ? `${API_BASE_URL.replace('/api', '')}${productData.images[0]}`
+          ? getImageUrl(productData.images[0])
           : '/placeholder-product.jpg',
         rating: productData.rating || 4.5,
         reviews: productData.reviews || 0,
@@ -66,7 +66,7 @@ export const ProductDetail = (props) => {
           name: { fr: p.name, en: p.name },
           price: p.price,
           image: p.images?.[0]
-            ? `${API_BASE_URL.replace('/api', '')}${p.images[0]}`
+            ? getImageUrl(p.images[0])
             : '/placeholder-product.jpg',
           category: p.category,
           inStock: p.stock > 0,

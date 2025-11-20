@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminSidebar from './AdminSidebar';
+import { getImageUrl } from './common';
 import {
   getAllProducts,
   createProduct,
@@ -434,7 +435,7 @@ export const AdminProducts = (props) => {
                       {formData.images.map((imageUrl, index) => (
                         <div key={index} className="relative group">
                           <img
-                            src={`${API_BASE_URL.replace('/api', '')}${imageUrl}`}
+                            src={getImageUrl(imageUrl)}
                             alt={`Product ${index + 1}`}
                             className="w-full h-32 object-cover rounded-lg border border-gray-300"
                           />
@@ -535,7 +536,7 @@ export const AdminProducts = (props) => {
                       {/* Product image or placeholder */}
                       {product.images && product.images.length > 0 ? (
                         <img
-                          src={`${API_BASE_URL.replace('/api', '')}${product.images[0]}`}
+                          src={getImageUrl(product.images[0])}
                           alt={product.name}
                           className="w-24 h-24 object-cover rounded-lg border border-gray-300"
                         />

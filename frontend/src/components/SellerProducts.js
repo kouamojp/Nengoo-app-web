@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { translations } from './common';
+import { translations, getImageUrl } from './common';
 import Header from './Header';
 import Footer from './Footer';
 import SellerSidebar from './SellerSidebar';
@@ -373,7 +373,7 @@ export const SellerProducts = (props) => {
                             {newProduct.images.map((imageUrl, index) => (
                               <div key={index} className="relative group">
                                 <img
-                                  src={`${API_BASE_URL.replace('/api', '')}${imageUrl}`}
+                                  src={getImageUrl(imageUrl)}
                                   alt={`Product ${index + 1}`}
                                   className="w-full h-32 object-cover rounded-lg border border-gray-300"
                                 />
@@ -540,7 +540,7 @@ export const SellerProducts = (props) => {
                             {editingProduct.images.map((imageUrl, index) => (
                               <div key={index} className="relative group">
                                 <img
-                                  src={`${API_BASE_URL.replace('/api', '')}${imageUrl}`}
+                                  src={getImageUrl(imageUrl)}
                                   alt={`Product ${index + 1}`}
                                   className="w-full h-32 object-cover rounded-lg border border-gray-300"
                                 />
@@ -607,7 +607,7 @@ export const SellerProducts = (props) => {
                           <img
                             src={
                               product.images && product.images.length > 0
-                                ? `${API_BASE_URL.replace('/api', '')}${product.images[0]}`
+                                ? getImageUrl(product.images[0])
                                 : 'https://via.placeholder.com/300x200?text=Pas+d%27image'
                             }
                             alt={product.name}

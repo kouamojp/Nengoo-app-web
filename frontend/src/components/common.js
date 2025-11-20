@@ -1,3 +1,13 @@
+// Helper function to get correct image URL (supports both local and S3 URLs)
+export const getImageUrl = (imageUrl, apiBaseUrl = 'http://localhost:8001') => {
+  if (!imageUrl) return '';
+  // If it's already a full URL (http or https), return as is
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    return imageUrl;
+  }
+  // Otherwise, it's a local path, prepend API base URL
+  return `${apiBaseUrl}${imageUrl}`;
+};
 
 // Translations
 export const translations = {

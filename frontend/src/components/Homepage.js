@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { translations } from './common';
+import { translations, getImageUrl } from './common';
 import Header from './Header';
 import Footer from './Footer';
 import ProductCard from './ProductCard';
@@ -40,7 +40,7 @@ export const Homepage = (props) => {
         category: product.category,
         price: product.price,
         image: product.images && product.images.length > 0
-          ? `${API_BASE_URL.replace('/api', '')}${product.images[0]}`
+          ? getImageUrl(product.images[0])
           : '/placeholder-product.jpg',
         rating: 4.5,
         reviews: 0,

@@ -17,6 +17,7 @@ import shutil
 import uuid
 import hashlib
 import base64
+from s3_config import upload_file_to_s3, delete_file_from_s3, check_s3_configuration
 
 
 ROOT_DIR = Path(__file__).parent
@@ -1566,7 +1567,7 @@ async def delete_order(order_id: str, current_user: dict = Depends(get_current_u
 
 @api_router.post("/upload/product-image")
 async def upload_product_image(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    """Upload a product image and return the file path"""
+    """Upload a product image to S3 and return the URL"""
     if current_user["type"] not in ["admin", "seller"]:
         raise HTTPException(status_code=403, detail="Accès non autorisé")
 
@@ -1585,40 +1586,31 @@ async def upload_product_image(file: UploadFile = File(...), current_user: dict 
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Le fichier est trop volumineux (max 5MB)")
 
-    # Generate unique filename
-    unique_filename = f"{uuid.uuid4()}{file_extension}"
-    file_path = UPLOAD_DIR / unique_filename
-
-    # Save file
+    # Upload to S3
     try:
-        with open(file_path, "wb") as buffer:
-            buffer.write(content)
+        result = upload_file_to_s3(
+            file_content=content,
+            filename=file.filename,
+            content_type=file.content_type
+        )
+        return {"url": result["url"], "filename": result["filename"]}
     except Exception as e:
-        logger.error(f"Error saving file: {str(e)}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la sauvegarde du fichier")
-
-    # Return the URL path
-    image_url = f"/uploads/products/{unique_filename}"
-    return {"url": image_url, "filename": unique_filename}
+        logger.error(f"Error uploading to S3: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'upload: {str(e)}")
 
 
 @api_router.delete("/upload/product-image/{filename}")
 async def delete_product_image(filename: str, current_user: dict = Depends(get_current_user)):
-    """Delete a product image"""
+    """Delete a product image from S3"""
     if current_user["type"] not in ["admin", "seller"]:
         raise HTTPException(status_code=403, detail="Accès non autorisé")
 
-    file_path = UPLOAD_DIR / filename
-
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="Fichier non trouvé")
-
     try:
-        file_path.unlink()
+        delete_file_from_s3(filename)
         return {"message": "Image supprimée avec succès"}
     except Exception as e:
-        logger.error(f"Error deleting file: {str(e)}")
-        raise HTTPException(status_code=500, detail="Erreur lors de la suppression du fichier")
+        logger.error(f"Error deleting from S3: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la suppression: {str(e)}")
 
 
 # ==================== PUBLIC ROUTES (No Auth Required) ====================
