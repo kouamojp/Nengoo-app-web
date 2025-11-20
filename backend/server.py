@@ -1299,6 +1299,31 @@ async def get_seller_orders(current_user: dict = Depends(get_current_user)):
     return enriched_orders
 
 
+@api_router.delete("/seller/orders/{order_id}")
+async def delete_seller_order(order_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an order containing seller's products (seller only)"""
+    if current_user["type"] != "seller":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # Verify the order exists and contains seller's products
+    order = await db.orders.find_one({"_id": ObjectId(order_id)})
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+
+    # Check if this order contains products from this seller
+    has_seller_products = any(item.get("sellerId") == current_user["id"] for item in order.get("items", []))
+    if not has_seller_products:
+        raise HTTPException(status_code=403, detail="Cette commande ne contient pas vos produits")
+
+    # Delete the order
+    result = await db.orders.delete_one({"_id": ObjectId(order_id)})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+
+    return {"message": "Commande supprimée avec succès"}
+
+
 # ==================== PROFILE ROUTES ====================
 
 @api_router.put("/seller/profile")

@@ -251,6 +251,14 @@ export const getSellerOrders = async () => {
   return apiCall('/seller/orders');
 };
 
+export const deleteSellerOrder = async (orderId) => {
+  console.log('deleteSellerOrder API function called with orderId:', orderId);
+  console.log('Making DELETE request to:', `/seller/orders/${orderId}`);
+  return apiCall(`/seller/orders/${orderId}`, {
+    method: 'DELETE',
+  });
+};
+
 // ==================== PUBLIC APIs (No Auth Required) ====================
 
 export const getPublicCategories = async () => {
