@@ -148,6 +148,23 @@ class ProductUpdate(BaseModel):
     unit: Optional[str] = None
     status: Optional[str] = None
 
+class OrderItem(BaseModel):
+    productId: str
+    productName: str
+    quantity: int
+    price: float
+
+class OrderCreate(BaseModel):
+    buyerId: str
+    items: List[OrderItem]
+    deliveryAddress: str
+    deliveryCity: str
+    deliveryPhone: str
+    notes: Optional[str] = None
+
+class OrderUpdate(BaseModel):
+    status: Optional[str] = None  # pending, confirmed, shipped, delivered, cancelled
+    notes: Optional[str] = None
 
 class AdminSellerUpdate(BaseModel):
     whatsapp: Optional[str] = None
@@ -257,7 +274,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         return {"id": user_id, "type": user_type}
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.JWTError:
+    except Exception as e:
+        logger.error(f"JWT validation error: {str(e)}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 def convert_objectid_to_str(doc):
@@ -266,6 +284,13 @@ def convert_objectid_to_str(doc):
         doc["id"] = str(doc["_id"])
         del doc["_id"]
     return doc
+
+async def find_buyer(buyer_id):
+    """Find buyer in both buyers and clients collections"""
+    buyer = await db.buyers.find_one({"_id": ObjectId(buyer_id)})
+    if not buyer:
+        buyer = await db.clients.find_one({"_id": ObjectId(buyer_id)})
+    return buyer
 
 
 # ==================== AUTHENTICATION ROUTES ====================
@@ -1115,6 +1140,249 @@ async def delete_product(product_id: str, current_user: dict = Depends(get_curre
         raise HTTPException(status_code=404, detail="Produit non trouvé")
 
     return {"message": "Produit supprimé avec succès"}
+
+
+# ==================== ORDERS ROUTES ====================
+
+@api_router.post("/orders", response_model=dict)
+async def create_order(order: OrderCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new order (buyer only)"""
+    if current_user["type"] != "buyer":
+        raise HTTPException(status_code=403, detail="Seuls les acheteurs peuvent créer des commandes")
+
+    # Verify buyer exists
+    buyer = await find_buyer(order.buyerId)
+    if not buyer or str(buyer["_id"]) != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Vous ne pouvez créer une commande que pour vous-même")
+
+    # Calculate total and verify products
+    total = 0
+    order_items_with_seller = []
+
+    for item in order.items:
+        product = await db.products.find_one({"_id": ObjectId(item.productId)})
+        if not product:
+            raise HTTPException(status_code=404, detail=f"Produit {item.productId} non trouvé")
+
+        if product.get("status") != "active":
+            raise HTTPException(status_code=400, detail=f"Le produit {product.get('name')} n'est plus disponible")
+
+        total += item.price * item.quantity
+
+        order_items_with_seller.append({
+            "productId": item.productId,
+            "productName": item.productName,
+            "quantity": item.quantity,
+            "price": item.price,
+            "sellerId": product.get("sellerId")
+        })
+
+    # Create order
+    order_dict = {
+        "buyerId": order.buyerId,
+        "items": order_items_with_seller,
+        "deliveryAddress": order.deliveryAddress,
+        "deliveryCity": order.deliveryCity,
+        "deliveryPhone": order.deliveryPhone,
+        "notes": order.notes,
+        "total": total,
+        "status": "pending",
+        "createdDate": datetime.now(timezone.utc).isoformat()
+    }
+
+    result = await db.orders.insert_one(order_dict)
+
+    return {
+        "message": "Commande créée avec succès",
+        "orderId": str(result.inserted_id),
+        "total": total
+    }
+
+
+@api_router.get("/orders/my")
+async def get_my_orders(current_user: dict = Depends(get_current_user)):
+    """Get orders for the current buyer"""
+    if current_user["type"] != "buyer":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    orders = await db.orders.find({"buyerId": current_user["id"]}).to_list(1000)
+
+    # Enrich orders with seller information
+    enriched_orders = []
+    for order in orders:
+        order_dict = convert_objectid_to_str(order)
+
+        # Get buyer info
+        buyer = await find_buyer(order["buyerId"])
+        if buyer:
+            order_dict["buyerName"] = buyer.get("name")
+            order_dict["buyerWhatsapp"] = buyer.get("whatsapp")
+
+        enriched_orders.append(order_dict)
+
+    return enriched_orders
+
+
+@api_router.get("/seller/orders")
+async def get_seller_orders(current_user: dict = Depends(get_current_user)):
+    """Get orders containing products from the current seller"""
+    if current_user["type"] != "seller":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # Find orders that contain products from this seller
+    orders = await db.orders.find({"items.sellerId": current_user["id"]}).to_list(1000)
+
+    enriched_orders = []
+    for order in orders:
+        order_dict = convert_objectid_to_str(order)
+
+        # Get buyer info
+        buyer = await find_buyer(order["buyerId"])
+        if buyer:
+            order_dict["buyerName"] = buyer.get("name")
+            order_dict["buyerWhatsapp"] = buyer.get("whatsapp")
+
+        # Filter items to only show this seller's products
+        seller_items = [item for item in order["items"] if item.get("sellerId") == current_user["id"]]
+        order_dict["items"] = seller_items
+
+        # Recalculate total for seller's items only
+        seller_total = sum(item["price"] * item["quantity"] for item in seller_items)
+        order_dict["sellerTotal"] = seller_total
+
+        enriched_orders.append(order_dict)
+
+    return enriched_orders
+
+
+@api_router.get("/admin/orders")
+async def get_all_orders(current_user: dict = Depends(get_current_user)):
+    """Get all orders with buyer and seller information (admin only)"""
+    if current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    orders = await db.orders.find().to_list(1000)
+
+    enriched_orders = []
+    for order in orders:
+        order_dict = convert_objectid_to_str(order)
+
+        # Get buyer info
+        buyer = await find_buyer(order["buyerId"])
+        if buyer:
+            order_dict["buyerName"] = buyer.get("name")
+            order_dict["buyerWhatsapp"] = buyer.get("whatsapp")
+            order_dict["buyerEmail"] = buyer.get("email")
+        else:
+            order_dict["buyerName"] = "Client introuvable"
+
+        # Enrich each item with seller info
+        enriched_items = []
+        for item in order.get("items", []):
+            item_dict = item.copy()
+
+            # Get seller info
+            if item.get("sellerId"):
+                seller = await db.sellers.find_one({"_id": ObjectId(item["sellerId"])})
+                if seller:
+                    item_dict["sellerName"] = seller.get("name")
+                    item_dict["sellerBusinessName"] = seller.get("businessName")
+                    item_dict["sellerWhatsapp"] = seller.get("whatsapp")
+                else:
+                    item_dict["sellerName"] = "Vendeur introuvable"
+
+            enriched_items.append(item_dict)
+
+        order_dict["items"] = enriched_items
+        enriched_orders.append(order_dict)
+
+    return enriched_orders
+
+
+@api_router.get("/admin/orders/{order_id}")
+async def get_order_by_id(order_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a specific order with all details (admin only)"""
+    if current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    order = await db.orders.find_one({"_id": ObjectId(order_id)})
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+
+    order_dict = convert_objectid_to_str(order)
+
+    # Get buyer info
+    buyer = await find_buyer(order["buyerId"])
+    if buyer:
+        order_dict["buyer"] = {
+            "id": str(buyer["_id"]),
+            "name": buyer.get("name"),
+            "whatsapp": buyer.get("whatsapp"),
+            "email": buyer.get("email")
+        }
+
+    # Enrich items with seller info
+    enriched_items = []
+    for item in order.get("items", []):
+        item_dict = item.copy()
+
+        if item.get("sellerId"):
+            seller = await db.sellers.find_one({"_id": ObjectId(item["sellerId"])})
+            if seller:
+                item_dict["seller"] = {
+                    "id": str(seller["_id"]),
+                    "name": seller.get("name"),
+                    "businessName": seller.get("businessName"),
+                    "whatsapp": seller.get("whatsapp")
+                }
+
+        enriched_items.append(item_dict)
+
+    order_dict["items"] = enriched_items
+
+    return order_dict
+
+
+@api_router.put("/admin/orders/{order_id}")
+async def update_order_status(order_id: str, order_update: OrderUpdate, current_user: dict = Depends(get_current_user)):
+    """Update order status (admin only)"""
+    if current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    update_data = order_update.dict(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
+
+    update_data["updatedDate"] = datetime.now(timezone.utc).isoformat()
+
+    result = await db.orders.update_one(
+        {"_id": ObjectId(order_id)},
+        {"$set": update_data}
+    )
+
+    if result.modified_count == 0:
+        order_exists = await db.orders.find_one({"_id": ObjectId(order_id)})
+        if not order_exists:
+            raise HTTPException(status_code=404, detail="Commande non trouvée")
+        return {"message": "Aucune modification détectée"}
+
+    return {"message": "Commande mise à jour avec succès"}
+
+
+@api_router.delete("/admin/orders/{order_id}")
+async def delete_order(order_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an order (admin only)"""
+    if current_user["type"] != "admin":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    result = await db.orders.delete_one({"_id": ObjectId(order_id)})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+
+    return {"message": "Commande supprimée avec succès"}
 
 
 # ==================== UPLOAD ROUTES ====================
