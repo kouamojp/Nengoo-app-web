@@ -164,7 +164,7 @@ export const Homepage = (props) => {
           ) : allProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
               {featuredProducts.map(product => (
-                <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
+                <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} user={props.user} />
               ))}
             </div>
           ) : (
@@ -187,7 +187,7 @@ export const Homepage = (props) => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
               {recentProducts.map(product => (
-                <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
+                <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} user={props.user} />
               ))}
             </div>
             <div className="text-center mt-8">

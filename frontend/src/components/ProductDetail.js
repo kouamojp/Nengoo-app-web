@@ -11,7 +11,7 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:800
 
 // Product Detail Component
 export const ProductDetail = (props) => {
-  const { language, addToCart } = props;
+  const { language, addToCart, user } = props;
   const { id } = useParams();
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(0);
@@ -122,6 +122,16 @@ export const ProductDetail = (props) => {
   const images = product.images || [product.image];
 
   const handleWhatsAppContact = () => {
+    // Vérifier si l'utilisateur est connecté et est un acheteur
+    if (!user || user.type !== 'buyer') {
+      // Sauvegarder l'URL actuelle pour redirection après connexion
+      localStorage.setItem('redirectAfterLogin', `/product/${id}`);
+      // Rediriger vers la page de connexion acheteur
+      navigate('/login/buyer');
+      return;
+    }
+
+    // Si connecté, ouvrir WhatsApp normalement
     const message = generateProductWhatsAppMessage(product, language);
     openWhatsApp(product.sellerWhatsApp, message);
   };
@@ -313,7 +323,7 @@ export const ProductDetail = (props) => {
             <h3 className="text-2xl font-bold mb-8">Produits similaires</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {relatedProducts.map(relatedProduct => (
-                <ProductCard key={relatedProduct.id} product={relatedProduct} language={language} addToCart={addToCart} />
+                <ProductCard key={relatedProduct.id} product={relatedProduct} language={language} addToCart={addToCart} user={user} />
               ))}
             </div>
           </div>

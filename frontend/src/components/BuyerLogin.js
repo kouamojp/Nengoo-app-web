@@ -41,8 +41,18 @@ export const BuyerLogin = (props) => {
       setUser(userData);
       localStorage.setItem('nengoo-user', JSON.stringify(userData));
 
-      // Redirect to homepage
-      navigate('/');
+      // Vérifier s'il y a une URL de redirection sauvegardée
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+
+      if (redirectUrl) {
+        // Supprimer l'URL de redirection du localStorage
+        localStorage.removeItem('redirectAfterLogin');
+        // Rediriger vers l'URL sauvegardée
+        navigate(redirectUrl);
+      } else {
+        // Redirection par défaut vers la page d'accueil
+        navigate('/');
+      }
     } catch (err) {
       setError(err.message || 'Une erreur est survenue lors de la connexion');
     } finally {

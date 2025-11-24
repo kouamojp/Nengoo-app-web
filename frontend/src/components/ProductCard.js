@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { translations, openWhatsApp, generateProductWhatsAppMessage } from './common';
 
 // Product Card Component
-const ProductCard = ({ product, language, addToCart }) => {
+const ProductCard = ({ product, language, addToCart, user }) => {
   const navigate = useNavigate();
   const t = translations[language];
-  
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -17,6 +17,16 @@ const ProductCard = ({ product, language, addToCart }) => {
   };
 
   const handleWhatsAppContact = () => {
+    // Vérifier si l'utilisateur est connecté et est un acheteur
+    if (!user || user.type !== 'buyer') {
+      // Sauvegarder l'URL actuelle pour redirection après connexion
+      localStorage.setItem('redirectAfterLogin', `/product/${product.id}`);
+      // Rediriger vers la page de connexion acheteur
+      navigate('/login/buyer');
+      return;
+    }
+
+    // Si connecté, ouvrir WhatsApp normalement
     const message = generateProductWhatsAppMessage(product, language);
     openWhatsApp(product.sellerWhatsApp, message);
   };

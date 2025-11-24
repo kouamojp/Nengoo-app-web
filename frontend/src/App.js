@@ -29,21 +29,25 @@ import AdminSellers from './components/AdminSellers';
 import AdminProducts from './components/AdminProducts';
 import AdminCategories from './components/AdminCategories';
 import AdminOrders from './components/AdminOrders';
+import CartNotification from './components/CartNotification';
 
 function App() {
   const [language, setLanguage] = useState('fr');
   const [currency, setCurrency] = useState('XAF');
-  const [cartItems, setCartItems] = useState([]);
+
+  // Initialiser cartItems directement depuis localStorage
+  const [cartItems, setCartItems] = useState(() => {
+    const savedCart = localStorage.getItem('nengoo-cart');
+    return savedCart ? JSON.parse(savedCart) : [];
+  });
+
   const [user, setUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationProduct, setNotificationProduct] = useState(null);
 
-  // Load cart from localStorage on mount
+  // Load user from localStorage on mount
   useEffect(() => {
-    const savedCart = localStorage.getItem('nengoo-cart');
-    if (savedCart) {
-      setCartItems(JSON.parse(savedCart));
-    }
-    
     const savedUser = localStorage.getItem('nengoo-user');
     if (savedUser) {
       setUser(JSON.parse(savedUser));
@@ -67,6 +71,10 @@ function App() {
       }
       return [...prev, { ...product, quantity }];
     });
+
+    // Afficher la notification
+    setNotificationProduct(product);
+    setShowNotification(true);
   };
 
   const updateCartQuantity = (productId, newQuantity) => {
@@ -130,7 +138,7 @@ function App() {
           <Route path="/profile" element={<UserProfile {...appProps} />} />
           <Route path="/about" element={<About {...appProps} />} />
           <Route path="/search" element={<SearchResults {...appProps} />} />
-          
+
           {/* Authentication Routes */}
           <Route path="/login" element={<Login {...appProps} />} />
           <Route path="/login/buyer" element={<BuyerLogin {...appProps} />} />
@@ -138,7 +146,7 @@ function App() {
           <Route path="/signup/buyer" element={<BuyerSignup {...appProps} />} />
           <Route path="/signup/seller" element={<SellerSignup {...appProps} />} />
           <Route path="/pending-approval" element={<PendingApproval {...appProps} />} />
-          
+
           {/* Seller Routes */}
           <Route path="/seller" element={<SellerDashboard {...appProps} />} />
           <Route path="/seller/products" element={<SellerProducts {...appProps} />} />
@@ -157,6 +165,13 @@ function App() {
           <Route path="/admin/categories" element={<AdminCategories {...appProps} />} />
           <Route path="/admin/orders" element={<AdminOrders {...appProps} />} />
         </Routes>
+
+        {/* Cart Notification */}
+        <CartNotification
+          show={showNotification}
+          product={notificationProduct}
+          onClose={() => setShowNotification(false)}
+        />
       </Router>
     </div>
   );

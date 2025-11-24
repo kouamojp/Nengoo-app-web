@@ -196,7 +196,7 @@ export const ProductCatalog = (props) => {
             ) : filteredProducts.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredProducts.map(product => (
-                  <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
+                  <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} user={props.user} />
                 ))}
               </div>
             ) : (
