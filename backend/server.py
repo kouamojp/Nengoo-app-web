@@ -18,6 +18,7 @@ import uuid
 import hashlib
 import base64
 from s3_config import upload_file_to_s3, delete_file_from_s3, check_s3_configuration
+from mail_utils import send_email, generate_seller_notification_email
 
 
 ROOT_DIR = Path(__file__).parent
@@ -1203,6 +1204,7 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
     # Calculate total and verify products
     total = 0
     order_items_with_seller = []
+    sellers_to_notify = {}  # {seller_id: [product_item]}
 
     for item in order.items:
         product = await db.products.find_one({"_id": ObjectId(item.productId)})
@@ -1213,14 +1215,26 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
             raise HTTPException(status_code=400, detail=f"Le produit {product.get('name')} n'est plus disponible")
 
         total += item.price * item.quantity
-
+        
+        seller_id = product.get("sellerId")
+        
+        # Add product to the main order item list
         order_items_with_seller.append({
             "productId": item.productId,
             "productName": item.productName,
             "quantity": item.quantity,
             "price": item.price,
-            "sellerId": product.get("sellerId")
+            "sellerId": seller_id
         })
+
+        # Group products by seller for notification
+        if seller_id:
+            if seller_id not in sellers_to_notify:
+                sellers_to_notify[seller_id] = []
+            sellers_to_notify[seller_id].append({
+                "name": item.productName,
+                "quantity": item.quantity
+            })
 
     # Create order
     order_dict = {
@@ -1236,10 +1250,28 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
     }
 
     result = await db.orders.insert_one(order_dict)
+    order_id = str(result.inserted_id)
+
+    # --- Send email notifications to sellers ---
+    for seller_id, products in sellers_to_notify.items():
+        seller = await db.sellers.find_one({"_id": ObjectId(seller_id)})
+        if seller and seller.get("email"):
+            seller_name = seller.get("businessName") or seller.get("name")
+            subject, body = generate_seller_notification_email(seller_name, order_id, products)
+            
+            # Run email sending in the background to not block the response
+            # Note: For a more robust solution, consider a background task queue like Celery or ARQ.
+            try:
+                send_email(seller["email"], subject, body)
+            except Exception as e:
+                logger.error(f"Failed to send order notification email to seller {seller_id} for order {order_id}. Error: {e}")
+        else:
+            logger.warning(f"Could not notify seller {seller_id} for order {order_id}: seller not found or has no email.")
+
 
     return {
         "message": "Commande créée avec succès",
-        "orderId": str(result.inserted_id),
+        "orderId": order_id,
         "total": total
     }
 
