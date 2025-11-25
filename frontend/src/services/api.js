@@ -221,6 +221,13 @@ export const getAllOrders = async () => {
   return apiCall('/admin/orders');
 };
 
+export const updateOrderStatus = async (orderId, statusData) => {
+  return apiCall(`/admin/orders/${orderId}`, {
+    method: 'PUT',
+    body: JSON.stringify(statusData),
+  });
+};
+
 // ==================== SELLER PRODUCTS APIs ====================
 
 export const getSellerOwnProducts = async () => {

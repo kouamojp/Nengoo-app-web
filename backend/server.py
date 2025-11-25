@@ -1471,36 +1471,45 @@ async def get_all_orders(current_user: dict = Depends(get_current_user)):
     if current_user["type"] != "admin":
         raise HTTPException(status_code=403, detail="Accès non autorisé")
 
-    orders = await db.orders.find().to_list(1000)
+    orders = await db.orders.find().sort("createdDate", -1).to_list(1000)
 
     enriched_orders = []
     for order in orders:
         order_dict = convert_objectid_to_str(order)
 
-        # Get buyer info
-        buyer = await find_buyer(order["buyerId"])
-        if buyer:
-            order_dict["buyerName"] = buyer.get("name")
-            order_dict["buyerWhatsapp"] = buyer.get("whatsapp")
-            order_dict["buyerEmail"] = buyer.get("email")
-        else:
-            order_dict["buyerName"] = "Client introuvable"
+        # Get buyer info safely
+        order_dict["buyerName"] = "Client non trouvé"
+        order_dict["buyerWhatsapp"] = ""
+        order_dict["buyerEmail"] = ""
+        
+        buyer_id = order.get("buyerId")
+        if buyer_id:
+            try:
+                buyer = await find_buyer(buyer_id)
+                if buyer:
+                    order_dict["buyerName"] = buyer.get("name")
+                    order_dict["buyerWhatsapp"] = buyer.get("whatsapp")
+                    order_dict["buyerEmail"] = buyer.get("email")
+            except Exception as e:
+                logger.warning(f"Could not fetch buyer for order {order_dict['id']} with buyerId {buyer_id}. Error: {e}")
 
-        # Enrich each item with seller info
+        # Enrich each item with seller info safely
         enriched_items = []
         for item in order.get("items", []):
             item_dict = item.copy()
+            item_dict["sellerName"] = "Vendeur non trouvé"
 
-            # Get seller info
-            if item.get("sellerId"):
-                seller = await db.sellers.find_one({"_id": ObjectId(item["sellerId"])})
-                if seller:
-                    item_dict["sellerName"] = seller.get("name")
-                    item_dict["sellerBusinessName"] = seller.get("businessName")
-                    item_dict["sellerWhatsapp"] = seller.get("whatsapp")
-                else:
-                    item_dict["sellerName"] = "Vendeur introuvable"
-
+            seller_id = item.get("sellerId")
+            if seller_id:
+                try:
+                    seller = await db.sellers.find_one({"_id": ObjectId(seller_id)})
+                    if seller:
+                        item_dict["sellerName"] = seller.get("businessName") or seller.get("name")
+                        item_dict["sellerBusinessName"] = seller.get("businessName")
+                        item_dict["sellerWhatsapp"] = seller.get("whatsapp")
+                except Exception as e:
+                    logger.warning(f"Could not fetch seller for item {item.get('productId')} in order {order_dict['id']} with sellerId {seller_id}. Error: {e}")
+            
             enriched_items.append(item_dict)
 
         order_dict["items"] = enriched_items

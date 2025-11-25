@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminSidebar from './AdminSidebar';
-
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000/api';
+import { getAllOrders, updateOrderStatus as apiUpdateOrderStatus } from '../services/api';
 
 export const AdminOrders = (props) => {
   const { setUser } = props;
@@ -15,21 +14,10 @@ export const AdminOrders = (props) => {
 
   const fetchOrders = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/admin/orders`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setOrders(data);
-      } else {
-        console.error('Erreur lors de la récupération des commandes');
-      }
+      const data = await getAllOrders();
+      setOrders(data);
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur lors de la récupération des commandes:', error);
     } finally {
       setLoading(false);
     }
@@ -37,28 +25,15 @@ export const AdminOrders = (props) => {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/admin/orders/${orderId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-
-      if (response.ok) {
-        // Update the order in the local state
-        setOrders(orders.map(order =>
-          order.id === orderId
-            ? { ...order, status: newStatus }
-            : order
-        ));
-      } else {
-        console.error('Erreur lors de la mise à jour du statut');
-      }
+      await apiUpdateOrderStatus(orderId, { status: newStatus });
+      // Update the order in the local state
+      setOrders(orders.map(order =>
+        order.id === orderId
+          ? { ...order, status: newStatus }
+          : order
+      ));
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur lors de la mise à jour du statut:', error);
     }
   };
 
@@ -69,7 +44,9 @@ export const AdminOrders = (props) => {
       minimumFractionDigits: 0,
     }).format(price);
   };
-
+  
+  // ... (le reste du composant reste identique)
+  
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-800';
@@ -108,7 +85,7 @@ export const AdminOrders = (props) => {
     : orders.filter(order => order.status === filterStatus);
 
   console.log('Filtered orders:', filteredOrders);
-
+  
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar setUser={setUser} />
