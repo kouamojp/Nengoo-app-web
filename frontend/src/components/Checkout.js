@@ -34,9 +34,17 @@ export const Checkout = (props) => {
   };
   
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = formData.deliveryOption === 'pickup' ? 0 : (subtotal > 50000 ? 0 : 2500); // Free shipping for pickup or orders over 50,000 XAF
-  const tax = subtotal * 0.1;
-  const total = subtotal + shipping + tax;
+
+  // Calculate delivery fees from unique sellers
+  const sellerDeliveryFees = cartItems.reduce((acc, item) => {
+    if (item.seller && item.seller.id && !acc[item.seller.id]) {
+      acc[item.seller.id] = item.seller.deliveryPrice || 0;
+    }
+    return acc;
+  }, {});
+  const shipping = formData.deliveryOption === 'pickup' ? 0 : Object.values(sellerDeliveryFees).reduce((sum, fee) => sum + fee, 0);
+  
+  const total = subtotal + shipping;
   
   const handleInputChange = (e) => {
     setFormData({
@@ -131,7 +139,7 @@ export const Checkout = (props) => {
                       />
                       <div className="flex items-center">
                         <span className="text-xl mr-3">🏠</span>
-                        <div>
+                        <div className='text-left'>
                           <span className="font-medium">Livraison à domicile</span>
                           <p className="text-sm text-gray-600">Livraison directe à votre adresse</p>
                         </div>
@@ -149,7 +157,7 @@ export const Checkout = (props) => {
                       />
                       <div className="flex items-center">
                         <span className="text-xl mr-3">📍</span>
-                        <div>
+                        <div className='text-left'>
                           <span className="font-medium">Point de retrait</span>
                           <p className="text-sm text-gray-600">Retrait gratuit dans un point Nengoo</p>
                         </div>
@@ -162,7 +170,7 @@ export const Checkout = (props) => {
                 {formData.deliveryOption === 'pickup' && (
                   <div className="mb-6">
                     <label className="block text-sm font-medium mb-3">Choisir un Point de Retrait</label>
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                    <div className="space-y-3 max-h-92 overflow-y-auto">
                       {mockSellerData.pickupPoints.map(point => (
                         <label key={point.id} className="flex items-start p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
                           <input
@@ -228,9 +236,9 @@ export const Checkout = (props) => {
                 <h3 className="text-xl font-bold mb-6">{t.paymentMethod}</h3>
                 <div className="space-y-3">
                   {[
-                    { key: 'mtnMoney', label: t.mtnMoney, icon: '📱' },
+                    /* { key: 'mtnMoney', label: t.mtnMoney, icon: '📱' },
                     { key: 'orangeMoney', label: t.orangeMoney, icon: '🍊' },
-                    { key: 'creditCard', label: t.creditCard, icon: '💳' },
+                    { key: 'creditCard', label: t.creditCard, icon: '💳' }, */
                     { key: 'cashOnDelivery', label: t.cashOnDelivery, icon: '💰' }
                   ].map(method => (
                     <label key={method.key} className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
@@ -292,10 +300,6 @@ export const Checkout = (props) => {
                     {formData.deliveryOption === 'pickup' ? 'Retrait gratuit' : t.shipping}
                   </span>
                   <span>{shipping === 0 ? 'Gratuit' : formatPrice(shipping)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>{t.tax}</span>
-                  <span>{formatPrice(tax)}</span>
                 </div>
                 {formData.deliveryOption === 'pickup' && formData.selectedPickupPoint && (
                   <div className="pt-2 border-t">

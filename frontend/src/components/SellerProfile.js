@@ -29,7 +29,8 @@ export const SellerProfile = (props) => {
         businessName: userData.businessName || '',
         email: userData.email || '',
         whatsapp: userData.whatsapp || '',
-        city: userData.city || ''
+        city: userData.city || '',
+        deliveryPrice: userData.deliveryPrice || 0
       });
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -49,7 +50,8 @@ export const SellerProfile = (props) => {
       businessName: profileData.businessName || '',
       email: profileData.email || '',
       whatsapp: profileData.whatsapp || '',
-      city: profileData.city || ''
+      city: profileData.city || '',
+      deliveryPrice: profileData.deliveryPrice || 0
     });
   };
 
@@ -236,6 +238,20 @@ export const SellerProfile = (props) => {
                       />
                     ) : (
                       <p className="text-lg text-gray-800">{profileData.city || 'N/A'}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Frais de livraison (XAF)</label>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        value={editData.deliveryPrice}
+                        onChange={(e) => setEditData({ ...editData, deliveryPrice: parseFloat(e.target.value) || 0 })}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <p className="text-lg text-gray-800">{profileData.deliveryPrice ? `${profileData.deliveryPrice} XAF` : '0 XAF'}</p>
                     )}
                   </div>
 

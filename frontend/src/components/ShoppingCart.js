@@ -20,9 +20,17 @@ export const ShoppingCart = (props) => {
   };
   
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 50000 ? 0 : 2500; // Free shipping over 50,000 XAF
-  const tax = subtotal * 0.1; // 10% tax
-  const total = subtotal + shipping + tax;
+
+  // Calculate delivery fees from unique sellers
+  const sellerDeliveryFees = cartItems.reduce((acc, item) => {
+    if (item.seller && item.seller.id && !acc[item.seller.id]) {
+      acc[item.seller.id] = item.seller.deliveryPrice || 0;
+    }
+    return acc;
+  }, {});
+  const shipping = Object.values(sellerDeliveryFees).reduce((sum, fee) => sum + fee, 0);
+
+  const total = subtotal + shipping;
 
   if (cartItems.length === 0) {
     return (
@@ -127,11 +135,6 @@ export const ShoppingCart = (props) => {
                 <div className="flex justify-between">
                   <span>{t.shipping}</span>
                   <span>{shipping === 0 ? 'Gratuit' : formatPrice(shipping)}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span>{t.tax} (10%)</span>
-                  <span>{formatPrice(tax)}</span>
                 </div>
                 
                 <hr />

@@ -76,6 +76,7 @@ class SellerCreate(BaseModel):
     city: str
     categories: List[str]
     password: str
+    deliveryPrice: Optional[float] = 0
 
 class LoginRequest(BaseModel):
     whatsapp: str
@@ -97,6 +98,7 @@ class UserResponse(BaseModel):
     city: Optional[str] = None
     categories: Optional[List[str]] = None
     status: Optional[str] = None
+    deliveryPrice: Optional[float] = None
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -176,6 +178,7 @@ class AdminSellerUpdate(BaseModel):
     city: Optional[str] = None
     categories: Optional[List[str]] = None
     status: Optional[str] = None
+    deliveryPrice: Optional[float] = None
 
 
 class AdminBuyerUpdate(BaseModel):
@@ -195,6 +198,7 @@ class SellerProfileUpdate(BaseModel):
     email: Optional[EmailStr] = None
     whatsapp: Optional[str] = None
     city: Optional[str] = None
+    deliveryPrice: Optional[float] = None
 
 
 class BuyerProfileUpdate(BaseModel):
@@ -403,7 +407,8 @@ async def register_seller(seller: SellerCreate):
         "password": hash_password(seller.password),
         "status": "pending",
         "submitDate": datetime.now(timezone.utc).isoformat(),
-        "type": "seller"
+        "type": "seller",
+        "deliveryPrice": seller.deliveryPrice
     }
 
     result = await db.sellers.insert_one(seller_dict)
@@ -743,7 +748,8 @@ async def create_seller_by_admin(seller: SellerCreate, current_user: dict = Depe
         "status": "approved",
         "submitDate": datetime.now(timezone.utc).isoformat(),
         "approvedDate": datetime.now(timezone.utc).isoformat(),
-        "type": "seller"
+        "type": "seller",
+        "deliveryPrice": seller.deliveryPrice
     }
 
     result = await db.sellers.insert_one(seller_dict)
@@ -1201,10 +1207,10 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
     if not buyer or str(buyer["_id"]) != current_user["id"]:
         raise HTTPException(status_code=403, detail="Vous ne pouvez créer une commande que pour vous-même")
 
-    # Calculate total and verify products
-    total = 0
+    # Calculate subtotal and verify products
+    subtotal = 0
     order_items_with_seller = []
-    sellers_to_notify = {}  # {seller_id: [product_item]}
+    sellers_in_order = {}  # {seller_id: [product_item]}
 
     for item in order.items:
         product = await db.products.find_one({"_id": ObjectId(item.productId)})
@@ -1214,11 +1220,10 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
         if product.get("status") != "active":
             raise HTTPException(status_code=400, detail=f"Le produit {product.get('name')} n'est plus disponible")
 
-        total += item.price * item.quantity
+        subtotal += item.price * item.quantity
         
         seller_id = product.get("sellerId")
         
-        # Add product to the main order item list
         order_items_with_seller.append({
             "productId": item.productId,
             "productName": item.productName,
@@ -1227,14 +1232,23 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
             "sellerId": seller_id
         })
 
-        # Group products by seller for notification
         if seller_id:
-            if seller_id not in sellers_to_notify:
-                sellers_to_notify[seller_id] = []
-            sellers_to_notify[seller_id].append({
+            if seller_id not in sellers_in_order:
+                sellers_in_order[seller_id] = []
+            sellers_in_order[seller_id].append({
                 "name": item.productName,
                 "quantity": item.quantity
             })
+
+    # Calculate total delivery fee
+    delivery_total = 0
+    for seller_id in sellers_in_order.keys():
+        seller = await db.sellers.find_one({"_id": ObjectId(seller_id)})
+        if seller:
+            delivery_total += seller.get("deliveryPrice", 0)
+
+    # Calculate final total
+    total = subtotal + delivery_total
 
     # Create order
     order_dict = {
@@ -1244,6 +1258,8 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
         "deliveryCity": order.deliveryCity,
         "deliveryPhone": order.deliveryPhone,
         "notes": order.notes,
+        "subtotal": subtotal,
+        "deliveryTotal": delivery_total,
         "total": total,
         "status": "pending",
         "createdDate": datetime.now(timezone.utc).isoformat()
@@ -1253,21 +1269,18 @@ async def create_order(order: OrderCreate, current_user: dict = Depends(get_curr
     order_id = str(result.inserted_id)
 
     # --- Send email notifications to sellers ---
-    for seller_id, products in sellers_to_notify.items():
+    for seller_id, products in sellers_in_order.items():
         seller = await db.sellers.find_one({"_id": ObjectId(seller_id)})
         if seller and seller.get("email"):
             seller_name = seller.get("businessName") or seller.get("name")
             subject, body = generate_seller_notification_email(seller_name, order_id, products)
             
-            # Run email sending in the background to not block the response
-            # Note: For a more robust solution, consider a background task queue like Celery or ARQ.
             try:
                 send_email(seller["email"], subject, body)
             except Exception as e:
                 logger.error(f"Failed to send order notification email to seller {seller_id} for order {order_id}. Error: {e}")
         else:
             logger.warning(f"Could not notify seller {seller_id} for order {order_id}: seller not found or has no email.")
-
 
     return {
         "message": "Commande créée avec succès",
@@ -1391,6 +1404,8 @@ async def update_seller_profile(profile_data: SellerProfileUpdate, current_user:
         update_data["whatsapp"] = profile_data.whatsapp
     if profile_data.city is not None:
         update_data["city"] = profile_data.city
+    if profile_data.deliveryPrice is not None:
+        update_data["deliveryPrice"] = profile_data.deliveryPrice
 
     if not update_data:
         raise HTTPException(status_code=400, detail="Aucune donnée à mettre à jour")
@@ -1713,7 +1728,8 @@ async def get_public_products(
                         "businessName": seller.get("businessName"),
                         "name": seller.get("name"),
                         "city": seller.get("city"),
-                        "whatsapp": seller.get("whatsapp")
+                        "whatsapp": seller.get("whatsapp"),
+                        "deliveryPrice": seller.get("deliveryPrice", 0)
                     }
             except Exception as e:
                 logger.error(f"Error fetching seller for product {product.get('_id')}: {str(e)}")
@@ -1749,7 +1765,8 @@ async def get_public_product(product_id: str):
                     "name": seller.get("name"),
                     "city": seller.get("city"),
                     "whatsapp": seller.get("whatsapp"),
-                    "email": seller.get("email")
+                    "email": seller.get("email"),
+                    "deliveryPrice": seller.get("deliveryPrice", 0)
                 }
         except Exception as e:
             logger.error(f"Error fetching seller for product {product_id}: {str(e)}")
