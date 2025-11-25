@@ -108,13 +108,15 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                   <span className="text-2xl">{user.type === 'seller' ? '🏪' : '👤'}</span>
                   <div className="text-sm">{user.name}</div>
                 </Link>
-                <button 
-                  onClick={() => setUser(null)}
-                  className="text-sm hover:text-yellow-300 transition-colors"
-                >
-                  {t.logout}
-                </button>
-              </div>
+                                <button
+                                  onClick={() => {
+                                    setUser(null);
+                                    navigate('/'); // Redirect to homepage after logout
+                                  }}
+                                  className="text-sm hover:text-yellow-300 transition-colors"
+                                >
+                                  {t.logout}
+                                </button>              </div>
             ) : (
               <Link to="/login" className="hover:text-yellow-300 transition-colors">
                 <span className="text-2xl">👤</span>
@@ -212,6 +214,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                     onClick={() => {
                       setUser(null);
                       setShowMobileMenu(false);
+                      navigate('/'); // Redirect to homepage after logout
                     }}
                     className="flex items-center space-x-3 py-2 hover:text-yellow-300 transition-colors"
                   >
