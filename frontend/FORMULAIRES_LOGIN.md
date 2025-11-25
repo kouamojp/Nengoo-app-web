@@ -154,7 +154,7 @@ Les formulaires utilisent le service API existant :
 ```javascript
 import { login } from '../services/api';
 
-// Pour acheteur
+// Pour client
 const response = await login(whatsapp, password, 'buyer');
 
 // Pour vendeur

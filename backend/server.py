@@ -236,6 +236,9 @@ class MessageResponse(BaseModel):
     parentMessageId: Optional[str] = None
 
 
+class NewsletterSubscription(BaseModel):
+    email: EmailStr
+
 # ==================== HELPER FUNCTIONS ====================
 
 def validate_password(password: str) -> None:
@@ -1670,6 +1673,26 @@ async def delete_product_image(filename: str, current_user: dict = Depends(get_c
 
 
 # ==================== PUBLIC ROUTES (No Auth Required) ====================
+
+@api_router.post("/newsletter/subscribe", status_code=status.HTTP_201_CREATED)
+async def subscribe_newsletter(subscription: NewsletterSubscription):
+    """Subscribe a user to the newsletter."""
+    # Check if email already exists
+    existing_subscriber = await db.newsletter_subscribers.find_one({"email": subscription.email})
+    if existing_subscriber:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cet email est déjà abonné à notre newsletter."
+        )
+    
+    # Add new subscriber
+    subscriber_data = {
+        "email": subscription.email,
+        "subscribed_at": datetime.now(timezone.utc)
+    }
+    await db.newsletter_subscribers.insert_one(subscriber_data)
+    
+    return {"message": "Merci pour votre abonnement ! Vous recevrez bientôt nos actualités."}
 
 @api_router.get("/categories")
 async def get_public_categories():

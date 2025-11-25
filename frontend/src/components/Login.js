@@ -58,7 +58,7 @@ export const Login = (props) => {
                   to="/signup/buyer"
                   className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                 >
-                  S'inscrire comme acheteur
+                  S'inscrire comme client
                 </Link>
                 <span className="text-gray-400">•</span>
                 <Link

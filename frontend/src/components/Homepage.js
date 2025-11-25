@@ -19,6 +19,11 @@ export const Homepage = (props) => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Newsletter state
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [newsletterFeedback, setNewsletterFeedback] = useState({ type: '', message: '' });
+
   useEffect(() => {
     loadData();
   }, []);
@@ -58,6 +63,40 @@ export const Homepage = (props) => {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleNewsletterSubmit = async (e) => {
+    e.preventDefault();
+    if (!newsletterEmail) {
+      setNewsletterFeedback({ type: 'error', message: 'Veuillez entrer une adresse email.' });
+      return;
+    }
+
+    setNewsletterLoading(true);
+    setNewsletterFeedback({ type: '', message: '' });
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/newsletter/subscribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: newsletterEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Une erreur est survenue.');
+      }
+
+      setNewsletterFeedback({ type: 'success', message: data.message });
+      setNewsletterEmail('');
+    } catch (error) {
+      setNewsletterFeedback({ type: 'error', message: error.message });
+    } finally {
+      setNewsletterLoading(false);
     }
   };
 
@@ -207,16 +246,30 @@ export const Homepage = (props) => {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold mb-4">{t.newsletter}</h2>
           <p className="text-lg sm:text-xl mb-6 lg:mb-8 opacity-90">Restez informé de nos dernières offres et nouveautés</p>
-          <div className="max-w-md mx-auto flex flex-col sm:flex-row">
-            <input
-              type="email"
-              placeholder={t.email}
-              className="flex-1 px-4 py-3 text-black rounded-t-lg sm:rounded-l-lg sm:rounded-tr-none focus:outline-none"
-            />
-            <button className="bg-yellow-500 hover:bg-yellow-600 px-6 py-3 rounded-b-lg sm:rounded-r-lg sm:rounded-bl-none font-semibold transition-colors text-black">
-              {t.subscribe}
-            </button>
-          </div>
+          <form onSubmit={handleNewsletterSubmit} className="max-w-md mx-auto">
+            <div className="flex flex-col sm:flex-row">
+              <input
+                type="email"
+                placeholder={t.email}
+                className="flex-1 px-4 py-3 text-black rounded-t-lg sm:rounded-l-lg sm:rounded-tr-none focus:outline-none disabled:bg-gray-300"
+                value={newsletterEmail}
+                onChange={(e) => setNewsletterEmail(e.target.value)}
+                disabled={newsletterLoading}
+              />
+              <button
+                type="submit"
+                className="bg-yellow-500 hover:bg-yellow-600 px-6 py-3 rounded-b-lg sm:rounded-r-lg sm:rounded-bl-none font-semibold transition-colors text-black disabled:bg-yellow-300 disabled:cursor-not-allowed"
+                disabled={newsletterLoading}
+              >
+                {newsletterLoading ? '...' : t.subscribe}
+              </button>
+            </div>
+            {newsletterFeedback.message && (
+              <p className={`mt-4 text-sm ${newsletterFeedback.type === 'success' ? 'text-green-300' : 'text-red-300'} font-bold`}>
+                {newsletterFeedback.message}
+              </p>
+            )}
+          </form>
         </div>
       </section>
 
