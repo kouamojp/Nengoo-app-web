@@ -221,10 +221,19 @@ export const getAllOrders = async () => {
   return apiCall('/admin/orders');
 };
 
-export const updateOrderStatus = async (orderId, statusData) => {
-  return apiCall(`/admin/orders/${orderId}`, {
+export const updateOrderStatus = async (orderId, newStatus, userType) => {
+  let endpoint = '';
+  if (userType === 'admin') {
+    endpoint = `/admin/orders/${orderId}`;
+  } else if (userType === 'seller') {
+    endpoint = `/seller/orders/${orderId}/status`;
+  } else {
+    throw new Error('Invalid userType provided for updating order status.');
+  }
+
+  return apiCall(endpoint, {
     method: 'PUT',
-    body: JSON.stringify(statusData),
+    body: JSON.stringify({ status: newStatus }),
   });
 };
 

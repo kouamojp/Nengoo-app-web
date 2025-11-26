@@ -25,7 +25,7 @@ export const AdminOrders = (props) => {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      await apiUpdateOrderStatus(orderId, { status: newStatus });
+      await apiUpdateOrderStatus(orderId, newStatus, 'admin');
       // Update the order in the local state
       setOrders(orders.map(order =>
         order.id === orderId

@@ -4,7 +4,7 @@ import Header from './Header';
 import Footer from './Footer';
 import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
-import { getSellerOrders, deleteSellerOrder } from '../services/api';
+import { getSellerOrders, deleteSellerOrder, updateOrderStatus } from '../services/api';
 
 // Seller Orders Management Component
 export const SellerOrders = (props) => {
@@ -28,6 +28,23 @@ export const SellerOrders = (props) => {
       alert('Erreur lors du chargement des commandes');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    try {
+      await updateOrderStatus(orderId, newStatus, 'seller');
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === orderId ? { ...order, status: newStatus } : order
+        )
+      );
+      alert('Statut de la commande mis à jour !');
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      alert(error.message || 'Erreur lors de la mise à jour du statut.');
+      // Optionally, revert state change on error
+      loadOrders();
     }
   };
 
@@ -226,13 +243,20 @@ export const SellerOrders = (props) => {
                           )}
                         </div>
 
-                        <div className="flex space-x-2">
-                          <button
-                            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                            onClick={() => alert('Détails de la commande (à implémenter)')}
-                          >
-                            Détails
-                          </button>
+                        <div className="flex items-center space-x-2">
+                          <div>
+                            <select
+                              value={order.status}
+                              onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            >
+                              <option value="pending">En attente</option>
+                              <option value="confirmed">Confirmée</option>
+                              <option value="shipped">Expédiée</option>
+                              <option value="delivered">Livrée</option>
+                              <option value="cancelled">Annulée</option>
+                            </select>
+                          </div>
                           <button
                             onClick={() => handleDeleteOrder(order.id)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -241,7 +265,7 @@ export const SellerOrders = (props) => {
                                 : 'bg-red-100 text-red-700 hover:bg-red-200'
                             }`}
                           >
-                            {deleteConfirm === order.id ? '🗑️ Confirmer ?' : '🗑️ Supprimer'}
+                            {deleteConfirm === order.id ? '🗑️ Confirmer ?' : '🗑️'}
                           </button>
                         </div>
                       </div>

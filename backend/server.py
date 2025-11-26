@@ -1348,6 +1348,44 @@ async def get_seller_orders(current_user: dict = Depends(get_current_user)):
     return enriched_orders
 
 
+@api_router.put("/seller/orders/{order_id}/status", response_model=dict)
+async def update_seller_order_status(order_id: str, order_update: OrderUpdate, current_user: dict = Depends(get_current_user)):
+    """Update order status by Seller"""
+    if current_user["type"] != "seller":
+        raise HTTPException(status_code=403, detail="Accès non autorisé")
+
+    # First, find the order
+    order = await db.orders.find_one({"_id": ObjectId(order_id)})
+    if not order:
+        raise HTTPException(status_code=404, detail="Commande non trouvée")
+
+    # Then, check if this order contains any product from the current seller
+    seller_id = current_user["id"]
+    if not any(item.get("sellerId") == seller_id for item in order.get("items", [])):
+        raise HTTPException(status_code=403, detail="Vous n'êtes pas autorisé à modifier cette commande")
+
+    update_data = order_update.dict(exclude_unset=True)
+    if not update_data or 'status' not in update_data:
+        raise HTTPException(status_code=400, detail="Aucun statut à mettre à jour fourni")
+
+    # Define allowed statuses
+    allowed_statuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']
+    if update_data['status'] not in allowed_statuses:
+        raise HTTPException(status_code=400, detail=f"Statut invalide. Les statuts autorisés sont : {', '.join(allowed_statuses)}")
+
+    update_data["updatedDate"] = datetime.now(timezone.utc).isoformat()
+
+    result = await db.orders.update_one(
+        {"_id": ObjectId(order_id)},
+        {"$set": {"status": update_data['status'], "updatedDate": update_data["updatedDate"]}}
+    )
+
+    if result.modified_count == 0:
+        return {"message": "Aucune modification détectée ou statut identique."}
+
+    return {"message": "Statut de la commande mis à jour avec succès"}
+
+
 @api_router.delete("/seller/orders/{order_id}")
 async def delete_seller_order(order_id: str, current_user: dict = Depends(get_current_user)):
     """Delete an order containing seller's products (seller only)"""
