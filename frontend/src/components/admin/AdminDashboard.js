@@ -8,6 +8,7 @@ import PickupPointManagement from './PickupPointManagement';
 import BuyerManagement from './BuyerManagement';
 import OrderManagement from './OrderManagement';
 import CategoryManagement from './CategoryManagement';
+import ShippingSettingsManagement from './ShippingSettingsManagement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -144,6 +145,11 @@ const AdminDashboard = (props) => {
                                     <span className="text-xl">🏷️</span><span className="font-medium text-sm">Catégories</span>
                                 </button>
                             )}
+                            {user.role === 'super_admin' && (
+                                <button onClick={() => setActiveSection('shipping')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'shipping' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                                    <span className="text-xl">🚚</span><span className="font-medium text-sm">Frais de livraison</span>
+                                </button>
+                            )}
                             <div className="border-t border-gray-200 my-2"></div>
                             <Link to="/admin/management" className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors hover:bg-purple-50 border-2 border-purple-300 bg-purple-50">
                                 <span className="text-xl">👑</span><span className="font-medium text-sm text-purple-700">Administrateurs</span>
@@ -166,6 +172,7 @@ const AdminDashboard = (props) => {
                     {activeSection === 'buyers' && <BuyerManagement {...props} />}
                     {activeSection === 'orders' && <OrderManagement {...props} orders={orders} onOrderUpdate={fetchOrders} />}
                     {activeSection === 'categories' && <CategoryManagement {...props} />}
+                    {activeSection === 'shipping' && <ShippingSettingsManagement {...props} />}
                 </div>
             </div>
         </div>
