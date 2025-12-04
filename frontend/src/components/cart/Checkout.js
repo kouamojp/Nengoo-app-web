@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
-import { mockSellerData } from '../../lib/mockData';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 
@@ -24,6 +23,26 @@ const Checkout = (props) => {
     deliveryOption: 'home', // 'home' or 'pickup'
     selectedPickupPoint: ''
   });
+  const [pickupPoints, setPickupPoints] = useState([]);
+
+  useEffect(() => {
+    const fetchPickupPoints = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/pickup-points`, {
+          headers: { 'X-Admin-Role': 'super_admin' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setPickupPoints(data);
+        } else {
+          console.error('Failed to fetch pickup points');
+        }
+      } catch (error) {
+        console.error('Error fetching pickup points:', error);
+      }
+    };
+    fetchPickupPoints();
+  }, []);
   
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -194,7 +213,7 @@ const Checkout = (props) => {
                   <div className="mb-6">
                     <label className="block text-sm font-medium mb-3">Choisir un Point de Retrait</label>
                     <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {mockSellerData.pickupPoints.map(point => (
+                      {pickupPoints.map(point => (
                         <label key={point.id} className="flex items-start p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
                           <input
                             type="radio"
@@ -328,7 +347,7 @@ const Checkout = (props) => {
                   <div className="pt-2 border-t">
                     <p className="text-sm font-medium text-purple-600">Point de retrait:</p>
                     <p className="text-sm text-gray-600">
-                      {mockSellerData.pickupPoints.find(p => p.id.toString() === formData.selectedPickupPoint)?.name}
+                      {pickupPoints.find(p => p.id.toString() === formData.selectedPickupPoint)?.name}
                     </p>
                   </div>
                 )}

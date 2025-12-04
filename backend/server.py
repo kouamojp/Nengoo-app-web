@@ -223,18 +223,12 @@ class AdminUpdate(BaseModel):
 class AdminStatusUpdate(BaseModel):
     status: str
 
-class Coordinates(BaseModel):
-    latitude: float
-    longitude: float
-
 class PickupPoint(BaseModel):
     id: str = Field(default_factory=lambda: f"pickup_{str(uuid.uuid4())[:8]}")
     name: str
     address: str
     city: str
     region: str
-    coordinates: Coordinates
-    managerId: str
     managerName: str
     managerWhatsApp: str
     phone: str
@@ -258,8 +252,6 @@ class PickupPointCreate(BaseModel):
     address: str
     city: str
     region: str
-    coordinates: Coordinates
-    managerId: str
     managerName: str
     managerWhatsApp: str
     phone: str
@@ -267,6 +259,18 @@ class PickupPointCreate(BaseModel):
     hours: str
     description: str
 
+class PickupPointUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    managerName: Optional[str] = None
+    managerWhatsApp: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    hours: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
 class Category(BaseModel):
     id: str = Field(default_factory=lambda: f"cat_{str(uuid.uuid4())[:8]}")
     name: str
@@ -598,11 +602,30 @@ async def create_pickup_point(pickup_data: PickupPointCreate):
     await db.pickupPoints.insert_one(pickup_point.dict())
     return pickup_point
 
-@api_router.get("/pickup-points", response_model=List[PickupPoint], dependencies=[Depends(super_admin_required)])
+@api_router.get("/pickup-points", response_model=List[PickupPoint])
 async def list_pickup_points():
     pickup_points_cursor = db.pickupPoints.find()
     pickup_points = await pickup_points_cursor.to_list(1000)
     return [PickupPoint(**p) for p in pickup_points]
+
+@api_router.put("/pickup-points/{pickup_point_id}", response_model=PickupPoint, dependencies=[Depends(super_admin_required)])
+async def update_pickup_point(pickup_point_id: str, pickup_data: PickupPointUpdate):
+    update_data = pickup_data.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided.")
+    
+    await db.pickupPoints.update_one({"id": pickup_point_id}, {"$set": update_data})
+    updated_pickup_point = await db.pickupPoints.find_one({"id": pickup_point_id})
+    if not updated_pickup_point:
+        raise HTTPException(status_code=404, detail="Pickup point not found")
+    return PickupPoint(**updated_pickup_point)
+
+@api_router.delete("/pickup-points/{pickup_point_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+async def delete_pickup_point(pickup_point_id: str):
+    result = await db.pickupPoints.delete_one({"id": pickup_point_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Pickup point not found")
+    return
 
 # --- Category Management ---
 @api_router.get("/categories", response_model=List[Category])
