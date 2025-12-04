@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nengoo</string>
+    <string name="title_activity_main">Nengoo</string>
+    <string name="package_name">com.nengoo.cameroon</string>
+    <string name="custom_url_scheme">com.nengoo.cameroon</string>
+</resources>

@@ -60,40 +60,41 @@ self.addEventListener('fetch', (event) => {
           return fetch(event.request);
         })
     );
-    return;
+    return; // Important: exit early for static assets
   }
 
   // Stratégie Network First pour les pages et API
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Vérifier si la réponse est valide
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+        // Only cache GET requests
+        if (event.request.method === 'GET' && response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME)
+            .then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+        }
+        return response; // Always return the network response if successful
+      })
+      .catch(async (error) => { // Catch network errors
+        // Try to get from cache if network fails
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
         }
 
-        // Cloner la réponse
-        const responseToCache = response.clone();
-
-        caches.open(CACHE_NAME)
-          .then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-
-        return response;
-      })
-      .catch(() => {
-        // Fallback vers le cache si offline
-        return caches.match(event.request)
-          .then((response) => {
-            if (response) {
-              return response;
-            }
-            // Fallback page pour les routes non cachées
-            if (event.request.mode === 'navigate') {
-              return caches.match('/');
-            }
-          });
+        // Fallback for navigation requests (e.g., if offline and page not cached)
+        if (event.request.mode === 'navigate') {
+          const offlinePage = await caches.match('/'); // Assume '/' is the offline fallback
+          if (offlinePage) {
+            return offlinePage;
+          }
+        }
+        
+        // If neither network nor cache worked, and it's not a navigation request with a fallback,
+        // rethrow the error. This will propagate the error back to the page.
+        return Promise.reject(error);
       })
   );
 });
