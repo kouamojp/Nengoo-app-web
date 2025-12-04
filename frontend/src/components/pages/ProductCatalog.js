@@ -15,8 +15,8 @@ const ProductCatalog = (props) => {
   const [loading, setLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [sortBy, setSortBy] = useState('name');
-  const [maxAllowedPrice, setMaxAllowedPrice] = useState(200000); // Default max price
-  const [priceRange, setPriceRange] = useState([0, 200000]); // Initialized with default max
+  const [maxAllowedPrice, setMaxAllowedPrice] = useState(2000000); // Default max price
+  const [priceRange, setPriceRange] = useState([0, 2000000]); // Initialized with default max
   const [selectedCategory, setSelectedCategory] = useState(category || 'all');
 
   const t = translations[language];
@@ -29,7 +29,7 @@ const ProductCatalog = (props) => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        const fetchedMaxPrice = data.maxPrice > 0 ? Math.ceil(data.maxPrice / 1000) * 1000 : 200000; // Round up to nearest thousand, min 200000
+        const fetchedMaxPrice = data.maxPrice > 0 ? Math.ceil(data.maxPrice / 1000) * 1000 : 2000000; // Round up to nearest thousand, min 200000
         setMaxAllowedPrice(fetchedMaxPrice);
         setPriceRange([0, fetchedMaxPrice]); // Set initial price range to [0, fetchedMaxPrice]
       } catch (error) {
