@@ -191,7 +191,6 @@ const PickupPointManagement = (props) => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Adresse</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gestionnaire</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ville</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
                         </thead>
@@ -202,11 +201,6 @@ const PickupPointManagement = (props) => {
                                     <td className="px-6 py-4 text-sm">{point.address}, {point.city}</td>
                                     <td className="px-6 py-4 text-sm">{point.managerName}</td>
                                     <td className="px-6 py-4 text-sm">{point.city}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 text-xs rounded-full ${point.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                            {point.status}
-                                        </span>
-                                    </td>
                                     <td className="px-6 py-4">
                                         <button onClick={() => handleEditClick(point)} className="text-blue-600 hover:text-blue-800 font-semibold text-sm">Modifier</button>
                                         <button onClick={() => handleDeletePickupPoint(point.id)} className="text-red-600 hover:text-red-800 font-semibold text-sm ml-4">Supprimer</button>
