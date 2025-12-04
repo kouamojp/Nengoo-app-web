@@ -51,13 +51,25 @@ async def support_or_higher_required(role: str = Depends(get_current_admin_role)
             detail="Support, Moderator, Admin, or Super admin privileges required."
         )
 
-async def seller_id_or_support_required(seller_id: Optional[str] = None, role: str = Depends(get_current_admin_role)):
+async def get_current_seller_optional(x_seller_id: Optional[str] = Header(None)) -> Optional[str]:
+    return x_seller_id
+
+async def seller_id_or_support_required(seller_id: Optional[str] = Depends(get_current_seller_optional), role: str = Depends(get_current_admin_role)):
     if seller_id:
         return
     if role not in ["super_admin", "admin", "moderator", "support"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Support, Moderator, Admin, or Super admin privileges required."
+        )
+
+async def seller_or_moderator_or_higher_required(seller_id: Optional[str] = Depends(get_current_seller_optional), role: str = Depends(get_current_admin_role)):
+    if seller_id:
+        return
+    if role not in ["super_admin", "admin", "moderator"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seller, Moderator, Admin, or Super admin privileges required."
         )
 
 # --- Hashing Utility ---
@@ -432,9 +444,54 @@ async def get_product(product_id: str):
         raise HTTPException(status_code=404, detail="Product not found")
     return Product(**product)
 
-@api_router.post("/products", response_model=Product, dependencies=[Depends(super_admin_required)])
-async def create_product(product_data: ProductCreate):
+class MaxPriceResponse(BaseModel):
+    maxPrice: float
+
+@api_router.get("/products/max-price", response_model=MaxPriceResponse)
+async def get_max_product_price():
+    # Use find().sort().limit(1) for a more robust way to get the product with the max price
+    product_cursor = db.products.find().sort("price", -1).limit(1)
+    products_list = await product_cursor.to_list(1)
+    
+    logger.info(f"💰 [Backend Debug] products_list from db.products.find(): {products_list}")
+
+    if products_list:
+        product = products_list[0]
+        logger.info(f"💰 [Backend] Found product with max price: {product['price']}")
+        return MaxPriceResponse(maxPrice=product["price"])
+    
+    logger.info("💰 [Backend] No products found, returning max price 0.0")
+    return MaxPriceResponse(maxPrice=0.0)
+
+@api_router.post("/products", response_model=Product, dependencies=[Depends(seller_or_moderator_or_higher_required)])
+async def create_product(product_data: ProductCreate, 
+                       current_seller_id: Optional[str] = Depends(get_current_seller_optional),
+                       admin_role: Optional[str] = Depends(get_current_admin_role)):
+    
+    seller_id_to_use = None
+    seller_name_to_use = None
+
+    if current_seller_id:
+        seller = await db.sellers.find_one({"id": current_seller_id})
+        if not seller:
+            raise HTTPException(status_code=404, detail="Seller not found.")
+        seller_id_to_use = current_seller_id
+        seller_name_to_use = seller["businessName"]
+    elif admin_role in ["super_admin", "admin", "moderator"]:
+        # For admins/moderators creating products, we can use a generic admin seller or require a sellerId in product_data
+        # For simplicity, let's assume if an admin creates, they specify the sellerId in product_data
+        # Or, we could assign it to a default admin seller.
+        # For now, if admin creates, sellerId and sellerName must be present in product_data.
+        if not product_data.sellerId or not product_data.sellerName:
+            raise HTTPException(status_code=400, detail="Seller ID and Name must be provided in product data when created by an admin role.")
+        seller_id_to_use = product_data.sellerId
+        seller_name_to_use = product_data.sellerName
+    else:
+        raise HTTPException(status_code=403, detail="Not authorized to create products.")
+
     product = Product(**product_data.dict())
+    product.sellerId = seller_id_to_use
+    product.sellerName = seller_name_to_use
     await db.products.insert_one(product.dict())
     return product
 

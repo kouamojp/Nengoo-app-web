@@ -15,10 +15,30 @@ const ProductCatalog = (props) => {
   const [loading, setLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [sortBy, setSortBy] = useState('name');
-  const [priceRange, setPriceRange] = useState([0, 200000]);
+  const [maxAllowedPrice, setMaxAllowedPrice] = useState(200000); // Default max price
+  const [priceRange, setPriceRange] = useState([0, 200000]); // Initialized with default max
   const [selectedCategory, setSelectedCategory] = useState(category || 'all');
 
   const t = translations[language];
+
+  useEffect(() => {
+    const fetchMaxPrice = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/products/max-price`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        const fetchedMaxPrice = data.maxPrice > 0 ? Math.ceil(data.maxPrice / 1000) * 1000 : 200000; // Round up to nearest thousand, min 200000
+        setMaxAllowedPrice(fetchedMaxPrice);
+        setPriceRange([0, fetchedMaxPrice]); // Set initial price range to [0, fetchedMaxPrice]
+      } catch (error) {
+        console.error("❌ [ProductCatalog] Erreur lors de la récupération du prix max:", error);
+        // Fallback to default maxAllowedPrice
+      }
+    };
+    fetchMaxPrice();
+  }, []);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -165,8 +185,8 @@ const ProductCatalog = (props) => {
                   <input
                     type="range"
                     min="0"
-                    max="200000"
-                    step="5000"
+                    max={maxAllowedPrice}
+                    step="1000" // Adjusted step for more granularity if max price is high
                     value={priceRange[1]}
                     onChange={(e) => setPriceRange([0, parseInt(e.target.value)])}
                     className="w-full"
