@@ -304,6 +304,10 @@ class BuyerUpdate(BaseModel):
     email: Optional[str] = None
     status: Optional[str] = None
 
+class NewsletterSubscription(BaseModel):
+    email: str
+    subscribed_at: datetime = Field(default_factory=datetime.utcnow)
+
 # --- API Endpoints ---
 # ... (existing endpoints)
 
@@ -760,6 +764,19 @@ async def delete_admin(admin_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Admin not found")
     return
+
+# --- Newsletter Subscription ---
+@api_router.post("/newsletter/subscribe", status_code=status.HTTP_201_CREATED)
+async def subscribe_newsletter(subscription: NewsletterSubscription):
+    """
+    Subscribes an email to the newsletter.
+    """
+    existing_subscription = await db.newsletter_subscriptions.find_one({"email": subscription.email})
+    if existing_subscription:
+        raise HTTPException(status_code=400, detail="This email is already subscribed.")
+    
+    await db.newsletter_subscriptions.insert_one(subscription.dict())
+    return {"message": "Successfully subscribed to the newsletter."}
 
 # --- App Initialization ---
 app.include_router(api_router)
