@@ -39,13 +39,13 @@ const ProductCard = ({ product, language, addToCart }) => {
             {t.outOfStock}
           </span>
         )}
-        <div className="absolute top-2 right-2 flex space-x-1">
+        {/* <div className="absolute top-2 right-2 flex space-x-1">
           {[...Array(5)].map((_, i) => (
             <span key={i} className={`text-sm ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`}>
               ⭐
             </span>
           ))}
-        </div>
+        </div> */}
       </div>
       
       <div className="p-4">
@@ -55,10 +55,10 @@ const ProductCard = ({ product, language, addToCart }) => {
         >
           {product.name[language]}
         </h3>
-        <p className="text-gray-600 text-sm mb-2">
+        {/* <p className="text-gray-600 text-sm mb-2">
           {product.reviews} {t.reviews} • {product.rating} ⭐
-        </p>
-        <div className="flex justify-between items-center mb-3">
+        </p> */}
+        <div className="flex justify-between items-center mb-3 mt-5">
           <span className="text-xl font-bold text-purple-600">
             {formatPrice(product.price)}
           </span>

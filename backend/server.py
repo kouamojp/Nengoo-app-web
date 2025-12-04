@@ -398,8 +398,16 @@ async def root():
 
 # --- Product Management ---
 @api_router.get("/products", response_model=List[Product])
-async def get_products():
-    products = await db.products.find().to_list(1000)
+async def get_products(search: Optional[str] = None):
+    query = {}
+    if search:
+        query = {
+            "$or": [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+            ]
+        }
+    products = await db.products.find(query).to_list(1000)
     return [Product(**p) for p in products]
 
 @api_router.get("/products/{product_id}", response_model=Product)

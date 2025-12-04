@@ -10,6 +10,8 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
   const navigate = useNavigate();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const t = translations[language];
 
   // Mapping des icônes pour les catégories
@@ -51,8 +53,48 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (searchQuery.trim().length > 1) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/products?search=${encodeURIComponent(searchQuery.trim())}`);
+          if (response.ok) {
+            const data = await response.json();
+            setSuggestions(data);
+            setShowSuggestions(true);
+          } else {
+            setSuggestions([]);
+          }
+        } catch (error) {
+          console.error("Erreur lors de la récupération des suggestions:", error);
+          setSuggestions([]);
+        }
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    };
+
+    const debounceTimeout = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(debounceTimeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showSuggestions && !event.target.closest('.search-container')) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSuggestions]);
+
   const handleSearch = (e) => {
     e.preventDefault();
+    setShowSuggestions(false);
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
     }
@@ -89,7 +131,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
           </Link>
 
           {/* Search Bar - Hidden on mobile, shown on tablet+ */}
-          <div className="hidden md:flex flex-1 max-w-2xl mx-8">
+          <div className="hidden md:flex flex-1 max-w-2xl mx-8 search-container">
             <form onSubmit={handleSearch} className="relative w-full">
               <input
                 type="text"
@@ -104,6 +146,24 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
               >
                 🔍
               </button>
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-lg shadow-lg z-10 max-h-96 overflow-y-auto">
+                  {suggestions.map(product => (
+                    <Link
+                      key={product.id}
+                      to={`/product/${product.id}`}
+                      className="flex items-center px-4 py-2 text-black hover:bg-gray-100"
+                      onClick={() => {
+                        setShowSuggestions(false);
+                        setSearchQuery('');
+                      }}
+                    >
+                      <img src={product.images[0]} alt={product.name} className="w-10 h-10 object-cover mr-4"/>
+                      <span>{product.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </form>
           </div>
 
@@ -167,7 +227,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
         </div>
 
         {/* Mobile Search Bar */}
-        <div className="md:hidden mt-4">
+        <div className="md:hidden mt-4 search-container">
           <form onSubmit={handleSearch} className="relative">
             <input
               type="text"
@@ -182,6 +242,24 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
             >
               🔍
             </button>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-lg shadow-lg z-10 max-h-80 overflow-y-auto">
+                {suggestions.map(product => (
+                  <Link
+                    key={product.id}
+                    to={`/products/${product.id}`}
+                    className="flex items-center px-4 py-2 text-black hover:bg-gray-100"
+                    onClick={() => {
+                      setShowSuggestions(false);
+                      setSearchQuery('');
+                    }}
+                  >
+                    <img src={product.images[0]} alt={product.name} className="w-10 h-10 object-cover mr-4"/>
+                    <span>{product.name}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </form>
         </div>
       </div>
