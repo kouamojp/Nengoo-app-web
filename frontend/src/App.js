@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import './App.css';
+import ScrollToTop from './components/ui/ScrollToTop';
 import Toast from './components/ui/Toast';
 import {
   Homepage,
@@ -151,6 +152,7 @@ function App() {
   return (
     <div className="App">
       <Router>
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<Homepage {...appProps} />} />
           <Route path="/catalog" element={<ProductCatalog {...appProps} />} />
