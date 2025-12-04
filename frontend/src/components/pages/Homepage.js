@@ -357,7 +357,7 @@ const Homepage = (props) => {
       </section>
 
       {/* Newsletter */}
-      <section className="py-12 lg:py-16 bg-gradient-to-r from-purple-600 to-red-600 text-white">
+      {/* <section className="py-12 lg:py-16 bg-gradient-to-r from-purple-600 to-red-600 text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold mb-4">{t.newsletter}</h2>
           <p className="text-lg sm:text-xl mb-6 lg:mb-8 opacity-90">Restez informé de nos dernières offres et nouveautés</p>
@@ -383,7 +383,7 @@ const Homepage = (props) => {
             </p>
           )}
         </div>
-      </section>
+      </section> */}
 
       <Footer language={language} />
     </div>
