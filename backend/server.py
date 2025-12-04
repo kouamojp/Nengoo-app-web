@@ -146,8 +146,19 @@ class SellerCreate(BaseModel):
     city: str
     region: str
     address: str
-    categories: List[str]
+    categories: List[str] = []
     description: str
+
+class SellerUpdate(BaseModel):
+    name: Optional[str] = None
+    businessName: Optional[str] = None
+    email: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    address: Optional[str] = None
+    categories: Optional[List[str]] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
 
 class OrderProduct(BaseModel):
     productId: str
@@ -316,7 +327,7 @@ class NewsletterSubscription(BaseModel):
 # ... (existing endpoints)
 
 # --- File Upload Management (AWS S3) ---
-@api_router.post("/generate-presigned-url", response_model=PresignedUrlResponse, dependencies=[Depends(super_admin_required)])
+@api_router.post("/generate-presigned-url", response_model=PresignedUrlResponse, dependencies=[Depends(seller_id_or_support_required)])
 async def generate_presigned_url(request: PresignedUrlRequest):
     """
     Generates a pre-signed URL to upload a file directly to S3.
@@ -447,13 +458,21 @@ async def delete_product(product_id: str):
     return
 
 # --- Seller Management ---
-@api_router.post("/sellers", response_model=Seller, dependencies=[Depends(super_admin_required)])
+@api_router.post("/sellers", response_model=Seller)
 async def create_seller(seller_data: SellerCreate):
     if await db.sellers.find_one({"whatsapp": seller_data.whatsapp}):
         raise HTTPException(status_code=400, detail="Seller with this WhatsApp number already exists.")
 
     hashed_password = hash_password(seller_data.password)
-    seller = Seller(password=hashed_password, **seller_data.dict(exclude={"password"}))
+    
+    seller_dict = seller_data.dict()
+    seller_dict['password'] = hashed_password
+    seller_dict['id'] = f"seller_{str(uuid.uuid4())[:8]}"
+    seller_dict['status'] = "pending"
+    seller_dict['createdAt'] = datetime.utcnow()
+    seller_dict['updatedAt'] = datetime.utcnow()
+
+    seller = Seller(**seller_dict)
 
     await db.sellers.insert_one(seller.dict())
     return seller
@@ -470,6 +489,52 @@ async def get_seller(seller_id: str):
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     return Seller(**seller)
+
+class SellerLoginRequest(BaseModel):
+    whatsapp: str
+    password: str
+
+@api_router.post("/sellers/login", response_model=Seller)
+async def seller_login(login_data: SellerLoginRequest):
+    seller = await db.sellers.find_one({"whatsapp": login_data.whatsapp})
+
+    if not seller:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
+
+    if not verify_password(login_data.password, seller["password"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
+
+    if seller["status"] != "approved":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Votre compte vendeur est en attente d'approbation")
+    
+    return Seller(**seller)
+
+@api_router.put("/sellers/{seller_id}/approve", response_model=Seller, dependencies=[Depends(moderator_or_higher_required)])
+async def approve_seller(seller_id: str):
+    await db.sellers.update_one({"id": seller_id}, {"$set": {"status": "approved"}})
+    updated_seller = await db.sellers.find_one({"id": seller_id})
+    if not updated_seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    return Seller(**updated_seller)
+
+@api_router.put("/sellers/{seller_id}", response_model=Seller, dependencies=[Depends(super_admin_required)])
+async def update_seller(seller_id: str, seller_data: SellerUpdate):
+    update_data = seller_data.dict(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided.")
+    
+    await db.sellers.update_one({"id": seller_id}, {"$set": update_data})
+    updated_seller = await db.sellers.find_one({"id": seller_id})
+    if not updated_seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    return Seller(**updated_seller)
+
+@api_router.delete("/sellers/{seller_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+async def delete_seller(seller_id: str):
+    result = await db.sellers.delete_one({"id": seller_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    return
 
 # --- Order Management ---
 @api_router.get("/orders", response_model=List[Order])
@@ -662,7 +727,7 @@ async def delete_category(category_id: str):
     return
 
 # --- File Upload Management (AWS S3) ---
-@api_router.post("/generate-presigned-url", response_model=PresignedUrlResponse, dependencies=[Depends(super_admin_required)])
+@api_router.post("/generate-presigned-url", response_model=PresignedUrlResponse, dependencies=[Depends(seller_id_or_support_required)])
 async def generate_presigned_url(request: PresignedUrlRequest):
     """
     Generates a pre-signed URL to upload a file directly to S3.

@@ -7,6 +7,8 @@ const SellerManagement = (props) => {
     const [sellers, setSellers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [currentSeller, setCurrentSeller] = useState(null);
     const [newSellerData, setNewSellerData] = useState({
         whatsapp: '', password: '', name: '', businessName: '', email: '',
         city: '', region: '', address: '', categories: '', description: '',
@@ -37,6 +39,11 @@ const SellerManagement = (props) => {
         setNewSellerData({ ...newSellerData, [name]: value });
     };
 
+    const handleEditInputChange = (e) => {
+        const { name, value } = e.target;
+        setCurrentSeller({ ...currentSeller, [name]: value });
+    };
+
     const handleAddSeller = async (e) => {
         e.preventDefault();
         try {
@@ -65,6 +72,74 @@ const SellerManagement = (props) => {
         } catch (error) {
             console.error('Error adding seller:', error);
             alert(`Erreur: ${error.message}`);
+        }
+    };
+
+    const handleApproveSeller = async (sellerId) => {
+        if (window.confirm('Êtes-vous sûr de vouloir approuver ce vendeur?')) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/sellers/${sellerId}/approve`, {
+                    method: 'PUT',
+                    headers: { 'X-Admin-Role': 'super_admin' },
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to approve seller');
+                }
+                await fetchSellers();
+                alert('✅ Vendeur approuvé avec succès!');
+            } catch (error) {
+                console.error('Error approving seller:', error);
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+    };
+
+    const handleEditClick = (seller) => {
+        setCurrentSeller(seller);
+        setShowEditModal(true);
+    };
+
+    const handleUpdateSeller = async (e) => {
+        e.preventDefault();
+        if (!currentSeller) return;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/sellers/${currentSeller.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Role': 'super_admin' },
+                body: JSON.stringify(currentSeller),
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Failed to update seller');
+            }
+            await fetchSellers();
+            setShowEditModal(false);
+            alert('✅ Vendeur mis à jour avec succès!');
+        } catch (error) {
+            console.error('Error updating seller:', error);
+            alert(`Erreur: ${error.message}`);
+        }
+    };
+
+    const handleDeleteSeller = async (sellerId) => {
+        if (window.confirm('Êtes-vous sûr de vouloir supprimer ce vendeur?')) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/sellers/${sellerId}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Admin-Role': 'super_admin' },
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to delete seller');
+                }
+                await fetchSellers();
+                alert('🗑️ Vendeur supprimé avec succès!');
+            } catch (error) {
+                console.error('Error deleting seller:', error);
+                alert(`Erreur: ${error.message}`);
+            }
         }
     };
     
@@ -109,6 +184,29 @@ const SellerManagement = (props) => {
                 </div>
             )}
 
+            {showEditModal && currentSeller && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-gray-900">✏️ Modifier le vendeur</h2>
+                            <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+                        </div>
+                        <form onSubmit={handleUpdateSeller} className="space-y-4">
+                            <input type="text" name="businessName" value={currentSeller.businessName} onChange={handleEditInputChange} placeholder="Nom de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="name" value={currentSeller.name} onChange={handleEditInputChange} placeholder="Nom du propriétaire" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="tel" name="whatsapp" value={currentSeller.whatsapp} onChange={handleEditInputChange} placeholder="WhatsApp" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="email" name="email" value={currentSeller.email} onChange={handleEditInputChange} placeholder="Email" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="address" value={currentSeller.address} onChange={handleEditInputChange} placeholder="Adresse" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="city" value={currentSeller.city} onChange={handleEditInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="region" value={currentSeller.region} onChange={handleEditInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
+                            <textarea name="description" value={currentSeller.description} onChange={handleEditInputChange} placeholder="Description de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="categories" value={currentSeller.categories} onChange={handleEditInputChange} placeholder="Catégories (séparées par des virgules)" className="w-full px-4 py-3 border rounded-lg" required />
+                            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold">Mettre à jour</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
                 {loading ? <p className="p-6">Chargement...</p> : (
                     <table className="w-full">
@@ -133,8 +231,11 @@ const SellerManagement = (props) => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <button className="text-blue-600 hover:text-blue-800 font-semibold text-sm">Modifier</button>
-                                        <button className="text-red-600 hover:text-red-800 font-semibold text-sm ml-4">Supprimer</button>
+                                        {seller.status === 'pending' && (
+                                            <button onClick={() => handleApproveSeller(seller.id)} className="text-green-600 hover:text-green-800 font-semibold text-sm">Approuver</button>
+                                        )}
+                                        <button onClick={() => handleEditClick(seller)} className="text-blue-600 hover:text-blue-800 font-semibold text-sm ml-4">Modifier</button>
+                                        <button onClick={() => handleDeleteSeller(seller.id)} className="text-red-600 hover:text-red-800 font-semibold text-sm ml-4">Supprimer</button>
                                     </td>
                                 </tr>
                             ))}

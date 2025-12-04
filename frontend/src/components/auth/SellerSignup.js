@@ -1,10 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import { mockUsers, cameroonCities } from '../../lib/mockData';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const SellerSignup = (props) => {
   const { language, setUser } = props;
@@ -12,11 +14,14 @@ const SellerSignup = (props) => {
   const t = translations[language];
   const [formData, setFormData] = useState({
     whatsapp: '',
+    password: '',
     name: '',
     businessName: '',
     email: '',
     city: '',
-    categories: []
+    region: '',
+    address: '',
+    description: '',
   });
   const [isLogin, setIsLogin] = useState(false);
 
@@ -27,67 +32,64 @@ const SellerSignup = (props) => {
     });
   };
 
-  const handleCategoryChange = (category) => {
-    setFormData(prev => ({
-      ...prev,
-      categories: prev.categories.includes(category)
-        ? prev.categories.filter(c => c !== category)
-        : [...prev.categories, category]
-    }));
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (isLogin) {
-      // Check if seller exists and is approved
-      const existingSeller = mockUsers.sellers.find(user => user.whatsapp === formData.whatsapp);
-      if (existingSeller && existingSeller.status === 'approved') {
-        setUser(existingSeller);
-        localStorage.setItem('nengoo-user', JSON.stringify(existingSeller));
+      try {
+        const response = await fetch(`${API_BASE_URL}/sellers/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            whatsapp: formData.whatsapp,
+            password: formData.password,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail || 'Failed to login');
+        }
+
+        setUser(data);
+        localStorage.setItem('nengoo-user', JSON.stringify(data));
         navigate('/seller');
-      } else {
-        alert('Compte vendeur non trouvé ou non approuvé. Veuillez contacter l\'administrateur.');
+      } catch (error) {
+        console.error('Login error:', error);
+        alert(error.message);
       }
     } else {
       // Register new seller
-      const newSeller = {
-        id: Date.now(), // ID unique basé sur timestamp
-        whatsapp: formData.whatsapp,
-        name: formData.name,
-        businessName: formData.businessName,
-        email: formData.email,
-        city: formData.city,
-        categories: formData.categories,
-        status: 'pending',
-        submitDate: new Date().toISOString().split('T')[0],
-        type: 'seller'
-      };
-      
-      // Sauvegarder dans localStorage pour persistance
-      const existingPendingSellers = JSON.parse(localStorage.getItem('nengoo-pending-sellers') || '[]');
-      existingPendingSellers.push(newSeller);
-      localStorage.setItem('nengoo-pending-sellers', JSON.stringify(existingPendingSellers));
-      
-      mockUsers.pendingSellers.push(newSeller);
-      navigate('/pending-approval', { state: { seller: newSeller } });
+      try {
+        const response = await fetch(`${API_BASE_URL}/sellers`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          console.error('Signup error response:', data);
+          const errorDetail = data.detail && Array.isArray(data.detail) 
+            ? data.detail.map(err => `${err.loc.join(' -> ')}: ${err.msg}`).join('; ')
+            : (data.detail || 'Failed to signup');
+          throw new Error(errorDetail);
+        }
+        
+        navigate('/pending-approval', { state: { seller: data } });
+
+      } catch (error) {
+        console.error('Signup error:', error);
+        alert(error.message);
+      }
     }
   };
-
-  const categoryOptions = [
-    { key: 'clothing_accessories', label: 'Vêtements et Accessoires', icon: '👗' },
-    { key: 'food_drinks', label: 'Aliments et Boissons', icon: '🍽️' },
-    { key: 'electronics', label: 'Électroniques', icon: '📱' },
-    { key: 'home_garden', label: 'Maison & Jardinage', icon: '🏠' },
-    { key: 'handicrafts', label: 'Artisanat et Produits Faits Main', icon: '🎨' },
-    { key: 'beauty_care', label: 'Produits de Beauté et Soins Personnels', icon: '💄' },
-    { key: 'sports_articles', label: 'Articles Sportifs', icon: '⚽' },
-    { key: 'toys', label: 'Jouets pour Enfants', icon: '🧸' },
-    { key: 'medical_equipment', label: 'Matériel Médical', icon: '🏥' },
-    { key: 'professional_equipment', label: 'Équipements Professionnels', icon: '🔧' },
-    { key: 'services', label: 'Services', icon: '🛠️' },
-    { key: 'travel_tickets', label: 'Voyages et Billets', icon: '✈️' }
-  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -116,6 +118,19 @@ const SellerSignup = (props) => {
                     value={formData.whatsapp}
                     onChange={handleInputChange}
                     placeholder="+237 6XX XXX XXX"
+                    required
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Mot de passe *</label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="Votre mot de passe"
                     required
                     className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
@@ -177,40 +192,50 @@ const SellerSignup = (props) => {
                         ))}
                       </select>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">{t.region} *</label>
+                      <input
+                        type="text"
+                        name="region"
+                        value={formData.region}
+                        onChange={handleInputChange}
+                        placeholder="Votre région"
+                        required
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">{t.address} *</label>
+                      <input
+                        type="text"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleInputChange}
+                        placeholder="Votre adresse"
+                        required
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium mb-2">Description *</label>
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={handleInputChange}
+                        placeholder="Décrivez votre entreprise"
+                        required
+                        className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
                   </>
                 )}
               </div>
 
-              {!isLogin && (
-                <div>
-                  <label className="block text-sm font-medium mb-4">{t.selectCategories} *</label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {categoryOptions.map(category => (
-                      <label key={category.key} className="flex flex-col items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={formData.categories.includes(category.key)}
-                          onChange={() => handleCategoryChange(category.key)}
-                          className="sr-only"
-                        />
-                        <div className={`text-2xl mb-1 ${formData.categories.includes(category.key) ? 'opacity-100' : 'opacity-50'}`}>
-                          {category.icon}
-                        </div>
-                        <span className={`text-xs text-center ${formData.categories.includes(category.key) ? 'font-semibold text-purple-700' : 'text-gray-600'}`}>
-                          {category.label}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  {formData.categories.length === 0 && (
-                    <p className="text-sm text-red-500 mt-2">Veuillez sélectionner au moins une catégorie</p>
-                  )}
-                </div>
-              )}
-
               <button
                 type="submit"
-                disabled={!isLogin && formData.categories.length === 0}
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white py-3 px-6 rounded-lg font-semibold hover:shadow-lg transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLogin ? t.login : "Soumettre ma candidature"}

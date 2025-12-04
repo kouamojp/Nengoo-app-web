@@ -20,8 +20,9 @@ const SellerProducts = (props) => {
       category: 'clothing_accessories',
       price: 0,
       stock: 0,
-      images: [''],
+      images: [],
     });
+    const [selectedFiles, setSelectedFiles] = useState([]);
 
     const fetchProducts = async () => {
       try {
@@ -64,11 +65,47 @@ const SellerProducts = (props) => {
     const handleAddProduct = async (e) => {
       e.preventDefault();
       
+      const uploadedImageUrls = [];
+      for (const file of selectedFiles) {
+        try {
+          // 1. Get presigned URL from your backend
+          const presignedResponse = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Admin-Role': 'support' // Assuming seller has 'support' access for upload
+            },
+            body: JSON.stringify({ fileName: file.name, fileType: file.type }),
+          });
+          if (!presignedResponse.ok) {
+            throw new Error('Failed to get presigned URL');
+          }
+          const { uploadUrl, publicUrl } = await presignedResponse.json();
+  
+          // 2. Upload image directly to S3 using the presigned URL
+          const uploadResult = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: file,
+            headers: {
+              'Content-Type': file.type,
+            },
+          });
+          if (!uploadResult.ok) {
+            throw new Error('Failed to upload image to S3');
+          }
+          uploadedImageUrls.push(publicUrl);
+        } catch (error) {
+          console.error("Error uploading file:", error);
+          alert(`Erreur lors du téléchargement de l'image ${file.name}: ${error.message}`);
+          return; // Stop the process if any upload fails
+        }
+      }
+
       const productData = {
           ...newProduct,
           sellerId: "seller_001", // Hardcoded for now
           sellerName: "Mode Africaine", // Hardcoded for now
-          images: [newProduct.images[0]], // Ensure it's an array with one image
+          images: uploadedImageUrls,
       };
 
       try {
@@ -92,8 +129,9 @@ const SellerProducts = (props) => {
             category: 'clothing_accessories',
             price: 0,
             stock: 0,
-            images: [''],
+            images: [],
         });
+        setSelectedFiles([]); // Clear selected files after successful upload
       } catch (error) {
         console.error("Error creating product:", error);
         // Here you might want to show an error message to the user
@@ -201,15 +239,20 @@ const SellerProducts = (props) => {
                     </div>
                     
                     <div>
-                        <label className="block text-sm font-medium mb-2">Image URL</label>
+                        <label className="block text-sm font-medium mb-2">Images du produit</label>
                         <input
-                          type="url"
-                          required
-                          value={newProduct.images[0]}
-                          onChange={(e) => setNewProduct({ ...newProduct, images: [e.target.value] })}
+                          type="file"
+                          multiple
+                          onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
                           className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {selectedFiles.map((file, index) => (
+                                <img key={index} src={URL.createObjectURL(file)} alt={`preview-${index}`} className="w-20 h-20 object-cover rounded-lg" />
+                            ))}
+                        </div>
                     </div>
+
                     <div>
                       <label className="block text-sm font-medium mb-2">Description</label>
                       <textarea
