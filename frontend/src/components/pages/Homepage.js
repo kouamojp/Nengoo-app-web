@@ -106,7 +106,7 @@ const Homepage = (props) => {
 
   // Sélection des produits pour les différentes sections
   const featuredProducts = products.slice(0, 4);
-  const localProducts = products.filter(p => p.category === 'handicrafts').slice(0, 3);
+  const localProducts = products.filter(p => p.category === 'cat_340d7906').slice(0, 3);
 
   const handleNewsletterSubmit = async (e) => {
     e.preventDefault();
