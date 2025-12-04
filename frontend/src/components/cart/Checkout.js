@@ -45,12 +45,43 @@ const Checkout = (props) => {
     });
   };
   
-  const handleSubmit = (e) => {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Mock order processing
-    alert('Commande passée avec succès! Vous recevrez une confirmation par email.');
-    clearCart();
-    navigate('/');
+
+    // Map cartItems to the format expected by the backend
+    const preparedCartItems = cartItems.map(item => ({
+      id: item.id.toString(), // Ensure id is a string
+      quantity: item.quantity
+    }));
+
+    const checkoutPayload = {
+      ...formData,
+      cartItems: preparedCartItems
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(checkoutPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to place order');
+      }
+
+      alert('Commande passée avec succès! Vous recevrez une confirmation.');
+      clearCart();
+      navigate('/');
+    } catch (error) {
+      console.error('Error placing order:', error);
+      alert(`Erreur lors de la commande: ${error.message}`);
+    }
   };
   
   if (cartItems.length === 0) {

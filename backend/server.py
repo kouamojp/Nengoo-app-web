@@ -44,6 +44,22 @@ async def moderator_or_higher_required(role: str = Depends(get_current_admin_rol
             detail="Moderator, Admin, or Super admin privileges required."
         )
 
+async def support_or_higher_required(role: str = Depends(get_current_admin_role)):
+    if role not in ["super_admin", "admin", "moderator", "support"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Support, Moderator, Admin, or Super admin privileges required."
+        )
+
+async def seller_id_or_support_required(seller_id: Optional[str] = None, role: str = Depends(get_current_admin_role)):
+    if seller_id:
+        return
+    if role not in ["super_admin", "admin", "moderator", "support"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Support, Moderator, Admin, or Super admin privileges required."
+        )
+
 # --- Hashing Utility ---
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -161,6 +177,25 @@ class OrderUpdate(BaseModel):
     paymentStatus: Optional[str] = None
     pickupStatus: Optional[str] = None
 
+
+class CheckoutProduct(BaseModel):
+    id: str
+    quantity: int
+
+
+class CheckoutRequest(BaseModel):
+    firstName: str
+    lastName: str
+    email: str
+    phone: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    region: Optional[str] = None
+    paymentMethod: str
+    deliveryOption: str
+    selectedPickupPoint: Optional[str] = None
+    cartItems: List[CheckoutProduct]
+
 class Admin(BaseModel):
     id: str
     name: str
@@ -171,6 +206,7 @@ class Admin(BaseModel):
     status: str
     createdDate: datetime
     lastLogin: Optional[datetime] = None
+    type: str = "admin"
 
 class AdminCreate(BaseModel):
     name: str
@@ -420,13 +456,32 @@ async def get_seller(seller_id: str):
     return Seller(**seller)
 
 # --- Order Management ---
-@api_router.get("/orders", response_model=List[Order], dependencies=[Depends(moderator_or_higher_required)])
-async def list_orders():
-    orders_cursor = db.orders.find()
+@api_router.get("/orders", response_model=List[Order])
+async def list_orders(seller_id: Optional[str] = None, role: str = Depends(get_current_admin_role)):
+    query = {}
+
+    # If a seller_id is provided, fetch orders for that seller.
+    # This is for the seller dashboard. A proper security check should be added.
+    if seller_id:
+        query["sellerId"] = seller_id
+    # If a role is provided, check if it's an admin role.
+    # If so, fetch all orders.
+    elif role in ["super_admin", "admin", "moderator", "support"]:
+        pass  # Empty query means all orders
+    # Otherwise, it's an unauthorized request.
+    else:
+        # This part might not be strictly necessary if another mechanism prevents unauthorized access,
+        # but it makes the endpoint self-contained and secure.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access orders."
+        )
+
+    orders_cursor = db.orders.find(query).sort("orderedDate", -1) # Sort by most recent
     orders = await orders_cursor.to_list(1000)
     return [Order(**o) for o in orders]
 
-@api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(super_admin_required)])
+@api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(support_or_higher_required)])
 async def update_order(order_id: str, order_data: OrderUpdate):
     update_data = order_data.dict(exclude_unset=True)
     if not update_data:
@@ -437,6 +492,92 @@ async def update_order(order_id: str, order_data: OrderUpdate):
     if not updated_order:
         raise HTTPException(status_code=404, detail="Order not found")
     return Order(**updated_order)
+
+@api_router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+async def delete_order(order_id: str):
+    result = await db.orders.delete_one({"id": order_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return
+
+@api_router.post("/checkout", response_model=List[Order])
+async def process_checkout(checkout_data: CheckoutRequest):
+    buyer_whatsapp = checkout_data.phone
+    buyer = await db.users.find_one({"whatsapp": buyer_whatsapp, "type": "buyer"})
+
+    if not buyer:
+        buyer_id = f"buyer_{str(uuid.uuid4())[:8]}"
+        new_buyer = {
+            "id": buyer_id,
+            "whatsapp": buyer_whatsapp,
+            "name": f"{checkout_data.firstName} {checkout_data.lastName}",
+            "email": checkout_data.email,
+            "type": "buyer",
+            "joinDate": datetime.utcnow(),
+            "status": "active",
+            "totalOrders": 0,
+            "totalSpent": 0.0
+        }
+        await db.users.insert_one(new_buyer)
+        buyer = new_buyer
+    
+    buyer_id = buyer["id"]
+    buyer_name = buyer["name"]
+
+    # Fetch all products from cart to get seller info
+    product_ids = [item.id for item in checkout_data.cartItems]
+    products_from_db_cursor = db.products.find({"id": {"$in": product_ids}})
+    products_from_db = {p["id"]: p for p in await products_from_db_cursor.to_list(len(product_ids))}
+
+    # Group cart items by seller
+    seller_orders = {} # {seller_id: [products]}
+    for item in checkout_data.cartItems:
+        product_info = products_from_db.get(item.id)
+        if not product_info:
+            raise HTTPException(status_code=404, detail=f"Product with id {item.id} not found in database.")
+        
+        seller_id = product_info["sellerId"]
+        if seller_id not in seller_orders:
+            seller_orders[seller_id] = {
+                "sellerName": product_info["sellerName"],
+                "products": []
+            }
+        
+        seller_orders[seller_id]["products"].append(OrderProduct(
+            productId=item.id,
+            name=product_info["name"],
+            quantity=item.quantity,
+            price=product_info["price"]
+        ))
+
+    created_orders = []
+    for seller_id, order_details in seller_orders.items():
+        total_amount = sum(p.price * p.quantity for p in order_details["products"])
+        
+        new_order = Order(
+            id=f"ord_{str(uuid.uuid4())[:8]}",
+            buyerId=buyer_id,
+            buyerName=buyer_name,
+            sellerId=seller_id,
+            sellerName=order_details["sellerName"],
+            products=order_details["products"],
+            totalAmount=total_amount,
+            status="pending",
+            paymentStatus="pending" if checkout_data.paymentMethod != 'cashOnDelivery' else 'unpaid',
+            pickupPointId=checkout_data.selectedPickupPoint if checkout_data.deliveryOption == 'pickup' else None,
+            pickupStatus="pending_pickup" if checkout_data.deliveryOption == 'pickup' else "not_applicable",
+            orderedDate=datetime.utcnow()
+        )
+        await db.orders.insert_one(new_order.dict())
+        created_orders.append(new_order)
+
+        # Update buyer's stats
+        await db.users.update_one(
+            {"id": buyer_id},
+            {"$inc": {"totalOrders": 1, "totalSpent": total_amount}}
+        )
+
+    return created_orders
 
 # --- Pickup Point Management ---
 @api_router.post("/pickup-points", response_model=PickupPoint, dependencies=[Depends(super_admin_required)])

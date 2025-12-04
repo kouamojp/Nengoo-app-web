@@ -1,7 +1,6 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { mockSellerData } from '../../lib/mockData';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import SellerSidebar from './SellerSidebar';
@@ -9,39 +8,48 @@ import SellerHeader from './SellerHeader';
 
 const SellerDashboard = (props) => {
   const { language } = props;
-  
-  const stats = [
-    { 
-      title: "Ventes Totales", 
-      value: "1,250", 
-      icon: "💰", 
-      color: "from-green-400 to-green-600",
-      change: "+12%" 
-    },
-    { 
-      title: "Commandes en Attente", 
-      value: "8", 
-      icon: "📋", 
-      color: "from-yellow-400 to-orange-500",
-      change: "+3" 
-    },
-    { 
-      title: "Revenus du Mois", 
-      value: "2,450,000 XAF", 
-      icon: "📈", 
-      color: "from-blue-400 to-blue-600",
-      change: "+18%" 
-    },
-    { 
-      title: "Produits Actifs", 
-      value: "24", 
-      icon: "📦", 
-      color: "from-purple-400 to-purple-600",
-      change: "+2" 
-    }
-  ];
+  const [stats, setStats] = useState([
+    { title: "Ventes Totales", value: "0", icon: "💰", color: "from-green-400 to-green-600", change: "+0%" },
+    { title: "Commandes en Attente", value: "0", icon: "📋", color: "from-yellow-400 to-orange-500", change: "+0" },
+    { title: "Revenus du Mois", value: "0 XAF", icon: "📈", color: "from-blue-400 to-blue-600", change: "+0%" },
+    { title: "Produits Actifs", value: "0", icon: "📦", color: "from-purple-400 to-purple-600", change: "+0" }
+  ]);
+  const [recentOrders, setRecentOrders] = useState([]);
 
-  const recentOrders = mockSellerData.orders.slice(0, 5);
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        // TODO: Replace with dynamic seller ID from auth context
+        const sellerId = 'seller_1';
+        const response = await fetch(`http://localhost:8000/api/orders?seller_id=${sellerId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch orders');
+        }
+        const orders = await response.json();
+        setRecentOrders(orders.slice(0, 5));
+        
+        // Calculate stats
+        const totalSales = orders.length;
+        const pendingOrders = orders.filter(o => o.status === 'pending').length;
+        const monthlyRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
+
+        // TODO: Fetch products to calculate active products
+        const activeProducts = 0; 
+
+        setStats([
+          { title: "Ventes Totales", value: totalSales, icon: "💰", color: "from-green-400 to-green-600", change: "" },
+          { title: "Commandes en Attente", value: pendingOrders, icon: "📋", color: "from-yellow-400 to-orange-500", change: "" },
+          { title: "Revenus du Mois", value: `${monthlyRevenue.toLocaleString()} XAF`, icon: "📈", color: "from-blue-400 to-blue-600", change: "" },
+          { title: "Produits Actifs", value: activeProducts, icon: "📦", color: "from-purple-400 to-purple-600", change: "" }
+        ]);
+
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -95,12 +103,12 @@ const SellerDashboard = (props) => {
                       <div className="flex justify-between items-start">
                         <div>
                           <p className="font-semibold">{order.id}</p>
-                          <p className="text-gray-600 text-sm">{order.customer}</p>
-                          <p className="text-xs text-gray-500">{order.date}</p>
+                          <p className="text-gray-600 text-sm">{order.buyerName}</p>
+                          <p className="text-xs text-gray-500">{new Date(order.orderedDate).toLocaleDateString('fr-FR')}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-purple-600">
-                            {order.total.toLocaleString()} XAF
+                            {order.totalAmount.toLocaleString()} XAF
                           </p>
                           <span className={`text-xs px-2 py-1 rounded-full ${
                             order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :

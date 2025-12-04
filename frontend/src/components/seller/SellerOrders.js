@@ -1,6 +1,5 @@
 
-import React, { useState } from 'react';
-import { mockSellerData } from '../../lib/mockData';
+import React, { useState, useEffect } from 'react';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import SellerSidebar from './SellerSidebar';
@@ -8,19 +7,59 @@ import SellerHeader from './SellerHeader';
 
 const SellerOrders = (props) => {
   const { language } = props;
-  const [orders, setOrders] = useState(mockSellerData.orders);
+  const [orders, setOrders] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        // TODO: Replace with dynamic seller ID from auth context
+        const sellerId = 'seller_1'; 
+        const response = await fetch(`http://localhost:8000/api/orders?seller_id=${sellerId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch orders');
+        }
+        const data = await response.json();
+        setOrders(data);
+      } catch (error) {
+        console.error("Error fetching orders:", error);
+        // Handle error, e.g., show a toast message
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const filteredOrders = filterStatus === 'all' 
     ? orders 
     : orders.filter(order => order.status === filterStatus);
 
-  const updateOrderStatus = (orderId, newStatus) => {
-    setOrders(orders.map(order => 
-      order.id === orderId 
-        ? { ...order, status: newStatus }
-        : order
-    ));
+  const updateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          // TODO: Add authorization headers if required
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update order status');
+      }
+
+      const updatedOrder = await response.json();
+
+      setOrders(orders.map(order => 
+        order.id === orderId 
+          ? updatedOrder
+          : order
+      ));
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      // Handle error, e.g., show a toast message
+    }
   };
 
   const formatPrice = (price) => {
@@ -115,10 +154,10 @@ const SellerOrders = (props) => {
                         </span>
                       </div>
                       <div className="flex items-center space-x-6 text-sm text-gray-600 mt-2">
-                        <span>👤 {order.customer}</span>
-                        <span>📅 {order.date}</span>
+                        <span>👤 {order.buyerName}</span>
+                        <span>📅 {new Date(order.orderedDate).toLocaleDateString('fr-FR')}</span>
                         <span className="font-semibold text-purple-600">
-                          {formatPrice(order.total)}
+                          {formatPrice(order.totalAmount)}
                         </span>
                       </div>
                     </div>
@@ -144,7 +183,7 @@ const SellerOrders = (props) => {
                   <div className="border-t pt-4">
                     <h4 className="font-semibold mb-3">Articles commandés:</h4>
                     <div className="space-y-2">
-                      {order.items.map((item, index) => (
+                      {order.products.map((item, index) => (
                         <div key={index} className="flex justify-between items-center py-2 px-4 bg-gray-50 rounded-lg">
                           <div>
                             <span className="font-medium">{item.name}</span>
