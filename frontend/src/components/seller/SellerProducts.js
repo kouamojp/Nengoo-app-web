@@ -27,7 +27,6 @@ const SellerProducts = (props) => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        console.log("🔄 [Vendeur] Récupération des produits depuis:", `${API_BASE_URL}/products`);
         const response = await fetch(`${API_BASE_URL}/products`);
 
         if (!response.ok) {
@@ -35,8 +34,8 @@ const SellerProducts = (props) => {
         }
 
         const data = await response.json();
-        console.log("✅ [Vendeur] Produits récupérés:", data.length, "produit(s)");
-        console.log("📦 [Vendeur] Données brutes:", data);
+        /* console.log("✅ [Vendeur] Produits récupérés:", data.length, "produit(s)");
+        console.log("📦 [Vendeur] Données brutes:", data); */
 
         const adaptedProducts = data.map(p => ({
             ...p,
@@ -64,7 +63,12 @@ const SellerProducts = (props) => {
   
     const handleAddProduct = async (e) => {
       e.preventDefault();
-      
+
+      if (!props.user || props.user.type !== 'seller') {
+        alert("Vous devez être connecté en tant que vendeur pour ajouter un produit.");
+        return;
+      }
+
       const uploadedImageUrls = [];
       for (const file of selectedFiles) {
         try {
@@ -73,7 +77,7 @@ const SellerProducts = (props) => {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
-                'X-Admin-Role': 'support' // Assuming seller has 'support' access for upload
+                'X-Seller-Id': props.user.id,
             },
             body: JSON.stringify({ fileName: file.name, fileType: file.type }),
           });
@@ -103,8 +107,8 @@ const SellerProducts = (props) => {
 
       const productData = {
           ...newProduct,
-          sellerId: "seller_001", // Hardcoded for now
-          sellerName: "Mode Africaine", // Hardcoded for now
+          sellerId: props.user.id,
+          sellerName: props.user.businessName,
           images: uploadedImageUrls,
       };
 
@@ -113,12 +117,14 @@ const SellerProducts = (props) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Seller-Id': props.user.id,
           },
           body: JSON.stringify(productData),
         });
   
         if (!response.ok) {
-          throw new Error('Failed to create product');
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to create product');
         }
   
         await fetchProducts(); // Refetch products to include the new one
@@ -133,8 +139,7 @@ const SellerProducts = (props) => {
         });
         setSelectedFiles([]); // Clear selected files after successful upload
       } catch (error) {
-        console.error("Error creating product:", error);
-        // Here you might want to show an error message to the user
+        alert(`Erreur: ${error.message}`);
       }
     };
   

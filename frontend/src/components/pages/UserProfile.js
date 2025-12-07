@@ -1,8 +1,48 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+const OrderDetailModal = ({ order, onClose, formatPrice }) => {
+    if (!order) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold">Détails de la commande #{order.id}</h3>
+                    <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
+                        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="space-y-4">
+                    <p><strong>Date:</strong> {new Date(order.orderedDate).toLocaleDateString()}</p>
+                    <p><strong>Statut:</strong> {order.status}</p>
+                    <p><strong>Vendeur:</strong> {order.sellerName}</p>
+                    <p><strong>Moyen de livraison:</strong> {order.pickupPointName ? `Retrait à "${order.pickupPointName}"` : 'Livraison à domicile'}</p>
+                    
+                    <div>
+                        <p className="font-bold">Produits:</p>
+                        <ul className="list-disc list-inside space-y-2 mt-2">
+                            {order.products.map(p => (
+                                <li key={p.productId}>
+                                    {p.name} (x{p.quantity}) - <span className="font-medium">{formatPrice(p.price * p.quantity)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    <div className="text-right font-bold text-lg border-t pt-4">
+                        Total: {formatPrice(order.totalAmount)}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const UserProfile = (props) => {
     const { language, user, cartItems } = props;
@@ -17,35 +57,11 @@ const UserProfile = (props) => {
       city: '',
       region: ''
     });
+
+    const [userOrders, setUserOrders] = useState([]);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [loadingOrders, setLoadingOrders] = useState(true);
     
-    // Mock data for user orders
-    const userOrders = [
-      {
-        id: 'CMD001',
-        date: '2025-01-15',
-        status: 'delivered',
-        total: 45000,
-        items: [{ name: 'Robe Traditionnelle', quantity: 1, price: 45000 }]
-      },
-      {
-        id: 'CMD002',
-        date: '2025-01-10',
-        status: 'in_transit',
-        total: 125000,
-        items: [{ name: 'Smartphone Android', quantity: 1, price: 125000 }]
-      },
-      {
-        id: 'CMD003',
-        date: '2025-01-05',
-        status: 'delivered',
-        total: 27500,
-        items: [
-          { name: 'Panier Artisanal', quantity: 1, price: 15000 },
-          { name: 'Cosmétiques Naturels', quantity: 1, price: 12000 }
-        ]
-      }
-    ];
-  
     // Mock saved addresses
     const [savedAddresses, setSavedAddresses] = useState([
       {
@@ -103,6 +119,30 @@ const UserProfile = (props) => {
         isDefault: false
       }
     ]);
+
+    useEffect(() => {
+        const fetchOrders = async () => {
+            if (user && user.id) {
+                setLoadingOrders(true);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/orders?buyer_id=${user.id}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch orders');
+                    }
+                    const data = await response.json();
+                    setUserOrders(data);
+                } catch (error) {
+                    console.error("Error fetching user orders:", error);
+                } finally {
+                    setLoadingOrders(false);
+                }
+            }
+        };
+
+        if (activeTab === 'orders') {
+            fetchOrders();
+        }
+    }, [user, activeTab]);
   
     const handleProfileUpdate = () => {
       setEditMode(false);
@@ -120,7 +160,7 @@ const UserProfile = (props) => {
     const getStatusColor = (status) => {
       switch (status) {
         case 'delivered': return 'bg-green-100 text-green-800';
-        case 'in_transit': return 'bg-blue-100 text-blue-800';
+        case 'shipped': return 'bg-blue-100 text-blue-800';
         case 'processing': return 'bg-yellow-100 text-yellow-800';
         case 'cancelled': return 'bg-red-100 text-red-800';
         default: return 'bg-gray-100 text-gray-800';
@@ -130,9 +170,10 @@ const UserProfile = (props) => {
     const getStatusText = (status) => {
       const statusTexts = {
         delivered: 'Livré',
-        in_transit: 'En transit',
+        shipped: 'En transit',
         processing: 'En cours',
-        cancelled: 'Annulé'
+        cancelled: 'Annulé',
+        pending: 'En attente'
       };
       return statusTexts[status] || status;
     };
@@ -157,6 +198,7 @@ const UserProfile = (props) => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header {...props} />
+        <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} formatPrice={formatPrice} />
         
         <div className="container mx-auto px-4 py-8">
           {/* User Header */}
@@ -168,7 +210,7 @@ const UserProfile = (props) => {
               <div className="text-center sm:text-left flex-1">
                 <h1 className="text-2xl sm:text-3xl font-bold mb-2">{user.name}</h1>
                 <p className="opacity-90">{user.whatsapp}</p>
-                <p className="text-sm opacity-75 mt-1">Membre depuis {user.joinDate}</p>
+                <p className="text-sm opacity-75 mt-1">Membre depuis {new Date(user.joinDate).toLocaleDateString()}</p>
               </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
                 {user.type === 'admin' && (
@@ -308,14 +350,14 @@ const UserProfile = (props) => {
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h2 className="text-2xl font-bold mb-6">Historique des commandes</h2>
                   
-                  {userOrders.length > 0 ? (
+                  {loadingOrders ? <p>Chargement des commandes...</p> : userOrders.length > 0 ? (
                     <div className="space-y-4">
                       {userOrders.map((order) => (
                         <div key={order.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4">
                             <div>
                               <h3 className="font-bold text-lg">Commande #{order.id}</h3>
-                              <p className="text-sm text-gray-600">Date: {order.date}</p>
+                              <p className="text-sm text-gray-600">Date: {new Date(order.orderedDate).toLocaleDateString()}</p>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-sm font-medium mt-2 sm:mt-0 ${getStatusColor(order.status)}`}>
                               {getStatusText(order.status)}
@@ -323,17 +365,17 @@ const UserProfile = (props) => {
                           </div>
                           
                           <div className="space-y-2 mb-4">
-                            {order.items.map((item, idx) => (
+                            {order.products.map((item, idx) => (
                               <div key={idx} className="flex justify-between text-sm">
                                 <span>{item.name} × {item.quantity}</span>
-                                <span className="font-medium">{formatPrice(item.price)}</span>
+                                <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
                               </div>
                             ))}
                           </div>
                           
                           <div className="flex justify-between items-center pt-4 border-t">
-                            <span className="font-bold text-lg">Total: {formatPrice(order.total)}</span>
-                            <button className="text-purple-600 hover:text-purple-700 font-semibold text-sm">
+                            <span className="font-bold text-lg">Total: {formatPrice(order.totalAmount)}</span>
+                            <button onClick={() => setSelectedOrder(order)} className="text-purple-600 hover:text-purple-700 font-semibold text-sm">
                               Voir les détails →
                             </button>
                           </div>

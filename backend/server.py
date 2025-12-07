@@ -182,6 +182,7 @@ class Order(BaseModel):
     id: str
     buyerId: str
     buyerName: str
+    buyerWhatsapp: Optional[str] = None # Added
     sellerId: str
     sellerName: str
     products: List[OrderProduct]
@@ -189,7 +190,8 @@ class Order(BaseModel):
     currency: str = "XAF"
     status: str
     paymentStatus: str
-    pickupPointId: str
+    pickupPointId: Optional[str] = None # Changed to Optional
+    pickupPointName: Optional[str] = None # Added
     pickupStatus: str
     orderedDate: datetime
     createdAt: datetime = Field(default_factory=datetime.utcnow)
@@ -595,29 +597,40 @@ async def delete_seller(seller_id: str):
 
 # --- Order Management ---
 @api_router.get("/orders", response_model=List[Order])
-async def list_orders(seller_id: Optional[str] = None, role: str = Depends(get_current_admin_role)):
+async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] = None, role: str = Depends(get_current_admin_role)):
     query = {}
 
-    # If a seller_id is provided, fetch orders for that seller.
-    # This is for the seller dashboard. A proper security check should be added.
-    if seller_id:
+    if buyer_id:
+        query["buyerId"] = buyer_id
+    elif seller_id:
         query["sellerId"] = seller_id
-    # If a role is provided, check if it's an admin role.
-    # If so, fetch all orders.
     elif role in ["super_admin", "admin", "moderator", "support"]:
         pass  # Empty query means all orders
-    # Otherwise, it's an unauthorized request.
     else:
-        # This part might not be strictly necessary if another mechanism prevents unauthorized access,
-        # but it makes the endpoint self-contained and secure.
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to access orders."
         )
 
     orders_cursor = db.orders.find(query).sort("orderedDate", -1) # Sort by most recent
-    orders = await orders_cursor.to_list(1000)
-    return [Order(**o) for o in orders]
+    orders_data = await orders_cursor.to_list(1000)
+
+    enriched_orders = []
+    for order_data in orders_data:
+        # Fetch buyer's whatsapp
+        buyer = await db.users.find_one({"id": order_data["buyerId"], "type": "buyer"})
+        if buyer:
+            order_data["buyerWhatsapp"] = buyer.get("whatsapp")
+
+        # Fetch pickup point name if pickupPointId exists
+        if order_data.get("pickupPointId"):
+            pickup_point = await db.pickupPoints.find_one({"id": order_data["pickupPointId"]})
+            if pickup_point:
+                order_data["pickupPointName"] = pickup_point.get("name")
+        
+        enriched_orders.append(Order(**order_data))
+    
+    return enriched_orders
 
 @api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(support_or_higher_required)])
 async def update_order(order_id: str, order_data: OrderUpdate):
