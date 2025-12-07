@@ -270,7 +270,7 @@ const UserProfile = (props) => {
                     <span className="font-medium">Points de retrait</span>
                   </button>
                   
-                  <button
+                  {/* <button
                     onClick={() => setActiveTab('payment')}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                       activeTab === 'payment' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
@@ -278,7 +278,7 @@ const UserProfile = (props) => {
                   >
                     <span className="text-xl">💳</span>
                     <span className="font-medium">Moyens de paiement</span>
-                  </button>
+                  </button> */}
                 </nav>
               </div>
             </div>
