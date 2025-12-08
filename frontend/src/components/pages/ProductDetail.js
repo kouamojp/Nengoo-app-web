@@ -10,7 +10,7 @@ import ProductCard from '../product/ProductCard';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const ProductDetail = (props) => {
-  const { language, addToCart } = props;
+  const { language, addToCart, user } = props;
   const { id } = useParams();
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(0);
@@ -19,6 +19,8 @@ const ProductDetail = (props) => {
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showSendMessageModal, setShowSendMessageModal] = useState(false);
+  const [messageToSend, setMessageToSend] = useState('');
 
   const t = translations[language];
 
@@ -123,6 +125,38 @@ const ProductDetail = (props) => {
     fetchProduct();
   }, [id, language]);
   
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!user) {
+        alert("Veuillez vous connecter pour envoyer un message.");
+        return;
+    }
+    try {
+        const response = await fetch(`${API_BASE_URL}/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'sender_id': user.id,
+                'sender_type': user.type,
+            },
+            body: JSON.stringify({
+                receiver_id: seller.id,
+                message: messageToSend,
+                product_id: product.id,
+            }),
+        });
+        if (!response.ok) {
+            throw new Error('Failed to send message');
+        }
+        setShowSendMessageModal(false);
+        setMessageToSend('');
+        alert('Message envoyé avec succès!');
+    } catch (error) {
+        console.error('Error sending message:', error);
+        alert(`Erreur: ${error.message}`);
+    }
+  };
+
   if (!product) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -152,6 +186,40 @@ const ProductDetail = (props) => {
     <div className="min-h-screen bg-gray-50">
       <Header {...props} />
       
+      {showSendMessageModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="text-xl font-bold">Contacter {seller.businessName}</h3>
+              <button onClick={() => setShowSendMessageModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+            </div>
+            <div className="p-4">
+              <form onSubmit={handleSendMessage}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Votre message</label>
+                  <textarea
+                    value={messageToSend}
+                    onChange={(e) => setMessageToSend(e.target.value)}
+                    placeholder="Tapez votre message ici..."
+                    rows={6}
+                    required
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                  >
+                    Envoyer
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="container mx-auto px-4 py-8">
         {/* Breadcrumb */}
         <nav className="mb-8 text-sm">
@@ -276,6 +344,16 @@ const ProductDetail = (props) => {
                   >
                     <span>📱</span>
                     <span>Contacter le vendeur sur WhatsApp</span>
+                  </button>
+                )}
+
+                {seller && (
+                  <button
+                    onClick={() => setShowSendMessageModal(true)}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    <span>✉️</span>
+                    <span>Contacter le vendeur</span>
                   </button>
                 )}
               </div>

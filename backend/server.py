@@ -337,6 +337,109 @@ class NewsletterSubscription(BaseModel):
     email: str
     subscribed_at: datetime = Field(default_factory=datetime.utcnow)
 
+class Message(BaseModel):
+    id: str = Field(default_factory=lambda: f"msg_{str(uuid.uuid4())[:8]}")
+    conversation_id: str
+    sender_id: str
+    receiver_id: str
+    sender_type: str  # 'buyer' or 'seller'
+    receiver_type: str # 'buyer' or 'seller'
+    message: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    read_status: bool = False
+
+class Conversation(BaseModel):
+    id: str = Field(default_factory=lambda: f"conv_{str(uuid.uuid4())[:8]}")
+    buyer_id: str
+    seller_id: str
+    product_id: str
+    last_message_timestamp: datetime = Field(default_factory=datetime.utcnow)
+    last_message_preview: str
+    seller_unread: bool = False
+    buyer_unread: bool = False
+
+# --- Messaging Endpoints ---
+
+class MessageCreate(BaseModel):
+    receiver_id: str
+    message: str
+    product_id: Optional[str] = None # Needed to create a new conversation
+
+@api_router.post("/messages", response_model=Message)
+async def create_message(message_data: MessageCreate, sender_id: str = Header(...), sender_type: str = Header(...)):
+    if sender_type not in ['buyer', 'seller']:
+        raise HTTPException(status_code=400, detail="Invalid sender_type")
+
+    receiver_type = 'seller' if sender_type == 'buyer' else 'buyer'
+    
+    # Find conversation or create new one
+    conversation = await db.conversations.find_one({
+        "$or": [
+            {"buyer_id": sender_id, "seller_id": message_data.receiver_id, "product_id": message_data.product_id},
+            {"buyer_id": message_data.receiver_id, "seller_id": sender_id, "product_id": message_data.product_id}
+        ]
+    })
+
+    if not conversation:
+        if sender_type == 'buyer' and message_data.product_id:
+            conversation_id = f"conv_{str(uuid.uuid4())[:8]}"
+            new_conv = Conversation(
+                id=conversation_id,
+                buyer_id=sender_id,
+                seller_id=message_data.receiver_id,
+                product_id=message_data.product_id,
+                last_message_preview=message_data.message,
+                seller_unread=True
+            )
+            await db.conversations.insert_one(new_conv.dict())
+            conversation = new_conv.dict()
+        else:
+            raise HTTPException(status_code=400, detail="Conversation does not exist. A buyer must initiate a conversation from a product page.")
+    else:
+        # Update conversation
+        update_data = {
+            "last_message_timestamp": datetime.utcnow(),
+            "last_message_preview": message_data.message
+        }
+        if sender_type == 'buyer':
+            update_data['seller_unread'] = True
+        else:
+            update_data['buyer_unread'] = True
+        await db.conversations.update_one({"id": conversation["id"]}, {"$set": update_data})
+
+
+    new_message = Message(
+        conversation_id=conversation["id"],
+        sender_id=sender_id,
+        receiver_id=message_data.receiver_id,
+        sender_type=sender_type,
+        receiver_type=receiver_type,
+        message=message_data.message
+    )
+    await db.messages.insert_one(new_message.dict())
+    return new_message
+
+@api_router.get("/conversations", response_model=List[Conversation])
+async def get_conversations(user_id: str = Header(...), user_type: str = Header(...)):
+    if user_type not in ['buyer', 'seller']:
+        raise HTTPException(status_code=400, detail="Invalid user_type")
+        
+    query_field = f"{user_type}_id"
+    conversations_cursor = db.conversations.find({query_field: user_id}).sort("last_message_timestamp", -1)
+    conversations = await conversations_cursor.to_list(1000)
+    return [Conversation(**c) for c in conversations]
+
+@api_router.get("/conversations/{conversation_id}/messages", response_model=List[Message])
+async def get_messages(conversation_id: str):
+    messages_cursor = db.messages.find({"conversation_id": conversation_id}).sort("timestamp", 1)
+    messages = await messages_cursor.to_list(1000)
+    return [Message(**m) for m in messages]
+
+@api_router.put("/messages/{message_id}/read", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_message_as_read(message_id: str):
+    await db.messages.update_one({"id": message_id}, {"$set": {"read_status": True}})
+    return
+
 # --- API Endpoints ---
 # ... (existing endpoints)
 
