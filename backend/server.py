@@ -668,7 +668,16 @@ async def create_seller(seller_data: SellerCreate):
 async def list_sellers():
     sellers_cursor = db.sellers.find()
     sellers = await sellers_cursor.to_list(1000)
-    return [Seller(**s) for s in sellers]
+    valid_sellers = []
+    for s in sellers:
+        try:
+            # The Seller model now includes password as optional, so this should be safe.
+            # We add this try-except block for added robustness against corrupted data.
+            valid_sellers.append(Seller(**s))
+        except Exception as e:
+            # Log the error and the problematic data
+            print(f"Skipping invalid seller data: {s}, error: {e}")
+    return valid_sellers
 
 @api_router.get("/sellers/{seller_id}", response_model=Seller)
 async def get_seller(seller_id: str):
