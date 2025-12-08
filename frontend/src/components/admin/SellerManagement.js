@@ -218,7 +218,7 @@ const SellerManagement = (props) => {
                             <textarea name="description" value={newSellerData.description} onChange={handleInputChange} placeholder="Description de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
                             <div className="space-y-2">
                                 <label className="font-semibold">Catégories</label>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-left">
                                     {categories.map(category => (
                                         <label key={category.id} className="flex items-center space-x-2">
                                             <input
