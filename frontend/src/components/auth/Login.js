@@ -25,27 +25,27 @@ const Login = (props) => {
 
             <div className="space-y-4">
               <Link
-                to="/signup/buyer"
+                to="/login/buyer"
                 className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-lg font-semibold text-center block hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-center justify-center space-x-3">
                   <span className="text-2xl">👤</span>
                   <div>
                     <div className="font-bold">{t.loginAsBuyer}</div>
-                    <div className="text-sm opacity-90">Acheter des produits</div>
+                    <div className="text-sm opacity-90">Accéder à votre compte acheteur</div>
                   </div>
                 </div>
               </Link>
 
               <Link
-                to="/signup/seller"
+                to="/login/seller"
                 className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white py-4 px-6 rounded-lg font-semibold text-center block hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-center justify-center space-x-3">
                   <span className="text-2xl">🏪</span>
                   <div>
                     <div className="font-bold">{t.loginAsSeller}</div>
-                    <div className="text-sm opacity-90">Vendre vos produits</div>
+                    <div className="text-sm opacity-90">Accéder à votre compte vendeur</div>
                   </div>
                 </div>
               </Link>

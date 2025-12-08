@@ -7,14 +7,14 @@ import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 
 const BuyerSignup = (props) => {
-  const { language, setUser } = props;
+  const { language, setUser, isLoginDefault = false } = props;
   const navigate = useNavigate();
   const t = translations[language];
   const [formData, setFormData] = useState({
     whatsapp: '',
     name: ''
   });
-  const [isLogin, setIsLogin] = useState(false);
+  const [isLogin, setIsLogin] = useState(isLoginDefault);
 
   const handleInputChange = (e) => {
     setFormData({

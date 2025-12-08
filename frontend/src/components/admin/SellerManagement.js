@@ -11,8 +11,10 @@ const SellerManagement = (props) => {
     const [currentSeller, setCurrentSeller] = useState(null);
     const [newSellerData, setNewSellerData] = useState({
         whatsapp: '', password: '', name: '', businessName: '', email: '',
-        city: '', region: '', address: '', categories: '', description: '',
+        city: '', region: '', address: '', categories: [], description: '',
     });
+    const [categories, setCategories] = useState([]);
+    const [newPassword, setNewPassword] = useState('');
 
     const fetchSellers = async () => {
         setLoading(true);
@@ -30,18 +32,50 @@ const SellerManagement = (props) => {
         }
     };
 
+    const fetchCategories = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/categories`);
+            if (!response.ok) throw new Error('Failed to fetch categories');
+            const data = await response.json();
+            setCategories(data);
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+        }
+    };
+
     useEffect(() => {
         fetchSellers();
+        fetchCategories();
     }, []);
 
     const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setNewSellerData({ ...newSellerData, [name]: value });
+        const { name, value, type, checked } = e.target;
+        if (name === 'categories') {
+            let newCategories = [...newSellerData.categories];
+            if (checked) {
+                newCategories.push(value);
+            } else {
+                newCategories = newCategories.filter(category => category !== value);
+            }
+            setNewSellerData({ ...newSellerData, categories: newCategories });
+        } else {
+            setNewSellerData({ ...newSellerData, [name]: value });
+        }
     };
 
     const handleEditInputChange = (e) => {
-        const { name, value } = e.target;
-        setCurrentSeller({ ...currentSeller, [name]: value });
+        const { name, value, type, checked } = e.target;
+        if (name === 'categories') {
+            let newCategories = [...currentSeller.categories];
+            if (checked) {
+                newCategories.push(value);
+            } else {
+                newCategories = newCategories.filter(category => category !== value);
+            }
+            setCurrentSeller({ ...currentSeller, categories: newCategories });
+        } else {
+            setCurrentSeller({ ...currentSeller, [name]: value });
+        }
     };
 
     const handleAddSeller = async (e) => {
@@ -49,7 +83,6 @@ const SellerManagement = (props) => {
         try {
             const sellerToCreate = {
                 ...newSellerData,
-                categories: newSellerData.categories.split(',').map(c => c.trim()),
             };
 
             const response = await fetch(`${API_BASE_URL}/sellers`, {
@@ -97,6 +130,7 @@ const SellerManagement = (props) => {
 
     const handleEditClick = (seller) => {
         setCurrentSeller(seller);
+        setNewPassword('');
         setShowEditModal(true);
     };
 
@@ -104,11 +138,16 @@ const SellerManagement = (props) => {
         e.preventDefault();
         if (!currentSeller) return;
 
+        const updatedData = { ...currentSeller };
+        if (newPassword) {
+            updatedData.password = newPassword;
+        }
+
         try {
             const response = await fetch(`${API_BASE_URL}/sellers/${currentSeller.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Admin-Role': 'super_admin' },
-                body: JSON.stringify(currentSeller),
+                body: JSON.stringify(updatedData),
             });
             if (!response.ok) {
                 const err = await response.json();
@@ -177,7 +216,23 @@ const SellerManagement = (props) => {
                             <input type="text" name="city" value={newSellerData.city} onChange={handleInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
                             <input type="text" name="region" value={newSellerData.region} onChange={handleInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
                             <textarea name="description" value={newSellerData.description} onChange={handleInputChange} placeholder="Description de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="categories" value={newSellerData.categories} onChange={handleInputChange} placeholder="Catégories (séparées par des virgules)" className="w-full px-4 py-3 border rounded-lg" required />
+                            <div className="space-y-2">
+                                <label className="font-semibold">Catégories</label>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    {categories.map(category => (
+                                        <label key={category.id} className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                name="categories"
+                                                value={category.id}
+                                                checked={newSellerData.categories.includes(category.id)}
+                                                onChange={handleInputChange}
+                                            />
+                                            <span>{category.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
                             <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold">Ajouter le vendeur</button>
                         </form>
                     </div>
@@ -196,11 +251,28 @@ const SellerManagement = (props) => {
                             <input type="text" name="name" value={currentSeller.name} onChange={handleEditInputChange} placeholder="Nom du propriétaire" className="w-full px-4 py-3 border rounded-lg" required />
                             <input type="tel" name="whatsapp" value={currentSeller.whatsapp} onChange={handleEditInputChange} placeholder="WhatsApp" className="w-full px-4 py-3 border rounded-lg" required />
                             <input type="email" name="email" value={currentSeller.email} onChange={handleEditInputChange} placeholder="Email" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="password" name="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe (laisser vide pour ne pas changer)" className="w-full px-4 py-3 border rounded-lg" />
                             <input type="text" name="address" value={currentSeller.address} onChange={handleEditInputChange} placeholder="Adresse" className="w-full px-4 py-3 border rounded-lg" required />
                             <input type="text" name="city" value={currentSeller.city} onChange={handleEditInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
                             <input type="text" name="region" value={currentSeller.region} onChange={handleEditInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
                             <textarea name="description" value={currentSeller.description} onChange={handleEditInputChange} placeholder="Description de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="categories" value={currentSeller.categories} onChange={handleEditInputChange} placeholder="Catégories (séparées par des virgules)" className="w-full px-4 py-3 border rounded-lg" required />
+                            <div className="space-y-2">
+                                <label className="font-semibold">Catégories</label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {categories.map(category => (
+                                        <label key={category.id} className="flex items-center space-x-2 text-left">
+                                            <input
+                                                type="checkbox"
+                                                name="categories"
+                                                value={category.id}
+                                                checked={currentSeller.categories.includes(category.id)}
+                                                onChange={handleEditInputChange}
+                                            />
+                                            <span>{category.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
                             <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold">Mettre à jour</button>
                         </form>
                     </div>

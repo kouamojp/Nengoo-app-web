@@ -9,7 +9,7 @@ import Footer from '../layout/Footer';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const SellerSignup = (props) => {
-  const { language, setUser } = props;
+  const { language, setUser, isLoginDefault = false } = props;
   const navigate = useNavigate();
   const t = translations[language];
   const [formData, setFormData] = useState({
@@ -23,7 +23,7 @@ const SellerSignup = (props) => {
     address: '',
     description: '',
   });
-  const [isLogin, setIsLogin] = useState(false);
+  const [isLogin, setIsLogin] = useState(isLoginDefault);
 
   const handleInputChange = (e) => {
     setFormData({
