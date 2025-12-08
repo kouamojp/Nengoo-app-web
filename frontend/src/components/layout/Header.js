@@ -199,6 +199,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                   onClick={() => {
                     setUser(null);
                     localStorage.removeItem('nengoo-user');
+                    navigate('/'); // Redirect to home page
                   }}
                   className="text-sm hover:text-yellow-300 transition-colors flex items-end mt-2"
                 >
@@ -330,6 +331,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                     onClick={() => {
                       setUser(null);
                       setShowMobileMenu(false);
+                      navigate('/'); // Redirect to home page
                     }}
                     className="flex items-center space-x-3 py-2 hover:text-yellow-300 transition-colors"
                   >

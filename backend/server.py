@@ -146,6 +146,7 @@ class Seller(BaseModel):
     categories: List[str]
     description: str
     status: str = "pending"
+    type: str = "seller"
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 
@@ -171,6 +172,13 @@ class SellerUpdate(BaseModel):
     categories: Optional[List[str]] = None
     description: Optional[str] = None
     status: Optional[str] = None
+
+class SellerAnalyticsData(BaseModel):
+    total_revenue: float
+    total_orders: int
+    total_customers: int
+    monthly_revenue: List[dict]
+    top_products: List[dict]
 
 class OrderProduct(BaseModel):
     productId: str
@@ -530,15 +538,16 @@ async def root():
 
 # --- Product Management ---
 @api_router.get("/products", response_model=List[Product])
-async def get_products(search: Optional[str] = None):
+async def get_products(search: Optional[str] = None, seller_id: Optional[str] = None):
     query = {}
     if search:
-        query = {
-            "$or": [
-                {"name": {"$regex": search, "$options": "i"}},
-                {"description": {"$regex": search, "$options": "i"}},
-            ]
-        }
+        query["$or"] = [
+            {"name": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}},
+        ]
+    if seller_id:
+        query["sellerId"] = seller_id
+        
     products = await db.products.find(query).to_list(1000)
     return [Product(**p) for p in products]
 
@@ -612,7 +621,7 @@ async def update_product(product_id: str, product_data: ProductUpdate):
         raise HTTPException(status_code=404, detail="Product not found")
     return Product(**updated_product)
 
-@api_router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(moderator_or_higher_required)])
+@api_router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(seller_or_moderator_or_higher_required)])
 async def delete_product(product_id: str):
     result = await db.products.delete_one({"id": product_id})
     if result.deleted_count == 0:
@@ -697,6 +706,47 @@ async def delete_seller(seller_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Seller not found")
     return
+
+@api_router.get("/sellers/{seller_id}/analytics", response_model=SellerAnalyticsData)
+async def get_seller_analytics(seller_id: str):
+    # Fetch all orders for the seller
+    orders_cursor = db.orders.find({"sellerId": seller_id})
+    orders = await orders_cursor.to_list(1000)
+
+    total_revenue = sum(order['totalAmount'] for order in orders)
+    total_orders = len(orders)
+    
+    # This is a simplification, as a customer can have multiple orders
+    total_customers = len(set(order['buyerId'] for order in orders))
+
+    # Monthly revenue
+    monthly_revenue = {}
+    for order in orders:
+        month = order['orderedDate'].strftime("%b")
+        if month not in monthly_revenue:
+            monthly_revenue[month] = 0
+        monthly_revenue[month] += order['totalAmount']
+    
+    monthly_revenue_list = [{"month": m, "revenue": r} for m, r in monthly_revenue.items()]
+
+    # Top products
+    product_sales = {}
+    for order in orders:
+        for product in order['products']:
+            if product['productId'] not in product_sales:
+                product_sales[product['productId']] = {"sales": 0, "revenue": 0, "name": product['name']}
+            product_sales[product['productId']]['sales'] += product['quantity']
+            product_sales[product['productId']]['revenue'] += product['price'] * product['quantity']
+
+    top_products = sorted(product_sales.values(), key=lambda x: x['revenue'], reverse=True)[:5]
+
+    return SellerAnalyticsData(
+        total_revenue=total_revenue,
+        total_orders=total_orders,
+        total_customers=total_customers,
+        monthly_revenue=monthly_revenue_list,
+        top_products=top_products
+    )
 
 # --- Order Management ---
 @api_router.get("/orders", response_model=List[Order])

@@ -25,41 +25,43 @@ const SellerProducts = (props) => {
     const [selectedFiles, setSelectedFiles] = useState([]);
 
     const fetchProducts = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`${API_BASE_URL}/products`);
+      if (props.user) {
+        try {
+          setLoading(true);
+          const response = await fetch(`${API_BASE_URL}/products?seller_id=${props.user.id}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const data = await response.json();
+          /* console.log("✅ [Vendeur] Produits récupérés:", data.length, "produit(s)");
+          console.log("📦 [Vendeur] Données brutes:", data); */
+
+          const adaptedProducts = data.map(p => ({
+              ...p,
+              name: { [language]: p.name },
+              description: { [language]: p.description },
+              image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/300',
+              inStock: p.stock > 0,
+              rating: p.rating || 0,
+              reviews: p.reviewsCount || 0,
+            }));
+
+          console.log("✨ [Vendeur] Produits adaptés:", adaptedProducts.length, "produit(s)");
+          setProducts(adaptedProducts);
+        } catch (error) {
+          console.error("❌ [Vendeur] Erreur lors de la récupération des produits:", error);
+          alert("Erreur: Impossible de charger les produits. Vérifiez que le backend est lancé et accessible.");
+        } finally {
+          setLoading(false);
         }
-
-        const data = await response.json();
-        /* console.log("✅ [Vendeur] Produits récupérés:", data.length, "produit(s)");
-        console.log("📦 [Vendeur] Données brutes:", data); */
-
-        const adaptedProducts = data.map(p => ({
-            ...p,
-            name: { [language]: p.name },
-            description: { [language]: p.description },
-            image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/300',
-            inStock: p.stock > 0,
-            rating: p.rating || 0,
-            reviews: p.reviewsCount || 0,
-          }));
-
-        console.log("✨ [Vendeur] Produits adaptés:", adaptedProducts.length, "produit(s)");
-        setProducts(adaptedProducts);
-      } catch (error) {
-        console.error("❌ [Vendeur] Erreur lors de la récupération des produits:", error);
-        alert("Erreur: Impossible de charger les produits. Vérifiez que le backend est lancé et accessible.");
-      } finally {
-        setLoading(false);
       }
     };
   
     useEffect(() => {
       fetchProducts();
-    }, [language]);
+    }, [props.user, language]);
   
     const handleAddProduct = async (e) => {
       e.preventDefault();
@@ -143,10 +145,22 @@ const SellerProducts = (props) => {
       }
     };
   
-    const handleDeleteProduct = (id) => {
+    const handleDeleteProduct = async (id) => {
       if (confirm('Êtes-vous sûr de vouloir supprimer ce produit?')) {
-        // In a real app, you would make a DELETE API call here
-        setProducts(products.filter(p => p.id !== id));
+        try {
+            const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-Seller-Id': props.user.id,
+                },
+            });
+            if (!response.ok) {
+                throw new Error('Failed to delete product');
+            }
+            await fetchProducts(); // Refetch products after deletion
+        } catch (error) {
+            alert(`Erreur: ${error.message}`);
+        }
       }
     };
   

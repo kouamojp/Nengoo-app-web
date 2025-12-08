@@ -1,42 +1,37 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
 const SellerAnalytics = (props) => {
-  const { language } = props;
+  const { language, user } = props;
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [loading, setLoading] = useState(true);
   
-  const analyticsData = {
-    revenue: {
-      daily: [120000, 150000, 80000, 200000, 180000, 250000, 300000],
-      monthly: [2450000, 2800000, 3200000, 2900000, 3500000, 3800000],
-      labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun']
-    },
-    topProducts: [
-      { name: 'Robe Traditionnelle', sales: 45, revenue: 2025000 },
-      { name: 'Panier Artisanal', sales: 32, revenue: 480000 },
-      { name: 'Chapeaux Traditionnels', sales: 28, revenue: 238000 },
-      { name: 'Cosmétiques Naturels', sales: 24, revenue: 288000 },
-      { name: 'Grains Biologiques', sales: 18, revenue: 63000 }
-    ],
-    demographics: {
-      age: [
-        { range: '18-25', percentage: 25 },
-        { range: '26-35', percentage: 35 },
-        { range: '36-45', percentage: 25 },
-        { range: '46+', percentage: 15 }
-      ],
-      cities: [
-        { city: 'Douala', percentage: 40 },
-        { city: 'Yaoundé', percentage: 30 },
-        { city: 'Bafoussam', percentage: 15 },
-        { city: 'Garoua', percentage: 10 },
-        { city: 'Autres', percentage: 5 }
-      ]
-    }
-  };
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+        if (user) {
+            try {
+                setLoading(true);
+                const response = await fetch(`${API_BASE_URL}/sellers/${user.id}/analytics`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch analytics');
+                }
+                const data = await response.json();
+                setAnalyticsData(data);
+            } catch (error) {
+                console.error('Error fetching analytics:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+    };
+    fetchAnalytics();
+  }, [user]);
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -45,6 +40,18 @@ const SellerAnalytics = (props) => {
       minimumFractionDigits: 0,
     }).format(price);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header {...props} />
+        <div className="container mx-auto px-4 py-8">
+          <p>Chargement des analyses...</p>
+        </div>
+        <Footer language={language} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -62,26 +69,19 @@ const SellerAnalytics = (props) => {
             <SellerHeader title="Analyses et Statistiques" language={language} />
             
             {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              {[
-                { title: 'Revenus Total', value: '18,500,000 XAF', change: '+15%', icon: '💰', color: 'from-green-400 to-green-600' },
-                { title: 'Commandes', value: '847', change: '+12%', icon: '📦', color: 'from-blue-400 to-blue-600' },
-                { title: 'Clients', value: '456', change: '+8%', icon: '👥', color: 'from-purple-400 to-purple-600' },
-                { title: 'Taux Conversion', value: '3.2%', change: '+0.5%', icon: '📊', color: 'from-orange-400 to-red-500' }
-              ].map((metric, index) => (
-                <div key={index} className={`bg-gradient-to-r ${metric.color} text-white rounded-lg p-6 shadow-lg`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm opacity-90">{metric.title}</p>
-                      <p className="text-2xl font-bold">{metric.value}</p>
-                      <p className="text-sm mt-1 bg-white bg-opacity-20 px-2 py-1 rounded inline-block">
-                        {metric.change}
-                      </p>
-                    </div>
-                    <div className="text-3xl">{metric.icon}</div>
-                  </div>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className={`bg-gradient-to-r from-green-400 to-green-600 text-white rounded-lg p-6 shadow-lg`}>
+                <p className="text-sm opacity-90">Revenus Total</p>
+                <p className="text-2xl font-bold">{formatPrice(analyticsData?.total_revenue || 0)}</p>
+              </div>
+              <div className={`bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-lg p-6 shadow-lg`}>
+                <p className="text-sm opacity-90">Commandes</p>
+                <p className="text-2xl font-bold">{analyticsData?.total_orders || 0}</p>
+              </div>
+              <div className={`bg-gradient-to-r from-purple-400 to-purple-600 text-white rounded-lg p-6 shadow-lg`}>
+                <p className="text-sm opacity-90">Clients</p>
+                <p className="text-2xl font-bold">{analyticsData?.total_customers || 0}</p>
+              </div>
             </div>
 
             {/* Charts Section */}
@@ -90,17 +90,17 @@ const SellerAnalytics = (props) => {
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-6">Évolution du Chiffre d'Affaires</h3>
                 <div className="h-64 bg-gradient-to-t from-purple-50 to-transparent rounded-lg flex items-end justify-around p-4">
-                  {analyticsData.revenue.monthly.map((value, index) => (
+                  {analyticsData?.monthly_revenue.map((value, index) => (
                     <div key={index} className="flex flex-col items-center">
                       <div 
                         className="bg-gradient-to-t from-purple-500 to-purple-300 rounded-t w-12"
-                        style={{ height: `${(value / Math.max(...analyticsData.revenue.monthly)) * 200}px` }}
+                        style={{ height: `${(value.revenue / Math.max(...analyticsData.monthly_revenue.map(v => v.revenue))) * 200}px` }}
                       ></div>
                       <span className="text-xs mt-2 text-gray-600">
-                        {analyticsData.revenue.labels[index]}
+                        {value.month}
                       </span>
                       <span className="text-xs text-purple-600 font-semibold">
-                        {(value / 1000000).toFixed(1)}M
+                        {(value.revenue / 1000000).toFixed(1)}M
                       </span>
                     </div>
                   ))}
@@ -111,7 +111,7 @@ const SellerAnalytics = (props) => {
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h3 className="text-xl font-bold mb-6">Produits les Plus Vendus</h3>
                 <div className="space-y-4">
-                  {analyticsData.topProducts.map((product, index) => (
+                  {analyticsData?.top_products.map((product, index) => (
                     <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-purple-500 text-white rounded-lg flex items-center justify-center text-sm font-bold">
@@ -126,51 +126,6 @@ const SellerAnalytics = (props) => {
                         <p className="font-bold text-purple-600">
                           {formatPrice(product.revenue)}
                         </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Demographics */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Age Demographics */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h3 className="text-xl font-bold mb-6">Répartition par Âge</h3>
-                <div className="space-y-4">
-                  {analyticsData.demographics.age.map((group, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="font-medium">{group.range} ans</span>
-                        <span className="font-bold">{group.percentage}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-blue-400 to-blue-600 h-2 rounded-full"
-                          style={{ width: `${group.percentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Geographic Distribution */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h3 className="text-xl font-bold mb-6">Répartition Géographique</h3>
-                <div className="space-y-4">
-                  {analyticsData.demographics.cities.map((location, index) => (
-                    <div key={index} className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="font-medium">{location.city}</span>
-                        <span className="font-bold">{location.percentage}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-green-400 to-green-600 h-2 rounded-full"
-                          style={{ width: `${location.percentage}%` }}
-                        ></div>
                       </div>
                     </div>
                   ))}
