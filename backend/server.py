@@ -53,6 +53,13 @@ async def super_admin_required(role: str = Depends(get_current_admin_role)):
             detail="Super admin privileges required for this operation."
         )
 
+async def admin_or_higher_required(role: str = Depends(get_current_admin_role)):
+    if role not in ["super_admin", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or Super admin privileges required for this operation."
+        )
+
 async def moderator_or_higher_required(role: str = Depends(get_current_admin_role)):
     if role not in ["super_admin", "admin", "moderator"]:
         raise HTTPException(
@@ -534,7 +541,7 @@ async def list_buyers():
     buyers = await buyers_cursor.to_list(1000)
     return [Buyer(**b) for b in buyers]
 
-@api_router.put("/buyers/{buyer_id}", response_model=Buyer, dependencies=[Depends(super_admin_required)])
+@api_router.put("/buyers/{buyer_id}", response_model=Buyer, dependencies=[Depends(admin_or_higher_required)])
 async def update_buyer(buyer_id: str, buyer_data: BuyerUpdate):
     update_data = buyer_data.dict(exclude_unset=True)
     if not update_data:
@@ -713,7 +720,7 @@ async def approve_seller(seller_id: str):
         raise HTTPException(status_code=404, detail="Seller not found")
     return Seller(**updated_seller)
 
-@api_router.put("/sellers/{seller_id}", response_model=Seller, dependencies=[Depends(super_admin_required)])
+@api_router.put("/sellers/{seller_id}", response_model=Seller, dependencies=[Depends(admin_or_higher_required)])
 async def update_seller(seller_id: str, seller_data: SellerUpdate):
     update_data = seller_data.dict(exclude_unset=True)
     if not update_data:

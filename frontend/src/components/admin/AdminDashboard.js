@@ -118,13 +118,6 @@ const AdminDashboard = (props) => {
         </header>
 
         <div className="container mx-auto px-4 py-8">
-            <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative mb-4" role="alert">
-                <strong className="font-bold">DEBUG INFO: </strong>
-                <span className="block sm:inline">
-                    Current User Role: <strong>{user ? user.role : 'Not Logged In'}</strong> | 
-                    User Type: <strong>{user ? user.type : 'N/A'}</strong>
-                </span>
-            </div>
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                 <div className="lg:col-span-1">
                     <div className="bg-white rounded-lg shadow-md p-4 sticky top-24">
