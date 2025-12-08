@@ -151,7 +151,7 @@ class ProductUpdate(BaseModel):
 class Seller(BaseModel):
     id: str = Field(default_factory=lambda: f"seller_{str(uuid.uuid4())[:8]}")
     whatsapp: str
-    password: str  # Hashed
+    password: Optional[str] = None  # Hashed. Made optional to support legacy data and public listing.
     name: str
     businessName: str
     email: str
