@@ -663,7 +663,7 @@ async def create_seller(seller_data: SellerCreate):
     await db.sellers.insert_one(seller.dict())
     return seller
 
-@api_router.get("/sellers", response_model=List[Seller], dependencies=[Depends(super_admin_required)])
+@api_router.get("/sellers", response_model=List[Seller])
 async def list_sellers():
     sellers_cursor = db.sellers.find()
     sellers = await sellers_cursor.to_list(1000)
