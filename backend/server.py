@@ -732,7 +732,7 @@ async def update_seller(seller_id: str, seller_data: SellerUpdate):
         raise HTTPException(status_code=404, detail="Seller not found")
     return Seller(**updated_seller)
 
-@api_router.delete("/sellers/{seller_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+@api_router.delete("/sellers/{seller_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(admin_or_higher_required)])
 async def delete_seller(seller_id: str):
     result = await db.sellers.delete_one({"id": seller_id})
     if result.deleted_count == 0:
