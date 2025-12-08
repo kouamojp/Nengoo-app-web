@@ -186,7 +186,7 @@ const Checkout = (props) => {
                 <div className="mb-6">
                   <label className="block text-sm font-medium mb-4">Option de Livraison</label>
                   <div className="space-y-3">
-                    <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer text-left">
                       <input
                         type="radio"
                         name="deliveryOption"
@@ -204,7 +204,7 @@ const Checkout = (props) => {
                       </div>
                     </label>
                     
-                    <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer text-left">
                       <input
                         type="radio"
                         name="deliveryOption"
@@ -239,7 +239,7 @@ const Checkout = (props) => {
                             onChange={handleInputChange}
                             className="mr-3 mt-1"
                           />
-                          <div className="flex-1">
+                          <div className="flex-1 text-left">
                             <div className="font-medium text-purple-700">{point.name}</div>
                             <div className="text-sm text-gray-600 mt-1">{point.address}</div>
                             <div className="text-sm text-gray-500 mt-1">
