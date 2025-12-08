@@ -24,8 +24,24 @@ const Checkout = (props) => {
     selectedPickupPoint: ''
   });
   const [pickupPoints, setPickupPoints] = useState([]);
+  const [backendShippingPrice, setBackendShippingPrice] = useState(0); // Default value
 
   useEffect(() => {
+    const fetchShippingPrice = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/settings/shipping`);
+            if (response.ok) {
+                const data = await response.json();
+                setBackendShippingPrice(data.price);
+            } else {
+                console.error('Failed to fetch shipping price');
+            }
+        } catch (error) {
+            console.error('Error fetching shipping price:', error);
+        }
+    };
+    fetchShippingPrice();
+
     const fetchPickupPoints = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/pickup-points`, {
@@ -53,7 +69,7 @@ const Checkout = (props) => {
   };
   
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = formData.deliveryOption === 'pickup' ? 0 : (subtotal > 50000 ? 0 : 2500); // Free shipping for pickup or orders over 50,000 XAF
+  const shipping = formData.deliveryOption === 'pickup' ? 0 : (subtotal > 1000 ? 0 : backendShippingPrice); // Free shipping for pickup or orders over 50,000 XAF
   const tax = 0;
   const total = subtotal + shipping;
   

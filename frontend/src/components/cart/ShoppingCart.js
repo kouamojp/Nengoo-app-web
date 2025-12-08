@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
@@ -10,6 +10,26 @@ const ShoppingCart = (props) => {
   const navigate = useNavigate();
   const t = translations[language];
   
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+  const [backendShippingPrice, setBackendShippingPrice] = useState(2500);
+
+  useEffect(() => {
+    const fetchShippingPrice = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/settings/shipping`);
+            if (response.ok) {
+                const data = await response.json();
+                setBackendShippingPrice(data.price);
+            } else {
+                console.error('Failed to fetch shipping price');
+            }
+        } catch (error) {
+            console.error('Error fetching shipping price:', error);
+        }
+    };
+    fetchShippingPrice();
+  }, []);
+  
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -19,8 +39,8 @@ const ShoppingCart = (props) => {
   };
   
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 50000 ? 0 : 2500; // Free shipping over 50,000 XAF
-  const tax = subtotal * 0.1; // 10% tax
+  const shipping = subtotal > 50000 ? 0 : backendShippingPrice; // Free shipping over 50,000 XAF
+  const tax = 0; // 10% tax
   const total = subtotal + shipping + tax;
 
   if (cartItems.length === 0) {
@@ -126,11 +146,6 @@ const ShoppingCart = (props) => {
                 <div className="flex justify-between">
                   <span>{t.shipping}</span>
                   <span>{shipping === 0 ? 'Gratuit' : formatPrice(shipping)}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span>{t.tax} (10%)</span>
-                  <span>{formatPrice(tax)}</span>
                 </div>
                 
                 <hr />

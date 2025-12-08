@@ -99,7 +99,7 @@ const AdminDashboard = (props) => {
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                         <div className="bg-white rounded-lg p-2"><span className="text-2xl font-bold text-purple-700">🔧</span></div>
-                        <div>
+                        <div className="text-left">
                             <h1 className="text-2xl font-bold">Panneau Administrateur</h1>
                             <p className="text-sm opacity-90">Gestion de Nengoo</p>
                         </div>
