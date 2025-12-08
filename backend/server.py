@@ -27,6 +27,7 @@ api_router = APIRouter(prefix="/api")
 
 origins = [
     "https://www.nengoo.com",
+    "https://nengoo.com",
     "https://nengoo-app-web.vercel.app",
     "https://nengoo-app-web.onrender.com",
     "http://localhost:3000"
@@ -34,7 +35,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
