@@ -25,6 +25,21 @@ db = client[os.environ['DB_NAME']]
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
+origins = [
+    "https://www.nengoo.com",
+    "https://nengoo-app-web.vercel.app",
+    "https://nengoo-app-web.onrender.com",
+    "http://localhost:3000"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Security (Mock Authorization) ---
 
 async def get_current_admin_role(x_admin_role: str = Header(None)) -> Optional[str]:
