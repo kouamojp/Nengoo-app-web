@@ -105,7 +105,7 @@ const Homepage = (props) => {
   }, [language]);
 
   // Sélection des produits pour les différentes sections
-  const featuredProducts = products.slice(0, 4);
+  const featuredProducts = products;
   const localProducts = products.filter(p => p.category === 'cat_340d7906').slice(0, 3);
 
   const handleNewsletterSubmit = async (e) => {
@@ -283,7 +283,7 @@ const Homepage = (props) => {
       {/* Featured Products */}
       <section className="py-12 lg:py-16 bg-white">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-6 lg:mb-8 space-y-4 sm:space-y-0">
+          {/* <div className="flex flex-col sm:flex-row justify-between items-center mb-6 lg:mb-8 space-y-4 sm:space-y-0">
             <h2 className="text-2xl sm:text-3xl font-bold">
               {t.featuredProducts}
               {!loading && products.length > 0 && (
@@ -293,7 +293,7 @@ const Homepage = (props) => {
             <Link to="/catalog" className="text-purple-600 hover:text-purple-700 font-semibold">
               {t.viewAll} →
             </Link>
-          </div>
+          </div> */}
 
           {loading ? (
             <div className="text-center py-16">
@@ -301,7 +301,7 @@ const Homepage = (props) => {
               <p className="text-lg text-gray-600">Chargement des produits...</p>
             </div>
           ) : featuredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
               {featuredProducts.map(product => (
                 <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
               ))}
@@ -320,7 +320,7 @@ const Homepage = (props) => {
       </section>
 
       {/* Local Specialties */}
-      <section className="py-12 lg:py-16 bg-gradient-to-r from-orange-100 to-red-100">
+      {/* <section className="py-12 lg:py-16 bg-gradient-to-r from-orange-100 to-red-100">
         <div className="container mx-auto px-4">
           <div className="text-center mb-8 lg:mb-12">
             <h2 className="text-2xl sm:text-3xl font-bold mb-4">
@@ -354,7 +354,7 @@ const Homepage = (props) => {
             </div>
           )}
         </div>
-      </section>
+      </section> */}
 
       {/* Newsletter */}
       {/* <section className="py-12 lg:py-16 bg-gradient-to-r from-purple-600 to-red-600 text-white">

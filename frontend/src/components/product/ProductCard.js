@@ -50,7 +50,7 @@ const ProductCard = ({ product, language, addToCart }) => {
       
       <div className="p-4">
         <h3 
-          className="font-semibold text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors"
+          className="font-semibold text-[1rem] leading-5 line- sm:text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors max-sm:min-h-10"
           onClick={() => navigate(`/product/${product.id}`)}
         >
           {product.name[language]}
@@ -58,14 +58,14 @@ const ProductCard = ({ product, language, addToCart }) => {
         {/* <p className="text-gray-600 text-sm mb-2">
           {product.reviews} {t.reviews} • {product.rating} ⭐
         </p> */}
-        <div className="flex justify-between items-center mb-3 mt-5">
-          <span className="text-xl font-bold text-purple-600">
+        <div className="sm:flex justify-between items-center mb-3 mt-5">
+          <span className=" text-lg sm:text-xl font-bold text-purple-600">
             {formatPrice(product.price)}
           </span>
           <button
             onClick={() => addToCart(product)}
             disabled={!product.inStock}
-            className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-3 py-1.5 text-sm rounded-lg transition-colors"
+            className="bg-purple-600 max-sm:mt-4 hover:bg-purple-700 disabled:bg-gray-400 text-white px-3 py-1.5 text-sm rounded-lg transition-colors"
           >
             {t.addToCart}
           </button>

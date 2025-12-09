@@ -239,7 +239,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
             />
             <button 
               type="submit"
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg transition-colors"
+              className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg transition-colors"
             >
               🔍
             </button>

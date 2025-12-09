@@ -1,10 +1,29 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
 const Footer = ({ language }) => {
   const t = translations[language];
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/categories`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch categories');
+        }
+        const data = await response.json();
+        setCategories(data);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+  }, []);
   
   const handleStoreClick = (store) => {
     if (store === 'android') {
@@ -17,7 +36,7 @@ const Footer = ({ language }) => {
   return (
     <footer className="bg-gray-900 text-white">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
           {/* Company Info */}
           <div>
             <div className="mb-4">
@@ -31,12 +50,12 @@ const Footer = ({ language }) => {
             <p className="text-gray-300 mb-4 w-80">
               {t.footerText}
             </p>
-            <div className="flex space-x-4">
+            {/* <div className="flex space-x-4">
               <a href="#" className="text-2xl hover:text-purple-400 transition-colors">📘</a>
               <a href="#" className="text-2xl hover:text-purple-400 transition-colors">📧</a>
               <a href="#" className="text-2xl hover:text-purple-400 transition-colors">📷</a>
               <a href="#" className="text-2xl hover:text-purple-400 transition-colors">🐦</a>
-            </div>
+            </div> */}
           </div>
 
           {/* Quick Links */}
@@ -53,21 +72,27 @@ const Footer = ({ language }) => {
           {/* Categories */}
           <div>
             <h4 className="text-lg font-semibold mb-4">{t.categories}</h4>
-            <ul className="space-y-2">
-              <li><Link to="/catalog/clothing_accessories" className="text-gray-300 hover:text-white transition-colors">{t.clothing_accessories}</Link></li>
-              <li><Link to="/catalog/electronics" className="text-gray-300 hover:text-white transition-colors">{t.electronics}</Link></li>
-              <li><Link to="/catalog/handicrafts" className="text-gray-300 hover:text-white transition-colors">{t.handicrafts}</Link></li>
-              <li><Link to="/catalog/food_drinks" className="text-gray-300 hover:text-white transition-colors">{t.food_drinks}</Link></li>
+            <ul className="space-y-2 md:grid grid-cols-2">
+              {categories.map(category => (
+                <li key={category.id}>
+                  <Link 
+                    to={`/catalog/${category.name.toLowerCase().replace(/\s/g, '_')}`} 
+                    className="text-gray-300 hover:text-white transition-colors"
+                  >
+                    {category.name}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
 
           {/* Download App */}
           <div>
-            <h4 className="text-lg font-semibold mb-4">📱 Télécharger l'App</h4>
-            <p className="text-gray-300 mb-4 text-sm">Installez Nengoo sur votre mobile</p>
+            {/* <h4 className="text-lg font-semibold mb-4">📱 Télécharger l'App</h4>
+            <p className="text-gray-300 mb-4 text-sm">Installez Nengoo sur votre mobile</p> */}
             
             {/* Google Play Badge */}
-            <button 
+           {/*  <button 
               onClick={() => handleStoreClick('android')}
               className="w-full bg-black hover:bg-gray-800 rounded-lg p-3 mb-3 transition-all hover:scale-105 flex items-center space-x-3 border border-gray-700"
             >
@@ -76,10 +101,10 @@ const Footer = ({ language }) => {
                 <div className="text-xs text-gray-400">Disponible sur</div>
                 <div className="text-sm font-semibold">Google Play</div>
               </div>
-            </button>
+            </button> */}
 
             {/* App Store Badge */}
-            <button 
+           {/*  <button 
               onClick={() => handleStoreClick('ios')}
               className="w-full bg-black hover:bg-gray-800 rounded-lg p-3 mb-3 transition-all hover:scale-105 flex items-center space-x-3 border border-gray-700"
             >
@@ -88,10 +113,10 @@ const Footer = ({ language }) => {
                 <div className="text-xs text-gray-400">Télécharger sur</div>
                 <div className="text-sm font-semibold">App Store</div>
               </div>
-            </button>
+            </button> */}
 
             {/* PWA Install */}
-            <div className="bg-purple-900 bg-opacity-50 rounded-lg p-3 border border-purple-700">
+            {/* <div className="bg-purple-900 bg-opacity-50 rounded-lg p-3 border border-purple-700">
               <div className="flex items-center space-x-2 mb-2">
                 <span className="text-lg">⚡</span>
                 <span className="text-xs font-semibold text-yellow-300">Installation Rapide</span>
@@ -99,7 +124,7 @@ const Footer = ({ language }) => {
               <p className="text-xs text-gray-300">
                 Installez maintenant en 1 clic depuis cette page (PWA)
               </p>
-            </div>
+            </div> */}
           </div>
         </div>
 
