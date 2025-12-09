@@ -6,15 +6,15 @@ import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
 
 const SellerOrders = (props) => {
-  const { language } = props;
+  const { language, user } = props;
   const [orders, setOrders] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
 
   useEffect(() => {
     const fetchOrders = async () => {
+      if (!user) return;
       try {
-        // TODO: Replace with dynamic seller ID from auth context
-        const sellerId = 'seller_1'; 
+        const sellerId = user.id; 
         const response = await fetch(`http://localhost:8000/api/orders?seller_id=${sellerId}`);
         if (!response.ok) {
           throw new Error('Failed to fetch orders');
@@ -28,7 +28,7 @@ const SellerOrders = (props) => {
     };
 
     fetchOrders();
-  }, []);
+  }, [user]);
 
   const filteredOrders = filterStatus === 'all' 
     ? orders 
@@ -108,12 +108,12 @@ const SellerOrders = (props) => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <SellerSidebar currentPage="orders" language={language} />
+            <SellerSidebar currentPage="orders" language={language} user={user} />
           </div>
           
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <SellerHeader title="Gestion des Commandes" language={language} />
+            <SellerHeader title="Gestion des Commandes" language={language} user={user} />
             
             {/* Filters and Stats */}
             <div className="bg-white rounded-lg shadow-lg p-6 mb-8">

@@ -7,7 +7,7 @@ import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
 
 const SellerDashboard = (props) => {
-  const { language } = props;
+  const { language, user } = props;
   const [stats, setStats] = useState([
     { title: "Ventes Totales", value: "0", icon: "💰", color: "from-green-400 to-green-600", change: "+0%" },
     { title: "Commandes en Attente", value: "0", icon: "📋", color: "from-yellow-400 to-orange-500", change: "+0" },
@@ -18,9 +18,10 @@ const SellerDashboard = (props) => {
 
   useEffect(() => {
     const fetchOrders = async () => {
+      if (!user) return;
+
       try {
-        // TODO: Replace with dynamic seller ID from auth context
-        const sellerId = 'seller_1';
+        const sellerId = user.id;
         const response = await fetch(`http://localhost:8000/api/orders?seller_id=${sellerId}`);
         if (!response.ok) {
           throw new Error('Failed to fetch orders');
@@ -49,7 +50,7 @@ const SellerDashboard = (props) => {
     };
 
     fetchOrders();
-  }, []);
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -59,12 +60,12 @@ const SellerDashboard = (props) => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <SellerSidebar currentPage="dashboard" language={language} />
+            <SellerSidebar currentPage="dashboard" language={language} user={user} />
           </div>
           
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <SellerHeader title="Tableau de Bord Vendeur" language={language} />
+            <SellerHeader title="Tableau de Bord Vendeur" language={language} user={user} />
             
             {/* Statistics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

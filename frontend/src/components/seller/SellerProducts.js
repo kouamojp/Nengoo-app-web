@@ -9,7 +9,7 @@ import SellerHeader from './SellerHeader';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const SellerProducts = (props) => {
-    const { language } = props;
+    const { language, user } = props;
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [products, setProducts] = useState([]);
@@ -180,12 +180,12 @@ const SellerProducts = (props) => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Sidebar */}
             <div className="lg:col-span-1">
-              <SellerSidebar currentPage="products" language={language} />
+              <SellerSidebar currentPage="products" language={language} user={user} />
             </div>
             
             {/* Main Content */}
             <div className="lg:col-span-3">
-              <SellerHeader title="Gestion des Produits" language={language} />
+              <SellerHeader title="Gestion des Produits" language={language} user={user} />
               
               {/* Actions Bar */}
               <div className="bg-white rounded-lg shadow-lg p-6 mb-8">

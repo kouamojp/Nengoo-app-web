@@ -265,7 +265,7 @@ const ProductDetail = (props) => {
               <h1 className="text-3xl font-bold mb-4">{product.name[language]}</h1>
               
               {/* Rating */}
-              <div className="flex items-center mb-4">
+             {/*  <div className="flex items-center mb-4">
                 <div className="flex mr-2">
                   {[...Array(5)].map((_, i) => (
                     <span key={i} className={`text-lg ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`}>
@@ -275,7 +275,7 @@ const ProductDetail = (props) => {
                 </div>
                 <span className="text-gray-600">({product.reviews} {t.reviews})</span>
               </div>
-              
+               */}
               {/* Price */}
               <div className="mb-6">
                 <span className="text-4xl font-bold text-purple-600">
@@ -360,7 +360,7 @@ const ProductDetail = (props) => {
               
               {/* Seller Info Card */}
               {seller && (
-                <div className="mt-8 bg-gray-50 rounded-lg p-6">
+                <div className="mt-8 bg-gray-50 rounded-lg p-6 text-left">
                   <h3 className="text-lg font-semibold mb-4">Informations Vendeur</h3>
                   <div className="flex items-center space-x-4">
                     <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center text-white text-2xl font-bold">

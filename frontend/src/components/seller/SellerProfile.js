@@ -1,6 +1,5 @@
 
-import React, { useState } from 'react';
-import { mockSellerData } from '../../lib/mockData';
+import React, { useState, useEffect } from 'react';
 import { openWhatsApp } from '../../lib/utils';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
@@ -8,16 +7,48 @@ import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
 
 const SellerProfile = (props) => {
-  const { language } = props;
-  const [profileData, setProfileData] = useState(mockSellerData.profile);
+  const { language, user } = props;
+  const [profileData, setProfileData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      // Map the user prop to the profileData state
+      setProfileData({
+        name: user.businessName || '',
+        email: user.email || '',
+        phone: user.whatsapp || '',
+        address: user.address ? `${user.address}, ${user.city}` : '',
+        description: user.description || '',
+        logo: user.logoUrl || null,
+        joinDate: user.joinDate || new Date().toISOString(),
+        rating: user.rating || 4.5, // Mock data for now
+        totalSales: user.totalSales || 120, // Mock data for now
+        socialMedia: user.socialMedia || { whatsapp: user.whatsapp || '' },
+      });
+    }
+  }, [user]);
 
   const handleSave = (e) => {
     e.preventDefault();
     setIsEditing(false);
     // Here you would save to backend
-    alert('Profil mis à jour avec succès!');
+    // For now, we can update the user prop via the function passed from App.js
+    props.setUser({ ...user, ...profileData }); 
+    alert('Profil mis à jour avec succès! (Simulation)');
   };
+
+  if (!profileData) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header {...props} />
+        <div className="container mx-auto px-4 py-8 text-center">
+          <p>Chargement du profil...</p>
+        </div>
+        <Footer language={language} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -27,7 +58,7 @@ const SellerProfile = (props) => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <SellerSidebar currentPage="profile" language={language} />
+            <SellerSidebar currentPage="profile" language={language} user={user} />
           </div>
           
           {/* Main Content */}
@@ -48,11 +79,17 @@ const SellerProfile = (props) => {
 
               <form onSubmit={handleSave} className="space-y-6">
                 <div className="flex items-center space-x-6 mb-8">
+                {profileData.logo ? (
                   <img
                     src={profileData.logo}
                     alt="Logo"
                     className="w-24 h-24 rounded-full object-cover border-4 border-purple-200"
                   />
+                ) : (
+                  <div className="w-24 h-24 rounded-full border-4 border-purple-200 bg-purple-600 flex items-center justify-center text-white text-4xl font-bold">
+                    {profileData.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
                   {isEditing && (
                     <div>
                       <label className="block text-sm font-medium mb-2">URL du Logo</label>
@@ -169,32 +206,6 @@ const SellerProfile = (props) => {
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                         />
                       </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Instagram</label>
-                        <input
-                          type="url"
-                          value={profileData.socialMedia?.instagram || ''}
-                          onChange={(e) => setProfileData({
-                            ...profileData,
-                            socialMedia: { ...profileData.socialMedia, instagram: e.target.value }
-                          })}
-                          placeholder="https://instagram.com/..."
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-gray-600 mb-1">Telegram</label>
-                        <input
-                          type="url"
-                          value={profileData.socialMedia?.telegram || ''}
-                          onChange={(e) => setProfileData({
-                            ...profileData,
-                            socialMedia: { ...profileData.socialMedia, telegram: e.target.value }
-                          })}
-                          placeholder="https://t.me/..."
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                        />
-                      </div>
                     </div>
                   ) : (
                     <div className="flex space-x-4">
@@ -218,28 +229,6 @@ const SellerProfile = (props) => {
                           <span>Facebook</span>
                         </a>
                       )}
-                      {profileData.socialMedia?.instagram && (
-                        <a
-                          href={profileData.socialMedia.instagram}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center space-x-2 bg-pink-500 text-white px-4 py-2 rounded-lg hover:bg-pink-600 transition-colors"
-                        >
-                          <span>📷</span>
-                          <span>Instagram</span>
-                        </a>
-                      )}
-                      {profileData.socialMedia?.telegram && (
-                        <a
-                          href={profileData.socialMedia.telegram}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center space-x-2 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-                        >
-                          <span>✈️</span>
-                          <span>Telegram</span>
-                        </a>
-                      )}
                     </div>
                   )}
                 </div>
@@ -258,7 +247,7 @@ const SellerProfile = (props) => {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-lg p-6 shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
@@ -296,7 +285,7 @@ const SellerProfile = (props) => {
                   <div className="text-4xl">🕐</div>
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
@@ -307,3 +296,4 @@ const SellerProfile = (props) => {
 };
 
 export default SellerProfile;
+

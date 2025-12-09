@@ -1,9 +1,8 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { mockSellerData } from '../../lib/mockData';
 
-const SellerSidebar = ({ currentPage, language }) => {
+const SellerSidebar = ({ currentPage, language, user }) => {
   const menuItems = [
     { key: 'dashboard', path: '/seller', icon: '📊', label: 'Tableau de Bord' },
     { key: 'products', path: '/seller/products', icon: '📦', label: 'Produits' },
@@ -13,20 +12,38 @@ const SellerSidebar = ({ currentPage, language }) => {
     { key: 'profile', path: '/seller/profile', icon: '⚙️', label: 'Profil' }
   ];
 
+  const sellerName = user?.businessName || 'Vendeur';
+  const sellerRating = user?.rating || 4.5;
+  const logoUrl = user?.logoUrl;
+  const initial = sellerName.charAt(0).toUpperCase();
+
+  const renderAvatar = () => {
+    if (logoUrl) {
+      return (
+        <img
+          src={logoUrl}
+          alt="Logo"
+          className="w-12 h-12 rounded-full mr-3 object-cover"
+        />
+      );
+    }
+    return (
+      <div className="w-12 h-12 rounded-full mr-3 bg-purple-600 flex items-center justify-center text-white text-xl font-bold">
+        {initial}
+      </div>
+    );
+  };
+
   return (
     <div className="bg-white shadow-lg rounded-lg p-6 sticky top-24">
       <div className="flex items-center mb-8">
-        <img
-          src={mockSellerData.profile.logo}
-          alt="Logo"
-          className="w-12 h-12 rounded-full mr-3"
-        />
+        {renderAvatar()}
         <div>
-          <h3 className="font-bold">{mockSellerData.profile.name}</h3>
-          <div className="flex items-center text-sm text-gray-600">
+          <h3 className="font-bold">{sellerName}</h3>
+          {/* <div className="flex items-center text-sm text-gray-600">
             <span className="mr-1">⭐</span>
-            {mockSellerData.profile.rating}
-          </div>
+            {sellerRating}
+          </div> */}
         </div>
       </div>
       
@@ -61,3 +78,4 @@ const SellerSidebar = ({ currentPage, language }) => {
 };
 
 export default SellerSidebar;
+
