@@ -7,6 +7,13 @@ import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
 const ProductCard = ({ product, language, addToCart }) => {
   const navigate = useNavigate();
   const t = translations[language];
+
+  const truncateProductName = (name, maxLength) => {
+    if (name.length > maxLength) {
+      return name.substring(0, maxLength) + '...';
+    }
+    return name;
+  };
   
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -49,13 +56,12 @@ const ProductCard = ({ product, language, addToCart }) => {
       </div>
       
       <div className="p-4">
-        <h3 
-          className="font-semibold text-[1rem] leading-5 line- sm:text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors max-sm:min-h-10"
-          onClick={() => navigate(`/product/${product.id}`)}
-        >
-          {product.name[language]}
-        </h3>
-        {/* <p className="text-gray-600 text-sm mb-2">
+                <h3
+                  className="font-semibold text-[1rem] leading-5 line- sm:text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors max-sm:min-h-10"
+                  onClick={() => navigate(`/product/${product.id}`)}
+                >
+                  {truncateProductName(product.name[language], 25)}
+                </h3>        {/* <p className="text-gray-600 text-sm mb-2">
           {product.reviews} {t.reviews} • {product.rating} ⭐
         </p> */}
         <div className="sm:flex justify-between items-center mb-3 mt-5">
