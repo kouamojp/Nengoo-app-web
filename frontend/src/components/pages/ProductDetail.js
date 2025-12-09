@@ -361,8 +361,8 @@ const ProductDetail = (props) => {
               {/* Seller Info Card */}
               {seller && (
                 <div className="mt-8 bg-gray-50 rounded-lg p-6 text-left">
-                  <h3 className="text-lg font-semibold mb-4">Informations Vendeur</h3>
-                  <div className="flex items-center space-x-4">
+                  {/* <h3 className="text-lg font-semibold mb-4">Informations Vendeur</h3> */}
+                  <div className="flex flex-col gap-4 ">
                     <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center text-white text-2xl font-bold">
                       {seller.businessName.charAt(0).toUpperCase()}
                     </div>
