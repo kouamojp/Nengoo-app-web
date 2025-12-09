@@ -106,9 +106,9 @@ const AdminDashboard = (props) => {
                     </div>
                     <div className="flex items-center space-x-4 max-md:hidden">
                         {/* <span className="text-sm">👤 {user.name}</span> */}
-                        <button onClick={() => setShowProfileEdit(true)} className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center space-x-2">
+                        {/* <button onClick={() => setShowProfileEdit(true)} className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center space-x-2">
                             <span>✏️</span><span>Modifier Profil</span>
-                        </button>
+                        </button> */}
                         <Link to="/" className="bg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
                             ← Retour au site
                         </Link>
@@ -155,9 +155,9 @@ const AdminDashboard = (props) => {
                                 <span className="text-xl">👑</span><span className="font-medium text-sm text-purple-700">Administrateurs</span>
                             </Link>
                             <div className="flex items-start flex-col gap-4 md:hidden">
-                                <button onClick={() => setShowProfileEdit(true)} className=" bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex space-x-2">
+                               {/*  <button onClick={() => setShowProfileEdit(true)} className=" bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex space-x-2">
                                     <span>✏️</span><span>Modifier Profil</span>
-                                </button>
+                                </button> */}
                                 <Link to="/" className="w-fullbg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
                                     ← Retour au site
                                 </Link>
