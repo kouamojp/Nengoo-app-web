@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2'; // Import SweetAlert2
 import { translations } from '../../lib/translations';
 import { mockUsers } from '../../lib/mockData';
 import Header from '../layout/Header';
@@ -32,9 +33,20 @@ const BuyerSignup = (props) => {
       if (existingUser) {
         setUser(existingUser);
         localStorage.setItem('nengoo-user', JSON.stringify(existingUser));
+        Swal.fire({
+          icon: 'success',
+          title: 'Connecté!',
+          text: 'Vous êtes connecté avec succès.',
+          showConfirmButton: false,
+          timer: 1500
+        });
         navigate('/');
       } else {
-        alert('Numéro WhatsApp non trouvé. Veuillez vous inscrire d\'abord.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Erreur de connexion',
+          text: 'Numéro WhatsApp non trouvé. Veuillez vous inscrire d\'abord.',
+        });
       }
     } else {
       // Register new buyer
@@ -49,6 +61,13 @@ const BuyerSignup = (props) => {
       mockUsers.buyers.push(newBuyer);
       setUser(newBuyer);
       localStorage.setItem('nengoo-user', JSON.stringify(newBuyer));
+      Swal.fire({
+        icon: 'success',
+        title: 'Inscription réussie!',
+        text: 'Votre compte acheteur a été créé avec succès.',
+        showConfirmButton: false,
+        timer: 1500
+      });
       navigate('/');
     }
   };

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2'; // Import SweetAlert2
 import { translations } from '../../lib/translations';
 import { mockUsers, cameroonCities } from '../../lib/mockData';
 import Header from '../layout/Header';
@@ -56,10 +57,21 @@ const SellerSignup = (props) => {
 
         setUser(data);
         localStorage.setItem('nengoo-user', JSON.stringify(data));
+        Swal.fire({
+          icon: 'success',
+          title: 'Connecté!',
+          text: 'Vous êtes connecté avec succès.',
+          showConfirmButton: false,
+          timer: 1500
+        });
         navigate('/seller');
       } catch (error) {
         console.error('Login error:', error);
-        alert(error.message);
+        Swal.fire({
+          icon: 'error',
+          title: 'Erreur de connexion',
+          text: error.message,
+        });
       }
     } else {
       // Register new seller
@@ -82,11 +94,22 @@ const SellerSignup = (props) => {
           throw new Error(errorDetail);
         }
         
+        Swal.fire({
+          icon: 'success',
+          title: 'Inscription en attente!',
+          text: 'Votre demande d\'inscription a été soumise avec succès. Veuillez attendre l\'approbation de l\'administrateur.',
+          showConfirmButton: false,
+          timer: 2000
+        });
         navigate('/pending-approval', { state: { seller: data } });
 
       } catch (error) {
         console.error('Signup error:', error);
-        alert(error.message);
+        Swal.fire({
+          icon: 'error',
+          title: 'Erreur d\'inscription',
+          text: error.message,
+        });
       }
     }
   };

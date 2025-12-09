@@ -100,13 +100,13 @@ const AdminDashboard = (props) => {
                     <div className="flex items-center space-x-4">
                         <div className="bg-white rounded-lg p-2"><span className="text-2xl font-bold text-purple-700">🔧</span></div>
                         <div className="text-left">
-                            <h1 className="text-2xl font-bold">Panneau Administrateur</h1>
+                            <h1 className="text-2xl font-bold max-md:text-xl">Panneau Administrateur</h1>
                             <p className="text-sm opacity-90">Gestion de Nengoo</p>
                         </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                        <span className="text-sm">👤 {user.name}</span>
-                        <button onClick={() => setShowProfileEdit(true)} className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex items-center space-x-2">
+                    <div className="flex items-center space-x-4 max-md:hidden">
+                        {/* <span className="text-sm">👤 {user.name}</span> */}
+                        <button onClick={() => setShowProfileEdit(true)} className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center space-x-2">
                             <span>✏️</span><span>Modifier Profil</span>
                         </button>
                         <Link to="/" className="bg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
@@ -121,7 +121,7 @@ const AdminDashboard = (props) => {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
                 <div className="lg:col-span-1">
                     <div className="bg-white rounded-lg shadow-md p-4 sticky top-24">
-                        <nav className="space-y-2">
+                        <nav className="space-y-2 text-left">
                             <button onClick={() => setActiveSection('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'dashboard' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                 <span className="text-xl">📊</span><span className="font-medium text-sm">Tableau de bord</span>
                             </button>
@@ -154,6 +154,15 @@ const AdminDashboard = (props) => {
                             <Link to="/admin/management" className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors hover:bg-purple-50 border-2 border-purple-300 bg-purple-50">
                                 <span className="text-xl">👑</span><span className="font-medium text-sm text-purple-700">Administrateurs</span>
                             </Link>
+                            <div className="flex items-start flex-col gap-4 md:hidden">
+                                <button onClick={() => setShowProfileEdit(true)} className=" bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex space-x-2">
+                                    <span>✏️</span><span>Modifier Profil</span>
+                                </button>
+                                <Link to="/" className="w-fullbg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
+                                    ← Retour au site
+                                </Link>
+                            </div>
+                            
                         </nav>
                     </div>
                 </div>

@@ -26,7 +26,7 @@ const Login = (props) => {
             <div className="space-y-4">
               <Link
                 to="/login/buyer"
-                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-lg font-semibold text-center block hover:shadow-lg transition-shadow"
+                className="w-full text-left bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-lg font-semibold block hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-center justify-center space-x-3">
                   <span className="text-2xl">👤</span>
@@ -39,7 +39,7 @@ const Login = (props) => {
 
               <Link
                 to="/login/seller"
-                className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white py-4 px-6 rounded-lg font-semibold text-center block hover:shadow-lg transition-shadow"
+                className="w-full text-left bg-gradient-to-r from-purple-500 to-purple-600 text-white py-4 px-6 rounded-lg font-semibold block hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-center justify-center space-x-3">
                   <span className="text-2xl">🏪</span>

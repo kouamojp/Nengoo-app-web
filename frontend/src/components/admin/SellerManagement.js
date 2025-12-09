@@ -170,7 +170,7 @@ const SellerManagement = (props) => {
                 </div>
             )}
             
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-md overflow-auto">
                 {loading ? <p className="p-6">Chargement...</p> : (
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b">
