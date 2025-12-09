@@ -279,6 +279,9 @@ class AdminUpdate(BaseModel):
 class AdminStatusUpdate(BaseModel):
     status: str
 
+class AdminPasswordUpdate(BaseModel):
+    newPassword: str
+
 class PickupPoint(BaseModel):
     id: str = Field(default_factory=lambda: f"pickup_{str(uuid.uuid4())[:8]}")
     name: str
@@ -1104,6 +1107,20 @@ async def update_admin_status(admin_id: str, status_data: AdminStatusUpdate):
     if not updated_admin:
         raise HTTPException(status_code=404, detail="Admin not found")
     return Admin(**updated_admin)
+
+@api_router.put("/admins/{admin_id}/password", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+async def update_admin_password(admin_id: str, password_data: AdminPasswordUpdate):
+    admin_to_update = await db.admins.find_one({"id": admin_id})
+    if not admin_to_update:
+        raise HTTPException(status_code=404, detail="Admin not found")
+    
+    hashed_password = hash_password(password_data.newPassword)
+    
+    await db.admins.update_one(
+        {"id": admin_id},
+        {"$set": {"accessCode": hashed_password}}
+    )
+    return
 
 @api_router.delete("/admins/{admin_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
 async def delete_admin(admin_id: str):

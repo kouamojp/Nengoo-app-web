@@ -11,6 +11,9 @@ const AdminManagement = (props) => {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState(null);
+  const [passwordChangeAdmin, setPasswordChangeAdmin] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     whatsapp: '',
@@ -157,6 +160,50 @@ const AdminManagement = (props) => {
           console.error("Error updating admin:", error);
           alert(`Erreur: ${error.message}`);
       }
+  };
+
+  const handlePasswordChange = async () => {
+    if (!passwordChangeAdmin) return;
+
+    if (newPassword.length < 6) {
+        alert('Le nouveau mot de passe doit contenir au moins 6 caractères.');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        alert('Les mots de passe ne correspondent pas.');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/admins/${passwordChangeAdmin.id}/password`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Admin-Role': 'super_admin',
+            },
+            body: JSON.stringify({ newPassword: newPassword }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            try {
+                const err = JSON.parse(errorText);
+                throw new Error(err.detail || 'Failed to update password');
+            } catch (e) {
+                throw new Error(errorText || 'Failed to update password');
+            }
+        }
+
+        alert('✅ Mot de passe mis à jour avec succès!');
+        setPasswordChangeAdmin(null);
+        setNewPassword('');
+        setConfirmPassword('');
+
+    } catch (error) {
+        console.error("Error updating password:", error);
+        alert(`Erreur: ${error.message}`);
+    }
   };
   
 
@@ -483,6 +530,18 @@ const AdminManagement = (props) => {
                           >
                             ✏️ Modifier
                           </button>
+                          {isSuperAdmin && (
+                            <button
+                                onClick={() => {
+                                    setPasswordChangeAdmin(admin);
+                                    setNewPassword('');
+                                    setConfirmPassword('');
+                                }}
+                                className="text-gray-600 hover:text-gray-800 font-semibold text-sm"
+                            >
+                                🔑 Changer Mdp
+                            </button>
+                          )}
                           {isSuperAdmin && admin.role !== 'super_admin' && (
                             <>
                               <button
@@ -510,6 +569,54 @@ const AdminManagement = (props) => {
           </div>
         </div>
         )}
+        
+        {/* Password Change Modal */}
+        {isSuperAdmin && passwordChangeAdmin && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
+                    <h3 className="text-2xl font-bold mb-6">Changer le mot de passe pour <span className="text-purple-600">{passwordChangeAdmin.name}</span></h3>
+                    
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe</label>
+                            <input
+                                type="password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="••••••••"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                placeholder="••••••••"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex space-x-4 mt-8">
+                        <button
+                            onClick={handlePasswordChange}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold w-full"
+                        >
+                            Mettre à jour le mot de passe
+                        </button>
+                        <button
+                            onClick={() => setPasswordChangeAdmin(null)}
+                            className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-lg font-semibold w-full"
+                        >
+                            Annuler
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         
 
         {/* Info Box */}
