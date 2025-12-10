@@ -64,7 +64,7 @@ const ProductCard = ({ product, language, addToCart }) => {
                 </h3>        {/* <p className="text-gray-600 text-sm mb-2">
           {product.reviews} {t.reviews} • {product.rating} ⭐
         </p> */}
-        <div className="sm:flex justify-between items-center mb-3 mt-3">
+        <div className="max-sm:flex-col flex justify-between items-center mb-3 mt-3">
           <span className=" text-lg sm:text-xl font-bold text-purple-600">
             {formatPrice(product.price)}
           </span>

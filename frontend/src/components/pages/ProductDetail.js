@@ -416,7 +416,7 @@ const ProductDetail = (props) => {
         {relatedProducts.length > 0 && (
           <div className="mt-16">
             <h3 className="text-2xl font-bold mb-8">Produits similaires</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {relatedProducts.map(relatedProduct => (
                 <ProductCard key={relatedProduct.id} product={relatedProduct} language={language} addToCart={addToCart} />
               ))}
