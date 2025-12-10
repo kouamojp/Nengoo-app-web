@@ -90,11 +90,11 @@ const ProductCatalog = (props) => {
 
         const data = await response.json();
 
-        // Trier les produits par date de création (du plus récent au plus ancien)
+        // Trier les produits par date de mise à jour (du plus récent au plus ancien)
         const sortedData = data.sort((a, b) => {
-          // Utiliser 0 comme fallback si created_at est null ou undefined
-          const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
-          const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+          // Utiliser 0 comme fallback si updatedAt est null ou undefined
+          const dateA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+          const dateB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
           return dateB - dateA;
         });
 
@@ -132,9 +132,9 @@ const ProductCatalog = (props) => {
   filteredProducts.sort((a, b) => {
     switch (sortBy) {
       case 'recent':
-        // Utiliser 0 comme fallback si created_at est null ou undefined
-        const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
-        const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+        // Utiliser 0 comme fallback si updatedAt est null ou undefined
+        const dateA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+        const dateB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
         return dateB - dateA;
       case 'price-low': return a.price - b.price;
       case 'price-high': return b.price - a.price;
