@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
@@ -18,8 +18,15 @@ const ProductCatalog = (props) => {
   const [maxAllowedPrice, setMaxAllowedPrice] = useState(2000000); // Default max price
   const [priceRange, setPriceRange] = useState([0, 2000000]); // Initialized with default max
   const [selectedCategory, setSelectedCategory] = useState(category || 'all');
+  const productListRef = useRef(null);
 
   const t = translations[language];
+
+  useEffect(() => {
+    if (window.innerWidth < 1024 && productListRef.current && selectedCategory !== 'all') {
+      productListRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [selectedCategory]);
 
   useEffect(() => {
     const fetchMaxPrice = async () => {
@@ -143,10 +150,10 @@ const ProductCatalog = (props) => {
           {/* Filters Sidebar */}
           <div className="lg:w-1/4">
             <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
-              <h3 className="text-xl font-bold mb-6">Filtres</h3>
+              <h3 className="text-xl font-bold mb-6 text-left">Filtres</h3>
               
               {/* Category Filter */}
-              <div className="mb-6">
+              <div className="mb-6 text-left">
                 <h4 className="font-semibold mb-3">
                   {t.categories}
                   {!categoriesLoading && categories.length > 0 && (
@@ -201,7 +208,7 @@ const ProductCatalog = (props) => {
           </div>
           
           {/* Products Grid */}
-          <div className="lg:w-3/4">
+          <div className="lg:w-3/4" ref={productListRef}>
             {/* Sort Options */}
             <div className="bg-white rounded-lg shadow-md p-4 mb-6">
               <div className="flex flex-col sm:flex-row justify-between items-center">

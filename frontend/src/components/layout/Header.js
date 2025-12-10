@@ -8,7 +8,6 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:800
 
 const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQuery, user, setUser }) => {
   const navigate = useNavigate();
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [categories, setCategories] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -167,14 +166,6 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
             </form>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setShowMobileMenu(!showMobileMenu)}
-            className="md:hidden text-white text-2xl"
-          >
-            {showMobileMenu ? '✕' : '☰'}
-          </button>
-
           {/* Desktop User Actions */}
           <div className="hidden md:flex items-end space-x-4">
             {/* <InstallButton /> */}
@@ -212,18 +203,6 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                 <div className="text-sm">{t.signin}</div>
               </Link>
             )}
-          </div>
-
-          {/* Mobile User Actions */}
-          <div className="flex md:hidden items-center space-x-3">
-            <Link to="/cart" className="relative">
-              <span className="text-xl">🛒</span>
-              {cartItems.length > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                  {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-                </span>
-              )}
-            </Link>
           </div>
         </div>
 
@@ -282,77 +261,6 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
           </div>
         </div>
       </nav>} */}
-
-      {/* Mobile Menu */}
-      {showMobileMenu && (
-        <div className="md:hidden bg-purple-600 border-t border-purple-500">
-          <div className="container mx-auto px-4 py-4">
-            {/* Mobile Categories */}
-            <div className="space-y-3 mb-6">
-              <h3 className="font-bold text-yellow-300">
-                Catégories
-                {categories.length > 0 && (
-                  <span className="text-sm ml-2">({categories.length})</span>
-                )}
-              </h3>
-              {categories.length > 0 ? (
-                categories.map(cat => {
-                  const icon = categoryIcons[cat.name] || '📦';
-                  return (
-                    <Link
-                      key={cat.id}
-                      to={`/catalog/${cat.name}`}
-                      onClick={() => setShowMobileMenu(false)}
-                      className="flex items-center space-x-3 py-2 hover:text-yellow-300 transition-colors"
-                    >
-                      <span className="text-xl">{icon}</span>
-                      <span>{cat.name}</span>
-                    </Link>
-                  );
-                })
-              ) : (
-                <p className="text-sm text-gray-300">Chargement des catégories...</p>
-              )}
-            </div>
-            
-            {/* Mobile User Links */}
-            <div className="space-y-3 border-t border-purple-500 pt-4">
-              {user ? (
-                <div className="space-y-3">
-                  <Link
-                    to={user.type === 'seller' ? '/seller' : '/profile'}
-                    onClick={() => setShowMobileMenu(false)}
-                    className="flex items-center space-x-3 py-2 hover:text-yellow-300 transition-colors"
-                  >
-                    <span className="text-xl">{user.type === 'seller' ? '🏪' : '👤'}</span>
-                    <span>{user.name}</span>
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setUser(null);
-                      setShowMobileMenu(false);
-                      navigate('/'); // Redirect to home page
-                    }}
-                    className="flex items-center space-x-3 py-2 hover:text-yellow-300 transition-colors"
-                  >
-                    <span className="text-xl">🚪</span>
-                    <span>{t.logout}</span>
-                  </button>
-                </div>
-              ) : (
-                <Link
-                  to="/login"
-                  onClick={() => setShowMobileMenu(false)}
-                  className="flex items-center space-x-3 py-2 hover:text-yellow-300 transition-colors"
-                >
-                  <span className="text-xl">👤</span>
-                  <span>{t.signin}</span>
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 };

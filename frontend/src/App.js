@@ -27,6 +27,7 @@ import {
   AdminManagement,
   PickupPointsMap
 } from './components';
+import BottomNav from './components/layout/BottomNav';
 
 function App() {
   const [language, setLanguage] = useState('fr');
@@ -149,6 +150,8 @@ function App() {
     setUser: updateUser
   };
 
+  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
   return (
     <div className="App">
       <Router>
@@ -186,6 +189,7 @@ function App() {
           <Route path="/admin/dashboard" element={<AdminDashboard {...appProps} />} />
           <Route path="/admin/management" element={<AdminManagement {...appProps} />} />
         </Routes>
+        <BottomNav cartItemCount={cartItemCount} user={user} />
       </Router>
       {toast.show && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
     </div>

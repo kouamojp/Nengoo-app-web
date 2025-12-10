@@ -19,7 +19,7 @@ const Toast = ({ message, type, onClose }) => {
   if (!message) return null;
 
   return (
-    <div className={`toast-container toast-${type}`}>
+    <div className={`toast-container toast-${type} w-[90%]`}>
       <div className="toast-message">{message}</div>
       <button className="toast-close" onClick={onClose}>
         &times;
