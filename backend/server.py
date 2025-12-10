@@ -577,13 +577,6 @@ async def get_products(search: Optional[str] = None, seller_id: Optional[str] = 
     products = await db.products.find(query).to_list(1000)
     return [Product(**p) for p in products]
 
-@api_router.get("/products/{product_id}", response_model=Product)
-async def get_product(product_id: str):
-    product = await db.products.find_one({"id": product_id})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return Product(**product)
-
 class MaxPriceResponse(BaseModel):
     maxPrice: float
 
@@ -602,6 +595,13 @@ async def get_max_product_price():
     
     logger.info("💰 [Backend] No products found, returning max price 0.0")
     return MaxPriceResponse(maxPrice=0.0)
+
+@api_router.get("/products/{product_id}", response_model=Product)
+async def get_product(product_id: str):
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return Product(**product)
 
 @api_router.post("/products", response_model=Product, dependencies=[Depends(seller_or_moderator_or_higher_required)])
 async def create_product(product_data: ProductCreate, 

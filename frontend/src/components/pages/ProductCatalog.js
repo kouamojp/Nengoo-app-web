@@ -32,16 +32,24 @@ const ProductCatalog = (props) => {
     const fetchMaxPrice = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/products/max-price`);
+
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          throw new Error(`API responded with status: ${response.status}`);
         }
+
         const data = await response.json();
-        const fetchedMaxPrice = data.maxPrice > 0 ? Math.ceil(data.maxPrice / 1000) * 1000 : 2000000; // Round up to nearest thousand, min 200000
-        setMaxAllowedPrice(fetchedMaxPrice);
-        setPriceRange([0, fetchedMaxPrice]); // Set initial price range to [0, fetchedMaxPrice]
+
+        if (data && typeof data.maxPrice === 'number' && data.maxPrice > 0) {
+          const fetchedMaxPrice = Math.ceil(data.maxPrice / 1000) * 1000;
+          setMaxAllowedPrice(fetchedMaxPrice);
+          setPriceRange([0, fetchedMaxPrice]);
+        } else {
+          setMaxAllowedPrice(2000000);
+          setPriceRange([0, 2000000]);
+        }
+
       } catch (error) {
-        console.error("❌ [ProductCatalog] Erreur lors de la récupération du prix max:", error);
-        // Fallback to default maxAllowedPrice
+        console.error("❌ [ProductCatalog] Critical error during fetchMaxPrice:", error);
       }
     };
     fetchMaxPrice();
@@ -118,6 +126,8 @@ const ProductCatalog = (props) => {
   if (selectedCategory && selectedCategory !== 'all') {
     filteredProducts = filteredProducts.filter(p => p.category === selectedCategory);
   }
+  
+  console.log(filteredProducts)
   
   filteredProducts = filteredProducts.filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
   
