@@ -28,8 +28,6 @@ const ProductDetail = (props) => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
-        console.log("🔍 [ProductDetail] Récupération du produit ID:", id);
-        console.log("🔍 [ProductDetail] API URL:", `${API_BASE_URL}/products/${id}`);
 
         const response = await fetch(`${API_BASE_URL}/products/${id}`);
 
@@ -43,7 +41,6 @@ const ProductDetail = (props) => {
         }
 
         const data = await response.json();
-        console.log("✅ [ProductDetail] Produit récupéré:", data);
 
         // Adapter les données pour le frontend
         const adaptedProduct = {
@@ -78,7 +75,6 @@ const ProductDetail = (props) => {
 
     const fetchRelatedProducts = async (category, currentProductId) => {
       try {
-        console.log("🔍 [ProductDetail] Récupération des produits similaires catégorie:", category);
         const response = await fetch(`${API_BASE_URL}/products`);
 
         if (!response.ok) return;
@@ -97,7 +93,6 @@ const ProductDetail = (props) => {
             rating: p.rating || 0,
           }));
 
-        console.log("✅ [ProductDetail] Produits similaires trouvés:", filtered.length);
         setRelatedProducts(filtered);
       } catch (error) {
         console.error("❌ [ProductDetail] Erreur produits similaires:", error);
@@ -106,7 +101,6 @@ const ProductDetail = (props) => {
 
     const fetchSeller = async (sellerId) => {
       try {
-        console.log("🔍 [ProductDetail] Récupération des infos vendeur ID:", sellerId);
         const response = await fetch(`${API_BASE_URL}/sellers/${sellerId}`);
 
         if (!response.ok) {
@@ -115,7 +109,6 @@ const ProductDetail = (props) => {
         }
 
         const data = await response.json();
-        console.log("✅ [ProductDetail] Vendeur récupéré:", data);
         setSeller(data);
       } catch (error) {
         console.error("❌ [ProductDetail] Erreur récupération vendeur:", error);

@@ -70,7 +70,6 @@ function App() {
 
   // Save cart to localStorage when cartItems change
   useEffect(() => {
-    console.log('[NengooCartDebug] App.js: Cart items changed, saving to localStorage:', JSON.stringify(cartItems, null, 2));
     localStorage.setItem('nengoo-cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
@@ -87,7 +86,6 @@ function App() {
       } else {
         newCart = [...prev, { ...product, quantity }];
       }
-      console.log('[NengooCartDebug] App.js: addToCart - New cart state:', newCart);
       return newCart;
     });
     showToast(`${product.name[language]} ajouté au panier!`, 'success');
@@ -103,7 +101,6 @@ function App() {
           item.id === productId ? { ...item, quantity: newQuantity } : item
         );
       }
-      console.log('[NengooCartDebug] App.js: updateCartQuantity - New cart state:', newCart);
       return newCart;
     });
   };
@@ -111,14 +108,12 @@ function App() {
   const removeFromCart = (productId) => {
     setCartItems(prev => {
       const newCart = prev.filter(item => item.id !== productId);
-      console.log('[NengooCartDebug] App.js: removeFromCart - New cart state:', newCart);
       return newCart;
     });
   };
 
   const clearCart = () => {
     setCartItems([]);
-    console.log('[NengooCartDebug] App.js: clearCart - Cart cleared.');
   };
 
   const toggleLanguage = () => {
@@ -126,7 +121,6 @@ function App() {
   };
 
   const updateUser = (userData) => {
-    console.log('App.js updateUser:', userData);
     setUser(userData);
     if (userData) {
       localStorage.setItem('nengoo-user', JSON.stringify(userData));

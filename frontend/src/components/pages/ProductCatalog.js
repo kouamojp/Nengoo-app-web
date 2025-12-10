@@ -59,7 +59,6 @@ const ProductCatalog = (props) => {
     const fetchCategories = async () => {
       try {
         setCategoriesLoading(true);
-        console.log("🏷️ [ProductCatalog] Récupération des catégories depuis:", `${API_BASE_URL}/categories`);
         const response = await fetch(`${API_BASE_URL}/categories`);
 
         if (!response.ok) {
@@ -67,9 +66,6 @@ const ProductCatalog = (props) => {
         }
 
         const data = await response.json();
-        console.log("✅ [ProductCatalog] Catégories récupérées:", data.length, "catégorie(s)");
-        console.log("📋 [ProductCatalog] Catégories:", data);
-
         setCategories(data);
       } catch (error) {
         console.error("❌ [ProductCatalog] Erreur lors de la récupération des catégories:", error);
@@ -86,7 +82,6 @@ const ProductCatalog = (props) => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        console.log("🔄 Récupération des produits depuis:", `${API_BASE_URL}/products`);
         const response = await fetch(`${API_BASE_URL}/products`);
 
         if (!response.ok) {
@@ -94,8 +89,6 @@ const ProductCatalog = (props) => {
         }
 
         const data = await response.json();
-        console.log("✅ Produits récupérés:", data.length, "produit(s)");
-        console.log("📦 Données brutes:", data);
 
         // Adapt backend data to frontend component structure
         const adaptedProducts = data.map(p => ({
@@ -108,7 +101,6 @@ const ProductCatalog = (props) => {
           // sellerWhatsApp is missing, will be handled later
         }));
 
-        console.log("✨ Produits adaptés:", adaptedProducts.length, "produit(s)");
         setProducts(adaptedProducts);
       } catch (error) {
         console.error("❌ Erreur lors de la récupération des produits:", error);
@@ -126,8 +118,6 @@ const ProductCatalog = (props) => {
   if (selectedCategory && selectedCategory !== 'all') {
     filteredProducts = filteredProducts.filter(p => p.category === selectedCategory);
   }
-  
-  console.log(filteredProducts)
   
   filteredProducts = filteredProducts.filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
   

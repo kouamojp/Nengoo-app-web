@@ -35,22 +35,17 @@ const SellerProducts = (props) => {
           }
 
           const data = await response.json();
-          /* console.log("✅ [Vendeur] Produits récupérés:", data.length, "produit(s)");
-          console.log("📦 [Vendeur] Données brutes:", data); */
-
-          const adaptedProducts = data.map(p => ({
-              ...p,
-              name: { [language]: p.name },
-              description: { [language]: p.description },
-              image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/300',
-              inStock: p.stock > 0,
-              rating: p.rating || 0,
-              reviews: p.reviewsCount || 0,
-            }));
-
-          console.log("✨ [Vendeur] Produits adaptés:", adaptedProducts.length, "produit(s)");
-          setProducts(adaptedProducts);
-        } catch (error) {
+        const adaptedProducts = data.map(p => ({
+          ...p,
+          name: p.name,
+          description: p.description,
+          category: p.category,
+          price: p.price,
+          stock: p.stock,
+          image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/150'
+        }));
+        setProducts(adaptedProducts);
+      } catch (error) {
           console.error("❌ [Vendeur] Erreur lors de la récupération des produits:", error);
           alert("Erreur: Impossible de charger les produits. Vérifiez que le backend est lancé et accessible.");
         } finally {

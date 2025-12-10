@@ -32,7 +32,6 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        console.log("🏷️ [Header] Récupération des catégories depuis:", `${API_BASE_URL}/categories`);
         const response = await fetch(`${API_BASE_URL}/categories`);
 
         if (!response.ok) {
@@ -40,8 +39,6 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
         }
 
         const data = await response.json();
-        console.log("✅ [Header] Catégories récupérées:", data.length, "catégorie(s)");
-
         setCategories(data);
       } catch (error) {
         console.error("❌ [Header] Erreur lors de la récupération des catégories:", error);

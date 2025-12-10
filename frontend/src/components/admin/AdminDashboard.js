@@ -48,7 +48,6 @@ const AdminDashboard = (props) => {
     };
 
     useEffect(() => {
-        console.log('AdminDashboard user object:', user);
         if (user && user.type === 'admin') { // Check if any admin type is logged in
             fetchOrders();
         }

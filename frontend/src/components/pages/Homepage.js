@@ -41,7 +41,6 @@ const Homepage = (props) => {
     const fetchCategories = async () => {
       try {
         setCategoriesLoading(true);
-        console.log("🏷️ [Homepage] Récupération des catégories depuis:", `${API_BASE_URL}/categories`);
         const response = await fetch(`${API_BASE_URL}/categories`);
 
         if (!response.ok) {
@@ -49,9 +48,6 @@ const Homepage = (props) => {
         }
 
         const data = await response.json();
-        console.log("✅ [Homepage] Catégories récupérées:", data.length, "catégorie(s)");
-        console.log("📋 [Homepage] Catégories:", data);
-
         setCategories(data);
       } catch (error) {
         /* console.error("❌ [Homepage] Erreur lors de la récupération des catégories:", error); */
@@ -68,7 +64,6 @@ const Homepage = (props) => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        /* console.log("🏠 [Homepage] Récupération des produits depuis:", `${API_BASE_URL}/products`); */
         const response = await fetch(`${API_BASE_URL}/products`);
 
         if (!response.ok) {
@@ -76,8 +71,6 @@ const Homepage = (props) => {
         }
 
         const data = await response.json();
-       /*  console.log("✅ [Homepage] Produits récupérés:", data.length, "produit(s)");
-        console.log("📦 [Homepage] Données brutes:", data); */
 
         // Adapter les données du backend
         const adaptedProducts = data.map(p => ({
@@ -90,7 +83,6 @@ const Homepage = (props) => {
           rating: p.rating || 0,
         }));
 
-        console.log("✨ [Homepage] Produits adaptés:", adaptedProducts.length, "produit(s)");
         setProducts(adaptedProducts);
       } catch (error) {
         console.error("❌ [Homepage] Erreur lors de la récupération des produits:", error);

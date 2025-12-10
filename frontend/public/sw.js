@@ -20,11 +20,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Cache ouvert');
         return cache.addAll(urlsToCache);
       })
       .catch((error) => {
-        console.log('Erreur lors du cache:', error);
+        // Erreur lors du cache
       })
   );
 });
@@ -36,7 +35,6 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log('Suppression du cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -104,7 +102,6 @@ self.addEventListener('sync', (event) => {
   if (event.tag === 'background-sync') {
     event.waitUntil(
       // Ici on pourrait synchroniser les données en attente
-      console.log('Synchronisation en arrière-plan')
     );
   }
 });
