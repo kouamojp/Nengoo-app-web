@@ -57,7 +57,7 @@ const ProductCard = ({ product, language, addToCart }) => {
       
       <div className="p-4">
                 <h3
-                  className="font-semibold text-[.95rem] leading-[1.3rem] line- sm:text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors max-sm:min-h-10"
+                  className="font-semibold tracking-[.01rem] text-[.95rem] leading-[1.3rem] line- sm:text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors max-sm:min-h-10"
                   onClick={() => navigate(`/product/${product.id}`)}
                 >
                   {truncateProductName(product.name[language], 25)}

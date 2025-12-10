@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    font-family: theme('fontFamily.sans');
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: theme('fontFamily.heading');
+  }
+}
+
 /* Mobile-First Optimizations */
 @layer base {
   html {
@@ -220,9 +229,9 @@
 
 body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
-        "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
-        "Helvetica Neue", sans-serif;
+    /* font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", */
+        /* "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", */
+        /* "Helvetica Neue", sans-serif; */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }

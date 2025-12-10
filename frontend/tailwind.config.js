@@ -5,7 +5,12 @@ module.exports = {
     "./public/index.html"
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['"PT Sans"', ...require('tailwindcss/defaultTheme').fontFamily.sans],
+        heading: ['Roboto', ...require('tailwindcss/defaultTheme').fontFamily.sans],
+      },
+    },
   },
   plugins: [],
 };
