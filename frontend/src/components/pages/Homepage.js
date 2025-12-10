@@ -149,9 +149,9 @@ const Homepage = (props) => {
                 <Link to="/catalog" className="bg-white text-purple-600 hover:bg-gray-100 px-6 sm:px-8 py-3 rounded-lg font-semibold transition-colors text-center">
                   {t.viewAll} 🛍️
                 </Link>
-                <Link to="/catalog/handicrafts" className="border-2 border-white hover:bg-white hover:text-purple-600 px-6 sm:px-8 py-3 rounded-lg font-semibold transition-colors text-center">
+                {/* <Link to="/catalog/handicrafts" className="border-2 border-white hover:bg-white hover:text-purple-600 px-6 sm:px-8 py-3 rounded-lg font-semibold transition-colors text-center">
                   {t.localSpecialties} 🎨
-                </Link>
+                </Link> */}
               </div>
             </div>
             <div className="relative order-first lg:order-last">
@@ -160,10 +160,10 @@ const Homepage = (props) => {
                 alt="Hero"
                 className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full"
               />
-              <div className="absolute -bottom-4 -left-4 bg-yellow-400 text-black p-3 sm:p-4 rounded-lg font-bold text-center">
+              {/* <div className="absolute -bottom-4 -left-4 bg-yellow-400 text-black p-3 sm:p-4 rounded-lg font-bold text-center">
                 {t.flashSale} 🔥<br />
                 <span className="text-sm">-30% OFF</span>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

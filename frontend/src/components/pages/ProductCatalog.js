@@ -262,7 +262,7 @@ const ProductCatalog = (props) => {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-16 bg-white rounded-lg shadow-md">
+              <div className="text-center py-12 px-4 bg-white rounded-lg shadow-md">
                 <div className="text-6xl mb-4">🔍</div>
                 <h3 className="text-xl font-semibold mb-2">Aucun produit trouvé</h3>
                 <p className="text-gray-600 mb-4">Aucun produit ne correspond à vos critères de recherche.</p>
