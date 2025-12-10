@@ -39,7 +39,7 @@ const SellerProducts = (props) => {
           category: p.category,
           price: p.price,
           stock: p.stock,
-          image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/150'
+          image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png'
         }));
         setProducts(adaptedProducts);
       } catch (error) {

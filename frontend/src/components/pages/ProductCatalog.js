@@ -94,7 +94,7 @@ const ProductCatalog = (props) => {
         const adaptedProducts = data.map(p => ({
           ...p,
           name: { [language]: p.name }, // Adapt name to be an object
-          image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/300', // Use first image
+          image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png', // Use first image
           inStock: p.stock > 0,
           reviews: p.reviewsCount || 0,
           rating: p.rating || 0,
