@@ -99,20 +99,20 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
   return (
     <header className="bg-gradient-to-r from-purple-700 to-red-600 text-white shadow-lg sticky top-0 z-50">
       {/* Top Bar */}
-      <div className="bg-purple-800 py-2">
+      {/* <div className="bg-purple-800 py-2">
         <div className="container mx-auto px-4 flex justify-between items-center text-sm">
           <div className="flex space-x-4">
             <span className="hidden sm:inline">📍 Cameroun</span>
-            {/* <span className="hidden md:inline">📞 +237 6XX XXX XXX</span> */}
+            <span className="hidden md:inline">📞 +237 6XX XXX XXX</span>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
-           {/*  <button onClick={toggleLanguage} className="hover:text-yellow-300 transition-colors text-xs sm:text-sm">
+            <button onClick={toggleLanguage} className="hover:text-yellow-300 transition-colors text-xs sm:text-sm">
               {language === 'fr' ? '🇫🇷 FR' : '🇬🇧 EN'}
-            </button> */}
+            </button>
             <span className="text-xs sm:text-sm">💰 XAF</span>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Main Header */}
       <div className="container mx-auto px-4 py-4">
