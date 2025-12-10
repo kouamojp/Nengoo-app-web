@@ -70,7 +70,7 @@ const Footer = ({ language }) => {
           </div> */}
 
           {/* Categories */}
-          <div>
+          <div className="max-md:hidden">
             <h4 className="text-lg font-semibold mb-4">{t.categories}</h4>
             <ul className="space-y-2 md:grid grid-cols-2">
               {categories.map(category => (
@@ -128,7 +128,7 @@ const Footer = ({ language }) => {
           </div>
         </div>
 
-        <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+        <div className="border-t border-gray-700 md:mt-8 pt-8 text-center text-gray-400">
           <p>&copy; 2025 Nengoo. Tous droits réservés.</p>
         </div>
       </div>
