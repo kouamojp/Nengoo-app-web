@@ -248,7 +248,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                 {suggestions.map(product => (
                   <Link
                     key={product.id}
-                    to={`/products/${product.id}`}
+                    to={`/product/${product.id}`}
                     className="flex items-center px-4 py-2 text-black hover:bg-gray-100"
                     onClick={() => {
                       setShowSuggestions(false);
