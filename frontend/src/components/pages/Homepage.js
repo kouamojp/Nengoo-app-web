@@ -72,8 +72,16 @@ const Homepage = (props) => {
 
         const data = await response.json();
 
+        // Trier les produits par date de création (du plus récent au plus ancien)
+        const sortedData = data.sort((a, b) => {
+          // Utiliser 0 comme fallback si created_at est null ou undefined
+          const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+          const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+          return dateB - dateA;
+        });
+
         // Adapter les données du backend
-        const adaptedProducts = data.map(p => ({
+        const adaptedProducts = sortedData.map(p => ({
           ...p,
           name: { [language]: p.name },
           description: { [language]: p.description },

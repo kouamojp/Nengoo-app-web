@@ -14,7 +14,7 @@ const ProductCatalog = (props) => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState('recent');
   const [maxAllowedPrice, setMaxAllowedPrice] = useState(2000000); // Default max price
   const [priceRange, setPriceRange] = useState([0, 2000000]); // Initialized with default max
   const [selectedCategory, setSelectedCategory] = useState(category || 'all');
@@ -90,8 +90,16 @@ const ProductCatalog = (props) => {
 
         const data = await response.json();
 
+        // Trier les produits par date de création (du plus récent au plus ancien)
+        const sortedData = data.sort((a, b) => {
+          // Utiliser 0 comme fallback si created_at est null ou undefined
+          const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+          const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+          return dateB - dateA;
+        });
+
         // Adapt backend data to frontend component structure
-        const adaptedProducts = data.map(p => ({
+        const adaptedProducts = sortedData.map(p => ({
           ...p,
           name: { [language]: p.name }, // Adapt name to be an object
           image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png', // Use first image
@@ -123,6 +131,11 @@ const ProductCatalog = (props) => {
   
   filteredProducts.sort((a, b) => {
     switch (sortBy) {
+      case 'recent':
+        // Utiliser 0 comme fallback si created_at est null ou undefined
+        const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+        const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+        return dateB - dateA;
       case 'price-low': return a.price - b.price;
       case 'price-high': return b.price - a.price;
       case 'rating': return b.rating - a.rating;
@@ -233,6 +246,7 @@ const ProductCatalog = (props) => {
                   onChange={(e) => setSortBy(e.target.value)}
                   className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 mt-4 sm:mt-0"
                 >
+                  <option value="recent">Plus récents</option>
                   <option value="name">Trier par nom</option>
                   <option value="price-low">Prix: Bas → Haut</option>
                   <option value="price-high">Prix: Haut → Bas</option>
