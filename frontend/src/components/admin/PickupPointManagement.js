@@ -124,7 +124,7 @@ const PickupPointManagement = (props) => {
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold">Gestion des Points de Retrait ({pickupPoints.length})</h2>
+                <h2 className="text-xl md:text-3xl font-bold">Gestion des Points de Retrait ({pickupPoints.length})</h2>
                 <button onClick={() => setShowAddModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
                     + Ajouter un Point de Retrait
                 </button>
@@ -182,7 +182,7 @@ const PickupPointManagement = (props) => {
              </div>
             )}
 
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-md overflow-auto">
                 {loading ? <p className="p-6">Chargement...</p> : (
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b">

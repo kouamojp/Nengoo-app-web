@@ -64,7 +64,7 @@ const ShippingSettingsManagement = ({ user }) => {
 
     return (
         <div>
-            <h2 className="text-3xl font-bold mb-6">Gestion des Frais de Livraison</h2>
+            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des Frais de Livraison</h2>
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <div className="mb-4">
                     <label htmlFor="shippingPrice" className="block text-sm font-medium text-gray-700">

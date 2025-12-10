@@ -5,9 +5,15 @@ import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
+import SellerProducts from './SellerProducts';
+import SellerOrders from './SellerOrders';
+import SellerAnalytics from './SellerAnalytics';
+import SellerMessages from './SellerMessages';
+import SellerProfile from './SellerProfile';
 
 const SellerDashboard = (props) => {
   const { language, user } = props;
+  const [activeSection, setActiveSection] = useState('dashboard');
   const [stats, setStats] = useState([
     { title: "Ventes Totales", value: "0", icon: "💰", color: "from-green-400 to-green-600", change: "+0%" },
     { title: "Commandes en Attente", value: "0", icon: "📋", color: "from-yellow-400 to-orange-500", change: "+0" },
@@ -15,6 +21,16 @@ const SellerDashboard = (props) => {
     { title: "Produits Actifs", value: "0", icon: "📦", color: "from-purple-400 to-purple-600", change: "+0" }
   ]);
   const [recentOrders, setRecentOrders] = useState([]);
+
+  const handleNavigate = (sectionId) => {
+    setActiveSection(sectionId);
+    setTimeout(() => {
+        const section = document.getElementById(`${sectionId}-section`);
+        if (section) {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, 0); 
+  };
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -29,12 +45,9 @@ const SellerDashboard = (props) => {
         const orders = await response.json();
         setRecentOrders(orders.slice(0, 5));
         
-        // Calculate stats
         const totalSales = orders.length;
         const pendingOrders = orders.filter(o => o.status === 'pending').length;
         const monthlyRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
-
-        // TODO: Fetch products to calculate active products
         const activeProducts = 0; 
 
         setStats([
@@ -58,131 +71,46 @@ const SellerDashboard = (props) => {
       
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
           <div className="lg:col-span-1">
-            <SellerSidebar currentPage="dashboard" language={language} user={user} />
+            <SellerSidebar onNavigate={handleNavigate} currentPage={activeSection} language={language} user={user} />
           </div>
           
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            <SellerHeader title="Tableau de Bord Vendeur" language={language} user={user} />
-            
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, index) => (
-                <div key={index} className={`bg-gradient-to-r ${stat.color} text-white rounded-lg p-6 shadow-lg`}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm opacity-90">{stat.title}</p>
-                      <p className="text-2xl font-bold">{stat.value}</p>
-                      <p className="text-sm mt-1">
-                        <span className="bg-white bg-opacity-20 px-2 py-1 rounded">
-                          {stat.change}
-                        </span>
-                      </p>
-                    </div>
-                    <div className="text-3xl">{stat.icon}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Recent Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Recent Orders */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold">Commandes Récentes</h2>
-                  <Link to="/seller/orders" className="text-purple-600 hover:text-purple-700 text-sm font-medium">
-                    Voir tout →
-                  </Link>
-                </div>
-                
-                <div className="space-y-4">
-                  {recentOrders.map(order => (
-                    <div key={order.id} className="border-l-4 border-purple-500 pl-4 py-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="font-semibold">{order.id}</p>
-                          <p className="text-gray-600 text-sm">{order.buyerName}</p>
-                          <p className="text-xs text-gray-500">{new Date(order.orderedDate).toLocaleDateString('fr-FR')}</p>
+          <div id="seller-content-area" className="lg:col-span-3 space-y-8">
+            <div id="dashboard-section" className={`${activeSection === 'dashboard' ? '' : 'hidden'}`}>
+                <div>
+                    <SellerHeader title="Tableau de Bord Vendeur" language={language} user={user} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                      {stats.map((stat, index) => (
+                        <div key={index} className={`bg-gradient-to-r ${stat.color} text-white rounded-lg p-6 shadow-lg`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm opacity-90">{stat.title}</p>
+                              <p className="text-2xl font-bold">{stat.value}</p>
+                            </div>
+                            <div className="text-3xl">{stat.icon}</div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-bold text-purple-600">
-                            {order.totalAmount.toLocaleString()} XAF
-                          </p>
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {order.status === 'pending' ? '⏳ En attente' :
-                             order.status === 'shipped' ? '🚚 Expédiée' : '✅ Livrée'}
-                          </span>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
                 </div>
-              </div>
-              
-              {/* Quick Actions */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-6">Actions Rapides</h2>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <Link
-                    to="/seller/products"
-                    className="bg-gradient-to-r from-green-400 to-green-600 text-white p-4 rounded-lg text-center hover:shadow-lg transition-shadow"
-                  >
-                    <div className="text-2xl mb-2">➕</div>
-                    <div className="font-semibold text-sm">Ajouter Produit</div>
-                  </Link>
-                  
-                  <Link
-                    to="/seller/orders"
-                    className="bg-gradient-to-r from-blue-400 to-blue-600 text-white p-4 rounded-lg text-center hover:shadow-lg transition-shadow"
-                  >
-                    <div className="text-2xl mb-2">📋</div>
-                    <div className="font-semibold text-sm">Gérer Commandes</div>
-                  </Link>
-                  
-                  <Link
-                    to="/seller/analytics"
-                    className="bg-gradient-to-r from-purple-400 to-purple-600 text-white p-4 rounded-lg text-center hover:shadow-lg transition-shadow"
-                  >
-                    <div className="text-2xl mb-2">📊</div>
-                    <div className="font-semibold text-sm">Voir Analyses</div>
-                  </Link>
-                  
-                  <Link
-                    to="/seller/messages"
-                    className="bg-gradient-to-r from-red-400 to-red-600 text-white p-4 rounded-lg text-center hover:shadow-lg transition-shadow"
-                  >
-                    <div className="text-2xl mb-2">💬</div>
-                    <div className="font-semibold text-sm">Messages</div>
-                  </Link>
-                </div>
-              </div>
             </div>
-            
-            {/* Performance Chart */}
-            <div className="bg-white rounded-lg shadow-lg p-6 mt-8">
-              <h2 className="text-xl font-bold mb-6">Évolution des Ventes (7 derniers jours)</h2>
-              <div className="h-64 bg-gradient-to-t from-purple-50 to-transparent rounded-lg flex items-end justify-around p-4">
-                {[120, 150, 80, 200, 180, 250, 300].map((value, index) => (
-                  <div key={index} className="flex flex-col items-center">
-                    <div 
-                      className="bg-gradient-to-t from-purple-500 to-purple-300 rounded-t w-8"
-                      style={{ height: `${(value / 300) * 200}px` }}
-                    ></div>
-                    <span className="text-xs mt-2 text-gray-600">
-                      {new Date(Date.now() - (6-index) * 24 * 60 * 60 * 1000).toLocaleDateString('fr-FR', { weekday: 'short' })}
-                    </span>
-                  </div>
-                ))}
-              </div>
+
+            <div id="products-section" className={`${activeSection === 'products' ? '' : 'hidden'}`}>
+                <SellerProducts {...props} />
             </div>
+            <div id="orders-section" className={`${activeSection === 'orders' ? '' : 'hidden'}`}>
+                <SellerOrders {...props} />
+            </div>
+            <div id="analytics-section" className={`${activeSection === 'analytics' ? '' : 'hidden'}`}>
+                <SellerAnalytics {...props} />
+            </div>
+            <div id="messages-section" className={`${activeSection === 'messages' ? '' : 'hidden'}`}>
+                <SellerMessages {...props} />
+            </div>
+            <div id="profile-section" className={`${activeSection === 'profile' ? '' : 'hidden'}`}>
+                <SellerProfile {...props} />
+            </div>
+
           </div>
         </div>
       </div>

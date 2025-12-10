@@ -30,8 +30,16 @@ const AdminDashboard = (props) => {
     });
     const [editingBuyer, setEditingBuyer] = useState(null);
     const [editingOrder, setEditingOrder] = useState(null);
-    
-    // const isSuperAdmin = user && user.whatsapp === '+237600000000'; // No longer needed directly
+
+    const handleNavigate = (sectionId) => {
+        setActiveSection(sectionId);
+        setTimeout(() => {
+            const section = document.getElementById(`${sectionId}-section`);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 0); 
+    };
 
     const fetchOrders = async () => {
         if (!user || !user.role) return; // Ensure user and role are available
@@ -77,8 +85,6 @@ const AdminDashboard = (props) => {
         }).format(price);
     };
     
-    // --- Handlers that remain in the dashboard ---
-    
     const handleProfileChange = (e) => {
       setProfileData({
         ...profileData,
@@ -87,7 +93,6 @@ const AdminDashboard = (props) => {
     };
   
     const handleProfileUpdate = () => {
-      // Mock logic for profile update
       alert('La mise à jour du profil sera bientôt connectée au backend!');
     };
 
@@ -104,10 +109,6 @@ const AdminDashboard = (props) => {
                         </div>
                     </div>
                     <div className="flex items-center space-x-4 max-md:hidden">
-                        {/* <span className="text-sm">👤 {user.name}</span> */}
-                        {/* <button onClick={() => setShowProfileEdit(true)} className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex items-center justify-center space-x-2">
-                            <span>✏️</span><span>Modifier Profil</span>
-                        </button> */}
                         <Link to="/" className="bg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
                             ← Retour au site
                         </Link>
@@ -121,31 +122,31 @@ const AdminDashboard = (props) => {
                 <div className="lg:col-span-1">
                     <div className="bg-white rounded-lg shadow-md p-4 sticky top-24">
                         <nav className="space-y-2 text-left">
-                            <button onClick={() => setActiveSection('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'dashboard' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                            <button onClick={() => handleNavigate('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'dashboard' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                 <span className="text-xl">📊</span><span className="font-medium text-sm">Tableau de bord</span>
                             </button>
-                            <button onClick={() => setActiveSection('sellers')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'sellers' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                            <button onClick={() => handleNavigate('sellers')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'sellers' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                 <span className="text-xl">🏪</span><span className="font-medium text-sm">Vendeurs</span>
                             </button>
-                             <button onClick={() => setActiveSection('buyers')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'buyers' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                             <button onClick={() => handleNavigate('buyers')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'buyers' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                 <span className="text-xl">👥</span><span className="font-medium text-sm">Acheteurs</span>
                             </button>
-                            <button onClick={() => setActiveSection('products')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'products' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                            <button onClick={() => handleNavigate('products')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'products' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                 <span className="text-xl">📦</span><span className="font-medium text-sm">Produits</span>
                             </button>
-                            <button onClick={() => setActiveSection('orders')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'orders' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                            <button onClick={() => handleNavigate('orders')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'orders' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                 <span className="text-xl">🛒</span><span className="font-medium text-sm">Commandes</span>
                             </button>
-                            <button onClick={() => setActiveSection('pickupPoints')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'pickupPoints' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                            <button onClick={() => handleNavigate('pickupPoints')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'pickupPoints' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                 <span className="text-xl">📍</span><span className="font-medium text-sm">Points de retrait</span>
                             </button>
                             {user.type === 'admin' && (
-                                <button onClick={() => setActiveSection('categories')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'categories' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                                <button onClick={() => handleNavigate('categories')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'categories' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                     <span className="text-xl">🏷️</span><span className="font-medium text-sm">Catégories</span>
                                 </button>
                             )}
                             {user.role === 'super_admin' && (
-                                <button onClick={() => setActiveSection('shipping')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'shipping' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                                <button onClick={() => handleNavigate('shipping')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'shipping' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                     <span className="text-xl">🚚</span><span className="font-medium text-sm">Frais de livraison</span>
                                 </button>
                             )}
@@ -154,33 +155,41 @@ const AdminDashboard = (props) => {
                                 <span className="text-xl">👑</span><span className="font-medium text-sm text-purple-700">Administrateurs</span>
                             </Link>
                             <div className="flex items-start flex-col gap-4 md:hidden">
-                               {/*  <button onClick={() => setShowProfileEdit(true)} className=" bg-yellow-400 hover:bg-yellow-500 text-black px-4 py-2 rounded-lg font-semibold transition-colors text-sm flex space-x-2">
-                                    <span>✏️</span><span>Modifier Profil</span>
-                                </button> */}
                                 <Link to="/" className="w-fullbg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
                                     ← Retour au site
                                 </Link>
                             </div>
-                            
                         </nav>
                     </div>
                 </div>
 
-                <div className="lg:col-span-4">
-                    {activeSection === 'dashboard' && (
+                <div className="lg:col-span-4 space-y-8">
+                    <div id="dashboard-section" className={`${activeSection === 'dashboard' ? '' : 'hidden'}`}>
                         <div>
                             <h2 className="text-3xl font-bold mb-6">Tableau de bord</h2>
-                            {/* Dashboard stats cards can be re-implemented here with fetched data */}
                         </div>
-                    )}
-
-                    {activeSection === 'sellers' && <SellerManagement {...props} />}
-                    {activeSection === 'products' && <ProductManagement {...props} />}
-                    {activeSection === 'pickupPoints' && <PickupPointManagement {...props} />}
-                    {activeSection === 'buyers' && <BuyerManagement {...props} />}
-                    {activeSection === 'orders' && <OrderManagement {...props} orders={orders} onOrderUpdate={fetchOrders} />}
-                    {activeSection === 'categories' && <CategoryManagement {...props} />}
-                    {activeSection === 'shipping' && <ShippingSettingsManagement {...props} />}
+                    </div>
+                    <div id="sellers-section" className={`${activeSection === 'sellers' ? '' : 'hidden'}`}>
+                        <SellerManagement {...props} />
+                    </div>
+                    <div id="products-section" className={`${activeSection === 'products' ? '' : 'hidden'}`}>
+                        <ProductManagement {...props} />
+                    </div>
+                    <div id="pickupPoints-section" className={`${activeSection === 'pickupPoints' ? '' : 'hidden'}`}>
+                        <PickupPointManagement {...props} />
+                    </div>
+                    <div id="buyers-section" className={`${activeSection === 'buyers' ? '' : 'hidden'}`}>
+                        <BuyerManagement {...props} />
+                    </div>
+                    <div id="orders-section" className={`${activeSection === 'orders' ? '' : 'hidden'}`}>
+                        <OrderManagement {...props} orders={orders} onOrderUpdate={fetchOrders} />
+                    </div>
+                    <div id="categories-section" className={`${activeSection === 'categories' ? '' : 'hidden'}`}>
+                        <CategoryManagement {...props} />
+                    </div>
+                    <div id="shipping-section" className={`${activeSection === 'shipping' ? '' : 'hidden'}`}>
+                        <ShippingSettingsManagement {...props} />
+                    </div>
                 </div>
             </div>
         </div>

@@ -100,7 +100,7 @@ const CategoryManagement = (props) => {
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-3xl font-bold">Gestion des Catégories ({categories.length})</h2>
+                <h2 className="text-xl md:text-3xl font-bold">Gestion des Catégories ({categories.length})</h2>
                 <button onClick={() => setShowAddModal(true)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded">
                     + Ajouter une Catégorie
                 </button>
@@ -122,7 +122,7 @@ const CategoryManagement = (props) => {
                 </div>
             )}
 
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-white rounded-lg shadow-md overflow-auto">
                 {loading ? <p className="p-6">Chargement...</p> : (
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b">

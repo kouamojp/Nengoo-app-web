@@ -1,7 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Header from '../layout/Header';
-import Footer from '../layout/Footer';
-import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
@@ -94,73 +91,61 @@ const SellerMessages = (props) => {
   const unreadCount = conversations.filter(c => c.seller_unread).length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header {...props} />
+    <div className="lg:col-span-3">
+      <SellerHeader title="Messages et Communications" language={language} user={user} />
       
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-1">
-            <SellerSidebar currentPage="messages" language={language} user={user} />
+      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold">Centre de Messages</h2>
+            <p className="text-gray-600">
+              {conversations.length} conversation(s) totale(s), {unreadCount} non lu(s)
+            </p>
           </div>
-          
-          <div className="lg:col-span-3">
-            <SellerHeader title="Messages et Communications" language={language} user={user} />
-            
-            <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-              <div className="flex items-center justify-between">
+          {unreadCount > 0 && (
+            <div className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-semibold">
+              {unreadCount} nouveau(x)
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {loadingConversations ? <p>Chargement des conversations...</p> : conversations.map(conversation => (
+          <div 
+            key={conversation.id} 
+            className={`bg-white rounded-lg shadow-lg p-6 cursor-pointer transition-all hover:shadow-xl ${
+              conversation.seller_unread ? 'border-l-4 border-purple-500' : ''
+            }`}
+            onClick={() => handleConversationClick(conversation)}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-4">
                 <div>
-                  <h2 className="text-xl font-bold">Centre de Messages</h2>
-                  <p className="text-gray-600">
-                    {conversations.length} conversation(s) totale(s), {unreadCount} non lu(s)
-                  </p>
+                  <h3 className="font-bold text-lg">{conversation.buyer_id}</h3>
+                  <p className="text-gray-600">Produit: {conversation.product_id}</p>
                 </div>
-                {unreadCount > 0 && (
-                  <div className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-semibold">
-                    {unreadCount} nouveau(x)
-                  </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">{new Date(conversation.last_message_timestamp).toLocaleString()}</p>
+                {conversation.seller_unread && (
+                  <span className="inline-block w-3 h-3 bg-red-500 rounded-full mt-2"></span>
                 )}
               </div>
             </div>
-
-            <div className="space-y-4">
-              {loadingConversations ? <p>Chargement des conversations...</p> : conversations.map(conversation => (
-                <div 
-                  key={conversation.id} 
-                  className={`bg-white rounded-lg shadow-lg p-6 cursor-pointer transition-all hover:shadow-xl ${
-                    conversation.seller_unread ? 'border-l-4 border-purple-500' : ''
-                  }`}
-                  onClick={() => handleConversationClick(conversation)}
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-4">
-                      <div>
-                        <h3 className="font-bold text-lg">{conversation.buyer_id}</h3>
-                        <p className="text-gray-600">Produit: {conversation.product_id}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500">{new Date(conversation.last_message_timestamp).toLocaleString()}</p>
-                      {conversation.seller_unread && (
-                        <span className="inline-block w-3 h-3 bg-red-500 rounded-full mt-2"></span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <p className="text-gray-700 line-clamp-2">{conversation.last_message_preview}</p>
-                </div>
-              ))}
-            </div>
-
-            {conversations.length === 0 && !loadingConversations && (
-              <div className="text-center py-16">
-                <div className="text-6xl mb-4">💬</div>
-                <h3 className="text-xl font-semibold mb-2">Aucune conversation</h3>
-                <p className="text-gray-600">Vous n'avez pas encore de conversations.</p>
-              </div>
-            )}
+            
+            <p className="text-gray-700 line-clamp-2">{conversation.last_message_preview}</p>
           </div>
-        </div>
+        ))}
       </div>
+
+      {conversations.length === 0 && !loadingConversations && (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-4">💬</div>
+          <h3 className="text-xl font-semibold mb-2">Aucune conversation</h3>
+          <p className="text-gray-600">Vous n'avez pas encore de conversations.</p>
+        </div>
+      )}
 
       {selectedConversation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -212,8 +197,6 @@ const SellerMessages = (props) => {
           </div>
         </div>
       )}
-      
-      <Footer language={language} />
     </div>
   );
 };

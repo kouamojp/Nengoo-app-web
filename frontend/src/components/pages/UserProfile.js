@@ -306,6 +306,16 @@ const UserProfile = (props) => {
       }
     ]);
 
+    const handleNavigate = (tab) => {
+        setActiveTab(tab);
+        setTimeout(() => {
+            const section = document.getElementById(`${tab}-section`);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 0);
+    };
+
     useEffect(() => {
         const fetchOrders = async () => {
             if (user && user.id) {
@@ -417,7 +427,7 @@ const UserProfile = (props) => {
               <div className="bg-white rounded-lg shadow-md p-4 sticky top-24">
                 <nav className="space-y-2">
                   <button
-                    onClick={() => setActiveTab('profile')}
+                    onClick={() => handleNavigate('profile')}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                       activeTab === 'profile' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
                     }`}
@@ -427,7 +437,7 @@ const UserProfile = (props) => {
                   </button>
                   
                   <button
-                    onClick={() => setActiveTab('orders')}
+                    onClick={() => handleNavigate('orders')}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                       activeTab === 'orders' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
                     }`}
@@ -437,7 +447,7 @@ const UserProfile = (props) => {
                   </button>
 
                   <button
-                    onClick={() => setActiveTab('messages')}
+                    onClick={() => handleNavigate('messages')}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                       activeTab === 'messages' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
                     }`}
@@ -447,7 +457,7 @@ const UserProfile = (props) => {
                   </button>
                   
                   <button
-                    onClick={() => setActiveTab('addresses')}
+                    onClick={() => handleNavigate('addresses')}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                       activeTab === 'addresses' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
                     }`}
@@ -457,7 +467,7 @@ const UserProfile = (props) => {
                   </button>
                   
                   <button
-                    onClick={() => setActiveTab('pickup')}
+                    onClick={() => handleNavigate('pickup')}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                       activeTab === 'pickup' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
                     }`}
@@ -465,24 +475,14 @@ const UserProfile = (props) => {
                     <span className="text-xl">📍</span>
                     <span className="font-medium">Points de retrait</span>
                   </button>
-                  
-                  {/* <button
-                    onClick={() => setActiveTab('payment')}
-                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                      activeTab === 'payment' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
-                    }`}
-                  >
-                    <span className="text-xl">💳</span>
-                    <span className="font-medium">Moyens de paiement</span>
-                  </button> */}
                 </nav>
               </div>
             </div>
   
             {/* Main Content */}
-            <div className="lg:col-span-3">
+            <div id="user-content-area" className="lg:col-span-3 space-y-8">
               {/* Personal Information Tab */}
-              {activeTab === 'profile' && (
+              <div id="profile-section" className={`${activeTab === 'profile' ? '' : 'hidden'}`}>
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg md:text-2xl font-bold">Informations personnelles</h2>
@@ -539,12 +539,14 @@ const UserProfile = (props) => {
                     )}
                   </div>
                 </div>
-              )}
+              </div>
 
-              {activeTab === 'messages' && <BuyerMessages user={user} language={language} />}
+              <div id="messages-section" className={`${activeTab === 'messages' ? '' : 'hidden'}`}>
+                <BuyerMessages user={user} language={language} />
+              </div>
   
               {/* Orders History Tab */}
-              {activeTab === 'orders' && (
+              <div id="orders-section" className={`${activeTab === 'orders' ? '' : 'hidden'}`}>
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <h2 className="text-2xl font-bold mb-6">Historique des commandes</h2>
                   
@@ -590,10 +592,10 @@ const UserProfile = (props) => {
                     </div>
                   )}
                 </div>
-              )}
+              </div>
   
               {/* Delivery Addresses Tab */}
-              {activeTab === 'addresses' && (
+              <div id="addresses-section" className={`${activeTab === 'addresses' ? '' : 'hidden'}`}>
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold">Adresses de livraison</h2>
@@ -632,10 +634,10 @@ const UserProfile = (props) => {
                     ))}
                   </div>
                 </div>
-              )}
+              </div>
   
               {/* Favorite Pickup Points Tab */}
-              {activeTab === 'pickup' && (
+              <div id="pickup-section" className={`${activeTab === 'pickup' ? '' : 'hidden'}`}>
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold">Points de retrait favoris</h2>
@@ -666,10 +668,10 @@ const UserProfile = (props) => {
                     ))}
                   </div>
                 </div>
-              )}
+              </div>
   
               {/* Payment Methods Tab */}
-              {activeTab === 'payment' && (
+              <div id="payment-section" className={`${activeTab === 'payment' ? '' : 'hidden'}`}>
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold">Méthodes de paiement</h2>
@@ -719,7 +721,7 @@ const UserProfile = (props) => {
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -727,6 +729,5 @@ const UserProfile = (props) => {
         <Footer language={language} />
       </div>
     );
-  };
-  
+};  
   export default UserProfile;

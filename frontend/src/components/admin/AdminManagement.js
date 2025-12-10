@@ -464,7 +464,7 @@ const AdminManagement = (props) => {
 
         {/* Admins List */}
         {isSuperAdmin && (
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="bg-white rounded-lg shadow-md overflow-auto">
           <div className="p-6 border-b">
             <h3 className="text-xl font-bold">Liste des Administrateurs ({admins.length})</h3>
           </div>

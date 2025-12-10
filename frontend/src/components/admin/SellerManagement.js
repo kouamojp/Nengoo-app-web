@@ -144,7 +144,7 @@ const SellerManagement = (props) => {
 
     return (
         <div>
-            <h2 className="text-3xl font-bold mb-6">Gestion des vendeurs ({sellers.length})</h2>
+            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des vendeurs ({sellers.length})</h2>
 
             {showEditModal && currentSeller && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
