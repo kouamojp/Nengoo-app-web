@@ -232,7 +232,7 @@ const Homepage = (props) => {
       </section> */}
 
       {/* Categories Grid */}
-      <section className="py-12 lg:py-16">
+      <section className="py-12 lg:py-16 max-md:hidden">
         <div className="container mx-auto px-4">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 lg:mb-12">
             {t.categories}
