@@ -485,7 +485,7 @@ const UserProfile = (props) => {
               {activeTab === 'profile' && (
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">Informations personnelles</h2>
+                    <h2 className="text-lg md:text-2xl font-bold">Informations personnelles</h2>
                     <button
                       onClick={() => setEditMode(!editMode)}
                       className="text-purple-600 hover:text-purple-700 font-semibold"
@@ -494,7 +494,7 @@ const UserProfile = (props) => {
                     </button>
                   </div>
   
-                  <div className="space-y-4">
+                  <div className="space-y-4 text-left ">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
                       <input
