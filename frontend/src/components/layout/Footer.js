@@ -45,9 +45,8 @@ const Footer = ({ language }) => {
                 alt="Nengoo Logo" 
                 className="h-12 w-auto mb-2"
               />
-              <p className="text-sm opacity-75">nengoo.com</p>
             </div>
-            <p className="text-gray-300 mb-4 w-80">
+            <p className="text-gray-300 mb-4 w-72">
               {t.footerText}
             </p>
             {/* <div className="flex space-x-4">
