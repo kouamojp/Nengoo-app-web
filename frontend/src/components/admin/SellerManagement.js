@@ -8,6 +8,7 @@ const SellerManagement = (props) => {
     const [sellers, setSellers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState([]);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // State for the edit modal
     const [showEditModal, setShowEditModal] = useState(false);
@@ -142,9 +143,32 @@ const SellerManagement = (props) => {
         );
     }
 
+
+    const filteredSellers = sellers.filter(seller => {
+        const query = searchQuery.toLowerCase();
+        return (
+            seller.businessName.toLowerCase().includes(query) ||
+            seller.name.toLowerCase().includes(query) ||
+            seller.email.toLowerCase().includes(query) ||
+            seller.whatsapp.toLowerCase().includes(query) ||
+            seller.city.toLowerCase().includes(query) ||
+            seller.region.toLowerCase().includes(query)
+        );
+    });
+
     return (
         <div>
-            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des vendeurs ({sellers.length})</h2>
+            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des vendeurs ({filteredSellers.length})</h2>
+
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder="Rechercher des vendeurs..."
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
 
             {showEditModal && currentSeller && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -183,7 +207,7 @@ const SellerManagement = (props) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {sellers.map((seller) => (
+                            {filteredSellers.map((seller) => (
                                 <tr key={seller.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium">{seller.businessName}</td>
                                     <td className="px-6 py-4 text-sm">{seller.whatsapp} <br/> {seller.email}</td>

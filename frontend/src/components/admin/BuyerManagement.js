@@ -9,6 +9,7 @@ const BuyerManagement = (props) => {
     const { user } = props;
     const [buyers, setBuyers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const fetchBuyers = async () => {
         if (!user || !user.role) return;
@@ -68,6 +69,15 @@ const BuyerManagement = (props) => {
         }).format(price);
     };
 
+    const filteredBuyers = buyers.filter(buyer => {
+        const query = searchQuery.toLowerCase();
+        return (
+            buyer.name.toLowerCase().includes(query) ||
+            buyer.email.toLowerCase().includes(query) ||
+            buyer.whatsapp.toLowerCase().includes(query)
+        );
+    });
+
     if (!user || !['super_admin', 'admin'].includes(user.role)) {
         return (
             <div className="p-6 bg-yellow-50 border-l-4 border-yellow-400">
@@ -79,7 +89,17 @@ const BuyerManagement = (props) => {
 
     return (
         <div>
-            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des acheteurs ({buyers.length})</h2>
+            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des acheteurs ({filteredBuyers.length})</h2>
+
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder="Rechercher des acheteurs..."
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
 
             <div className="bg-white rounded-lg shadow-md overflow-auto">
                 {loading ? <p className="p-6">Chargement...</p> : (
@@ -95,7 +115,7 @@ const BuyerManagement = (props) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {buyers.map((buyer) => (
+                            {filteredBuyers.map((buyer) => (
                                 <tr key={buyer.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium">{buyer.name}</td>
                                     <td className="px-6 py-4 text-sm">{buyer.whatsapp}</td>

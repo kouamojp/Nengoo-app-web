@@ -12,6 +12,7 @@ const ProductManagement = (props) => {
     const [uploading, setUploading] = useState(false);
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null); // State for editing
+    const [searchQuery, setSearchQuery] = useState('');
 
     // State for new product form
     const [newProductData, setNewProductData] = useState({
@@ -306,13 +307,33 @@ const ProductManagement = (props) => {
         }).format(price);
       };
 
+    const filteredProducts = products.filter(product => {
+        const query = searchQuery.toLowerCase();
+        return (
+            product.name.toLowerCase().includes(query) ||
+            product.description.toLowerCase().includes(query) ||
+            product.category.toLowerCase().includes(query) ||
+            product.sellerName.toLowerCase().includes(query)
+        );
+    });
+
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl md:text-3xl font-bold">Gestion des produits ({products.length})</h2>
+                <h2 className="text-xl md:text-3xl font-bold">Gestion des produits ({filteredProducts.length})</h2>
                 <button onClick={() => setShowAddModal(true)} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
                     + Ajouter un Produit
                 </button>
+            </div>
+
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder="Rechercher des produits..."
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
             </div>
 
             {/* Edit Product Modal */}
@@ -589,7 +610,7 @@ const ProductManagement = (props) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {products.map((product) => (
+                            {filteredProducts.map((product) => (
                                 <tr key={product.id} className="hover:bg-gray-50">
                                     <td className="px-6 py-4 font-medium">{product.name}</td>
                                     <td className="px-6 py-4 text-sm">{product.sellerName}</td>

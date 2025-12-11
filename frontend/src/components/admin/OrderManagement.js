@@ -6,6 +6,7 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:800
 const OrderManagement = ({ orders, user, onOrderUpdate }) => {
     const [loading, setLoading] = useState(false); // For update and delete operations
     const [expandedOrderId, setExpandedOrderId] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const toggleProducts = (orderId) => {
         setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
@@ -83,10 +84,31 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
         }).format(price);
     };
 
+    const filteredOrders = orders.filter(order => {
+        const query = searchQuery.toLowerCase();
+        const productNames = order.products ? order.products.map(p => p.name.toLowerCase()).join(' ') : '';
+        return (
+            order.id.toString().toLowerCase().includes(query) ||
+            order.buyerName.toLowerCase().includes(query) ||
+            order.sellerName.toLowerCase().includes(query) ||
+            productNames.includes(query)
+        );
+    });
+
     return (
         <div>
-            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des commandes ({orders.length})</h2>
+            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des commandes ({filteredOrders.length})</h2>
             
+            <div className="mb-4">
+                <input
+                    type="text"
+                    placeholder="Rechercher des commandes..."
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </div>
+
             <div className="bg-white rounded-lg shadow-md overflow-auto">
                 {loading ? <p className="p-6">Chargement...</p> : (
                     <table className="w-full">
@@ -102,7 +124,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                            {orders.map((order) => (
+                            {filteredOrders.map((order) => (
                                 <React.Fragment key={order.id}>
                                     <tr className="hover:bg-gray-50">
                                         <td className="px-2 py-4">
