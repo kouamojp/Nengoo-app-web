@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import './App.css';
 import ScrollToTop from './components/ui/ScrollToTop';
 import Toast from './components/ui/Toast';
@@ -28,18 +28,8 @@ import {
   PickupPointsMap
 } from './components';
 import BottomNav from './components/layout/BottomNav';
-import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
-import ReactGA from "react-ga4";
 
 function App() {
-
-  const location = useLocation();
-
-  useEffect(() => {
-    // Chaque changement de route = envoi d'un pageview
-    ReactGA.send({ hitType: "pageview", page: location.pathname });
-  }, [location]);
   
   const [language, setLanguage] = useState('fr');
   const [currency, setCurrency] = useState('XAF');
