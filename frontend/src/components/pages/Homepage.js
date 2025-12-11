@@ -237,7 +237,7 @@ const Homepage = (props) => {
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 lg:mb-12">
             {t.categories}
             {!categoriesLoading && categories.length > 0 && (
-              <span className="text-gray-500 text-lg ml-2">({categories.length})</span>
+              {/* <span className="text-gray-500 text-lg ml-2">({categories.length})</span> */}
             )}
           </h2>
 
