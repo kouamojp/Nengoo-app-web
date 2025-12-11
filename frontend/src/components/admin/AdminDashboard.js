@@ -9,6 +9,7 @@ import BuyerManagement from './BuyerManagement';
 import OrderManagement from './OrderManagement';
 import CategoryManagement from './CategoryManagement';
 import ShippingSettingsManagement from './ShippingSettingsManagement';
+import HomepageManagement from './HomepageManagement'; // Importer le nouveau composant
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -146,9 +147,14 @@ const AdminDashboard = (props) => {
                                 </button>
                             )}
                             {user.role === 'super_admin' && (
-                                <button onClick={() => handleNavigate('shipping')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'shipping' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
-                                    <span className="text-xl">🚚</span><span className="font-medium text-sm">Frais de livraison</span>
-                                </button>
+                                <>
+                                    <button onClick={() => handleNavigate('homepage')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'homepage' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                                        <span className="text-xl">🏠</span><span className="font-medium text-sm">Gestion Page d'accueil</span>
+                                    </button>
+                                    <button onClick={() => handleNavigate('shipping')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'shipping' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                                        <span className="text-xl">🚚</span><span className="font-medium text-sm">Frais de livraison</span>
+                                    </button>
+                                </>
                             )}
                             <div className="border-t border-gray-200 my-2"></div>
                             <Link to="/admin/management" className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors hover:bg-purple-50 border-2 border-purple-300 bg-purple-50">
@@ -189,6 +195,9 @@ const AdminDashboard = (props) => {
                     </div>
                     <div id="shipping-section" className={`${activeSection === 'shipping' ? '' : 'hidden'}`}>
                         <ShippingSettingsManagement {...props} />
+                    </div>
+                    <div id="homepage-section" className={`${activeSection === 'homepage' ? '' : 'hidden'}`}>
+                        <HomepageManagement {...props} />
                     </div>
                 </div>
             </div>

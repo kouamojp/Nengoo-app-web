@@ -520,6 +520,9 @@ async def generate_presigned_url(request: PresignedUrlRequest):
 class ShippingSettings(BaseModel):
     price: float = Field(..., description="Prix de la livraison standard")
 
+class HomepageSettings(BaseModel):
+    heroImageUrl: str = Field(..., description="URL de l'image de la section hero de la page d'accueil")
+
 # --- API Endpoints for Settings ---
 @api_router.get("/settings/shipping", response_model=ShippingSettings)
 async def get_shipping_price():
@@ -532,6 +535,23 @@ async def get_shipping_price():
 async def update_shipping_price(settings: ShippingSettings):
     await db.settings.update_one(
         {"_id": "shipping_price"},
+        {"$set": settings.dict()},
+        upsert=True
+    )
+    return settings
+
+@api_router.get("/settings/homepage", response_model=HomepageSettings)
+async def get_homepage_settings():
+    homepage_settings = await db.settings.find_one({"_id": "homepage_settings"})
+    if homepage_settings:
+        return HomepageSettings(**homepage_settings)
+    # Remplacer par une URL par défaut ou une image de secours appropriée
+    return HomepageSettings(heroImageUrl="https://via.placeholder.com/1920x1080.png?text=Nengoo")
+
+@api_router.put("/settings/homepage", response_model=HomepageSettings, dependencies=[Depends(super_admin_required)])
+async def update_homepage_settings(settings: HomepageSettings):
+    await db.settings.update_one(
+        {"_id": "homepage_settings"},
         {"$set": settings.dict()},
         upsert=True
     )

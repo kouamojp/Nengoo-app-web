@@ -20,6 +20,7 @@ const Homepage = (props) => {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [newsletterFeedback, setNewsletterFeedback] = useState({ message: '', isError: false });
+  const [heroImageUrl, setHeroImageUrl] = useState('');
 
   // Mapping des icônes et couleurs pour les catégories
   const categoryIcons = {
@@ -36,6 +37,25 @@ const Homepage = (props) => {
     'Services': { icon: '🛠️', bg: 'from-teal-400 to-green-400' },
     'Voyages et Billets': { icon: '✈️', bg: 'from-cyan-400 to-blue-400' }
   };
+
+  useEffect(() => {
+    const fetchHomepageSettings = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/settings/homepage`);
+        if (!response.ok) {
+          throw new Error('Could not fetch homepage settings');
+        }
+        const data = await response.json();
+        setHeroImageUrl(data.heroImageUrl);
+      } catch (error) {
+        console.error("Erreur lors de la récupération de l'image hero:", error);
+        // Fallback to a default image if the fetch fails
+        setHeroImageUrl("https://images.unsplash.com/photo-1550041499-4c5857d2b508");
+      }
+    };
+
+    fetchHomepageSettings();
+  }, []);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -164,7 +184,7 @@ const Homepage = (props) => {
             </div>
             <div className="relative order-first lg:order-last">
               <img
-                src="https://images.unsplash.com/photo-1550041499-4c5857d2b508"
+                src={heroImageUrl || "https://images.unsplash.com/photo-1550041499-4c5857d2b508"}
                 alt="Hero"
                 className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full"
               />
