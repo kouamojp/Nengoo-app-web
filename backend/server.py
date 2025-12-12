@@ -1,4 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks
+from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+from pydantic import EmailStr
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -16,6 +18,23 @@ from botocore.exceptions import ClientError
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# --- Email Configuration ---
+# Add these variables to your .env file
+conf = ConnectionConfig(
+    MAIL_USERNAME=os.getenv("SMTP_USER", "your-email@example.com"),
+    MAIL_PASSWORD=os.getenv("SMTP_PASSWORD", "your-password"),
+    MAIL_FROM=os.getenv("EMAIL_FROM", "your-email@example.com"),
+    MAIL_PORT=int(os.getenv("SMTP_PORT", 587)),
+    MAIL_SERVER=os.getenv("SMTP_HOST", "smtp.example.com"),
+    MAIL_STARTTLS=os.getenv("MAIL_STARTTLS", "True").lower() == "true",
+    MAIL_SSL_TLS=os.getenv("SMTP_SECURE", "False").lower() == "true",
+    USE_CREDENTIALS=os.getenv("USE_CREDENTIALS", "True").lower() == "true",
+    VALIDATE_CERTS=os.getenv("VALIDATE_CERTS", "True").lower() == "true",
+    TEMPLATE_FOLDER=Path(__file__).parent / 'templates',
+)
+
+fm = FastMail(conf)
 
 # --- App and DB Setup ---
 mongo_url = os.environ['MONGO_URL']
@@ -172,6 +191,8 @@ class Seller(BaseModel):
     type: str = "seller"
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
+    logoUrl: Optional[str] = None
+    socialMedia: Optional[dict] = None
 
 class SellerCreate(BaseModel):
     whatsapp: str
@@ -195,6 +216,9 @@ class SellerUpdate(BaseModel):
     categories: Optional[List[str]] = None
     description: Optional[str] = None
     status: Optional[str] = None
+    whatsapp: Optional[str] = None
+    logoUrl: Optional[str] = None
+    socialMedia: Optional[dict] = None
 
 class SellerAnalyticsData(BaseModel):
     total_revenue: float
@@ -743,9 +767,23 @@ async def approve_seller(seller_id: str):
         raise HTTPException(status_code=404, detail="Seller not found")
     return Seller(**updated_seller)
 
-@api_router.put("/sellers/{seller_id}", response_model=Seller, dependencies=[Depends(admin_or_higher_required)])
-async def update_seller(seller_id: str, seller_data: SellerUpdate):
+@api_router.put("/sellers/{seller_id}", response_model=Seller)
+async def update_seller(
+    seller_id: str, 
+    seller_data: SellerUpdate, 
+    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id"),
+    role: str = Depends(get_current_admin_role)
+):
+    # Authorization check
+    if role not in ["super_admin", "admin"] and x_seller_id != seller_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this seller profile."
+        )
+
     update_data = seller_data.dict(exclude_unset=True)
+    update_data["updatedAt"] = datetime.utcnow()
+    
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
     
@@ -841,15 +879,35 @@ async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] =
     return enriched_orders
 
 @api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(support_or_higher_required)])
-async def update_order(order_id: str, order_data: OrderUpdate):
+async def update_order(order_id: str, order_data: OrderUpdate, background_tasks: BackgroundTasks):
     update_data = order_data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
 
+    # Get order before update to check for status change
+    order_before_update = await db.orders.find_one({"id": order_id})
+    if not order_before_update:
+        raise HTTPException(status_code=404, detail="Order not found")
+
     await db.orders.update_one({"id": order_id}, {"$set": update_data})
     updated_order = await db.orders.find_one({"id": order_id})
-    if not updated_order:
-        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Check if status has changed and send notification
+    if 'status' in update_data and order_before_update.get('status') != updated_order.get('status'):
+        buyer = await db.users.find_one({"id": updated_order["buyerId"], "type": "buyer"})
+        if buyer and buyer.get("email"):
+            message = MessageSchema(
+                subject=f"Mise à jour de votre commande Nengoo #{updated_order['id']}",
+                recipients=[buyer["email"]],
+                template_body={
+                    "buyer_name": buyer["name"],
+                    "order_id": updated_order["id"],
+                    "status": updated_order["status"],
+                },
+                subtype="html"
+            )
+            background_tasks.add_task(fm.send_message, message, template_name="status_update_buyer.html")
+
     return Order(**updated_order)
 
 @api_router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
@@ -860,13 +918,13 @@ async def delete_order(order_id: str):
     return
 
 @api_router.post("/checkout", response_model=List[Order])
-async def process_checkout(checkout_data: CheckoutRequest):
+async def process_checkout(checkout_data: CheckoutRequest, background_tasks: BackgroundTasks):
     buyer_whatsapp = checkout_data.phone
     buyer = await db.users.find_one({"whatsapp": buyer_whatsapp, "type": "buyer"})
 
     if not buyer:
         buyer_id = f"buyer_{str(uuid.uuid4())[:8]}"
-        new_buyer = {
+        new_buyer_data = {
             "id": buyer_id,
             "whatsapp": buyer_whatsapp,
             "name": f"{checkout_data.firstName} {checkout_data.lastName}",
@@ -877,11 +935,12 @@ async def process_checkout(checkout_data: CheckoutRequest):
             "totalOrders": 0,
             "totalSpent": 0.0
         }
-        await db.users.insert_one(new_buyer)
-        buyer = new_buyer
+        await db.users.insert_one(new_buyer_data)
+        buyer = new_buyer_data
     
     buyer_id = buyer["id"]
     buyer_name = buyer["name"]
+    buyer_email = buyer["email"]
 
     # Fetch all products from cart to get seller info
     product_ids = [item.id for item in checkout_data.cartItems]
@@ -935,6 +994,37 @@ async def process_checkout(checkout_data: CheckoutRequest):
             {"id": buyer_id},
             {"$inc": {"totalOrders": 1, "totalSpent": total_amount}}
         )
+
+        # --- Send Email Notifications ---
+        # 1. To Buyer
+        if buyer_email:
+            message_buyer = MessageSchema(
+                subject=f"Confirmation de votre commande Nengoo #{new_order.id}",
+                recipients=[buyer_email],
+                template_body={
+                    "buyer_name": buyer_name,
+                    "order_id": new_order.id,
+                    "total_amount": total_amount
+                },
+                subtype="html"
+            )
+            background_tasks.add_task(fm.send_message, message_buyer, template_name="new_order_buyer.html")
+
+        # 2. To Seller
+        seller = await db.sellers.find_one({"id": seller_id})
+        if seller and seller.get("email"):
+            message_seller = MessageSchema(
+                subject=f"Nouvelle commande sur Nengoo - #{new_order.id}",
+                recipients=[seller["email"]],
+                template_body={
+                    "seller_name": seller["businessName"],
+                    "buyer_name": buyer_name,
+                    "order_id": new_order.id,
+                    "total_amount": total_amount
+                },
+                subtype="html"
+            )
+            background_tasks.add_task(fm.send_message, message_seller, template_name="new_order_seller.html")
 
     return created_orders
 

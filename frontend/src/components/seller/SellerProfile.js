@@ -15,7 +15,8 @@ const SellerProfile = (props) => {
         name: user.businessName || '',
         email: user.email || '',
         phone: user.whatsapp || '',
-        address: user.address ? `${user.address}, ${user.city}` : '',
+        address: user.address || '',
+        city: user.city || '',
         description: user.description || '',
         logo: user.logoUrl || null,
         joinDate: user.joinDate || new Date().toISOString(),
@@ -26,13 +27,55 @@ const SellerProfile = (props) => {
     }
   }, [user]);
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    setIsEditing(false);
-    // Here you would save to backend
-    // For now, we can update the user prop via the function passed from App.js
-    props.setUser({ ...user, ...profileData }); 
-    alert('Profil mis à jour avec succès! (Simulation)');
+
+    const sellerId = user.id;
+    if (!sellerId) {
+      alert("Erreur: ID du vendeur non trouvé.");
+      return;
+    }
+
+    console.log('profileData before update:', profileData);
+
+    // Mapping frontend state to backend model
+    const updateData = {
+      businessName: profileData?.name,
+      email: profileData?.email,
+      whatsapp: profileData?.phone,
+      address: profileData?.address,
+      city: profileData?.city,
+      description: profileData?.description,
+      logoUrl: profileData?.logo,
+      socialMedia: profileData?.socialMedia
+    };
+
+    try {
+      const response = await fetch(`http://localhost:8000/api/sellers/${sellerId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Seller-Id': sellerId,
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to update profile');
+      }
+
+      const updatedSeller = await response.json();
+
+      // Update local state and UI
+      props.setUser(updatedSeller);
+      setIsEditing(false);
+      alert('Profil mis à jour avec succès!');
+
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert(`Erreur lors de la mise à jour du profil: ${error.message}`);
+    }
   };
 
   if (!profileData) {
@@ -80,7 +123,7 @@ const SellerProfile = (props) => {
                 <label className="block text-sm font-medium mb-2">URL du Logo</label>
                 <input
                   type="url"
-                  value={profileData.logo}
+                  value={profileData.logo || ''}
                   onChange={(e) => setProfileData({ ...profileData, logo: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
@@ -134,14 +177,24 @@ const SellerProfile = (props) => {
             <div>
               <label className="block text-sm font-medium mb-2">Adresse</label>
               {isEditing ? (
-                <input
-                  type="text"
-                  value={profileData.address}
-                  onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Adresse"
+                    value={profileData.address}
+                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-2"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Ville"
+                    value={profileData.city}
+                    onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
               ) : (
-                <p className="text-lg text-gray-800">{profileData.address}</p>
+                <p className="text-lg text-gray-800">{profileData.address}{profileData.city ? `, ${profileData.city}` : ''}</p>
               )}
             </div>
           </div>

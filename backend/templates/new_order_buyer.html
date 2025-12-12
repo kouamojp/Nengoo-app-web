@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmation de votre commande</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333;">
+    <div style="max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px;">
+        <h2>Merci pour votre commande, {{buyer_name}} !</h2>
+        <p>Nous avons bien reçu votre commande et nous la traitons.</p>
+        <p><strong>Détails de la commande :</strong></p>
+        <ul>
+            <li><strong>Numéro de commande :</strong> {{order_id}}</li>
+            <li><strong>Montant total :</strong> {{total_amount}} XAF</li>
+        </ul>
+        <p>Vous recevrez une notification par email lorsque le statut de votre commande sera mis à jour. Vous pouvez également suivre votre commande depuis votre profil sur notre site.</p>
+        <a href="https://nengoo.com/profile" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">Voir ma commande</a>
+        <p>Merci de faire confiance à Nengoo !</p>
+    </div>
+</body>
+</html>

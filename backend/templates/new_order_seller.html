@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nouvelle Commande Reçue</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 0; padding: 20px; color: #333;">
+    <div style="max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px;">
+        <h2>Bonjour {{seller_name}},</h2>
+        <p>Bonne nouvelle ! Vous avez reçu une nouvelle commande sur Nengoo.</p>
+        <p><strong>Détails de la commande :</strong></p>
+        <ul>
+            <li><strong>Numéro de commande :</strong> {{order_id}}</li>
+            <li><strong>Client :</strong> {{buyer_name}}</li>
+            <li><strong>Montant total :</strong> {{total_amount}} XAF</li>
+        </ul>
+        <p>Veuillez vous connecter à votre tableau de bord vendeur pour voir les détails complets de la commande et la traiter.</p>
+        <a href="https://nengoo.com/seller" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">Accéder au Tableau de Bord</a>
+        <p>Merci de vendre sur Nengoo !</p>
+    </div>
+</body>
+</html>
