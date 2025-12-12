@@ -8,9 +8,13 @@ const SellerProfile = (props) => {
   const [profileData, setProfileData] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
 
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
   useEffect(() => {
-    if (user) {
-      // Map the user prop to the profileData state
+    // Only reset the form data if we are NOT in editing mode.
+    // This prevents the form from being reset while the user is typing,
+    // and also correctly resets the form on "Cancel".
+    if (user && !isEditing) {
       setProfileData({
         name: user.businessName || '',
         email: user.email || '',
@@ -25,7 +29,7 @@ const SellerProfile = (props) => {
         socialMedia: user.socialMedia || { whatsapp: user.whatsapp || '' },
       });
     }
-  }, [user]);
+  }, [user, isEditing]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -51,7 +55,7 @@ const SellerProfile = (props) => {
     };
 
     try {
-      const response = await fetch(`http://localhost:8000/api/sellers/${sellerId}`, {
+      const response = await fetch(`${API_BASE_URL}/sellers/${sellerId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
