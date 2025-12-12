@@ -183,6 +183,8 @@ function App() {
           <Route path="/admin/login" element={<AdminLogin {...appProps} />} />
           <Route path="/admin/dashboard" element={<AdminDashboard {...appProps} />} />
           <Route path="/admin/management" element={<AdminManagement {...appProps} />} />
+          {/* Catch-all route for unmatched paths */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <BottomNav cartItemCount={cartItemCount} user={user} />
       </Router>
