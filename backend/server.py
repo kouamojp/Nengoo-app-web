@@ -370,6 +370,9 @@ class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
+class CategoryWithCount(Category):
+    productCount: int
+
 class PresignedUrlRequest(BaseModel):
     fileName: str
     fileType: str
@@ -1078,11 +1081,29 @@ async def delete_pickup_point(pickup_point_id: str):
     return
 
 # --- Category Management ---
-@api_router.get("/categories", response_model=List[Category])
+@api_router.get("/categories", response_model=List[CategoryWithCount])
 async def list_categories():
-    categories_cursor = db.categories.find()
-    categories = await categories_cursor.to_list(1000)
-    return [Category(**c) for c in categories]
+    pipeline = [
+        {
+            "$lookup": {
+                "from": "products",
+                "localField": "id",
+                "foreignField": "category",
+                "as": "products"
+            }
+        },
+        {
+            "$project": {
+                "id": "$id",
+                "name": "$name",
+                "description": "$description",
+                "productCount": { "$size": "$products" }
+            }
+        }
+    ]
+    categories_cursor = db.categories.aggregate(pipeline)
+    categories_with_count = await categories_cursor.to_list(1000)
+    return categories_with_count
 
 @api_router.post("/categories", response_model=Category, dependencies=[Depends(moderator_or_higher_required)])
 async def create_category(category_data: CategoryCreate):

@@ -130,6 +130,7 @@ const CategoryManagement = (props) => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre de produits</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
                         </thead>
@@ -139,6 +140,7 @@ const CategoryManagement = (props) => {
                                     <td className="px-6 py-4 font-mono text-sm">{cat.id}</td>
                                     <td className="px-6 py-4 font-medium">{cat.name}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600">{cat.description}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-600">{cat.productCount}</td>
                                     <td className="px-6 py-4">
                                         <button onClick={() => handleDeleteCategory(cat.id)} className="text-red-600 hover:text-red-800 font-semibold text-sm">Supprimer</button>
                                     </td>

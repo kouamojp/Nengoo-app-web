@@ -137,6 +137,77 @@ const SellerProducts = (props) => {
       }
     };
   
+    const handleUpdateProduct = async (e) => {
+      e.preventDefault();
+
+      if (!editingProduct) return;
+
+      const uploadedImageUrls = [];
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          try {
+            // 1. Get presigned URL from your backend
+            const presignedResponse = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
+              method: 'POST',
+              headers: { 
+                  'Content-Type': 'application/json',
+                  'X-Seller-Id': props.user.id,
+              },
+              body: JSON.stringify({ fileName: file.name, fileType: file.type }),
+            });
+            if (!presignedResponse.ok) {
+              throw new Error('Failed to get presigned URL');
+            }
+            const { uploadUrl, publicUrl } = await presignedResponse.json();
+    
+            // 2. Upload image directly to S3 using the presigned URL
+            const uploadResult = await fetch(uploadUrl, {
+              method: 'PUT',
+              body: file,
+              headers: {
+                'Content-Type': file.type,
+              },
+            });
+            if (!uploadResult.ok) {
+              throw new Error('Failed to upload image to S3');
+            }
+            uploadedImageUrls.push(publicUrl);
+          } catch (error) {
+            console.error("Error uploading file:", error);
+            alert(`Erreur lors du téléchargement de l'image ${file.name}: ${error.message}`);
+            return; // Stop the process if any upload fails
+          }
+        }
+      }
+
+      const productData = {
+          ...editingProduct,
+          images: uploadedImageUrls.length > 0 ? uploadedImageUrls : editingProduct.images,
+      };
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Seller-Id': props.user.id,
+          },
+          body: JSON.stringify(productData),
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to update product');
+        }
+  
+        await fetchProducts(); // Refetch products to include the updated one
+        setEditingProduct(null);
+        setSelectedFiles([]); // Clear selected files after successful upload
+      } catch (error) {
+        alert(`Erreur: ${error.message}`);
+      }
+    };
+
     const handleDeleteProduct = async (id) => {
       if (confirm('Êtes-vous sûr de vouloir supprimer ce produit?')) {
         try {
@@ -183,6 +254,105 @@ const SellerProducts = (props) => {
             </button>
           </div>
         </div>
+
+        {/* Edit Product Form */}
+        {editingProduct && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h3 className="text-xl font-bold mb-6">Modifier le Produit</h3>
+            <form onSubmit={handleUpdateProduct} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Nom du produit</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingProduct.name}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Catégorie</label>
+                  <select
+                    value={editingProduct.category}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="clothing_accessories">Vêtements et Accessoires</option>
+                    <option value="food_drinks">Aliments et Boissons</option>
+                    <option value="electronics">Électroniques</option>
+                    <option value="home_garden">Maison & Jardinage</option>
+                    <option value="handicrafts">Artisanat</option>
+                    <option value="beauty_care">Beauté et Soins</option>
+                    {/* Add other categories as needed */}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Prix (XAF)</label>
+                  <input
+                    type="number"
+                    required
+                    value={editingProduct.price}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, price: parseInt(e.target.value) || 0 })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Stock</label>
+                  <input
+                    type="number"
+                    required
+                    value={editingProduct.stock}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                  <label className="block text-sm font-medium mb-2">Images du produit</label>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                  <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedFiles.map((file, index) => (
+                          <img key={index} src={URL.createObjectURL(file)} alt={`preview-${index}`} className="w-20 h-20 object-cover rounded-lg" />
+                      ))}
+                  </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Description</label>
+                <textarea
+                  required
+                  value={editingProduct.description}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                  rows={3}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              
+              <div className="flex space-x-4">
+                <button
+                  type="submit"
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
+                >
+                  Mettre à jour le Produit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  className="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
 
         {/* Add Product Form */}
         {showAddForm && (
