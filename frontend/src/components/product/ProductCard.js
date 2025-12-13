@@ -36,6 +36,10 @@ const ProductCard = ({ product, language, addToCart }) => {
           alt={product.name[language]}
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
           onClick={() => navigate(`/product/${product.id}`)}
+          onError={(e) => {
+            e.target.onerror = null; // Prevent infinite loop if fallback also fails
+            e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
+          }}
         />
         {product.inStock ? (
           <span className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 text-xs rounded">

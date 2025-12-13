@@ -48,8 +48,8 @@ const ProductDetail = (props) => {
           sellerId: data.sellerId, // Ensure sellerId is explicitly passed
           name: { [language]: data.name },
           description: { [language]: data.description },
-          image: data.images && data.images.length > 0 ? data.images[0] : 'https://via.placeholder.com/300',
-          images: data.images || [data.images && data.images.length > 0 ? data.images[0] : 'https://via.placeholder.com/300'],
+          image: data.images && data.images.length > 0 ? data.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
+          images: data.images || [data.images && data.images.length > 0 ? data.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png'],
           inStock: data.stock > 0,
           reviews: data.reviewsCount || 0,
           rating: data.rating || 0,
@@ -88,7 +88,7 @@ const ProductDetail = (props) => {
             ...p,
             name: { [language]: p.name },
             description: { [language]: p.description },
-            image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/300',
+            image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
             inStock: p.stock > 0,
             reviews: p.reviewsCount || 0,
             rating: p.rating || 0,
@@ -235,6 +235,10 @@ const ProductDetail = (props) => {
                   src={images[selectedImage]}
                   alt={product.name[language]}
                   className="w-full h-96 object-cover rounded-lg"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
+                  }}
                 />
               </div>
               {images.length > 1 && (
@@ -248,6 +252,10 @@ const ProductDetail = (props) => {
                         selectedImage === index ? 'border-purple-500' : 'border-gray-200'
                       }`}
                       onClick={() => setSelectedImage(index)}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
+                      }}
                     />
                   ))}
                 </div>
