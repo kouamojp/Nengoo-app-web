@@ -13,6 +13,7 @@ const ProductManagement = (props) => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null); // State for editing
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedProducts, setSelectedProducts] = useState([]);
 
     // State for new product form
     const [newProductData, setNewProductData] = useState({
@@ -34,6 +35,47 @@ const ProductManagement = (props) => {
     const [editingImageUrl, setEditingImageUrl] = useState('');
     const [editingUploadMethod, setEditingUploadMethod] = useState('url');
 
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedProducts(filteredProducts.map(p => p.id));
+        } else {
+            setSelectedProducts([]);
+        }
+    };
+
+    const handleSelectOne = (e, id) => {
+        if (e.target.checked) {
+            setSelectedProducts([...selectedProducts, id]);
+        } else {
+            setSelectedProducts(selectedProducts.filter(productId => productId !== id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedProducts.length} produits?`)) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/products`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Role': user.role,
+                    },
+                    body: JSON.stringify({ ids: selectedProducts }),
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to delete products');
+                }
+                await fetchProducts();
+                setSelectedProducts([]);
+                alert('🗑️ Produits supprimés avec succès!');
+            } catch (error) {
+                console.error('Error deleting products:', error);
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+    };
 
     const fetchProducts = async () => {
         setLoading(true);
@@ -321,9 +363,18 @@ const ProductManagement = (props) => {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl md:text-3xl font-bold">Gestion des produits ({filteredProducts.length})</h2>
-                <button onClick={() => setShowAddModal(true)} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
-                    + Ajouter un Produit
-                </button>
+                <div className="flex items-center space-x-2">
+                    <button
+                        onClick={handleBulkDelete}
+                        disabled={selectedProducts.length === 0}
+                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Supprimer la sélection
+                    </button>
+                    <button onClick={() => setShowAddModal(true)} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+                        + Ajouter un Produit
+                    </button>
+                </div>
             </div>
 
             <div className="mb-4">
@@ -601,6 +652,13 @@ const ProductManagement = (props) => {
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b">
                             <tr>
+                                <th className="px-6 py-3 text-left">
+                                    <input
+                                        type="checkbox"
+                                        onChange={handleSelectAll}
+                                        checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                                    />
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendeur</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
@@ -612,6 +670,13 @@ const ProductManagement = (props) => {
                         <tbody className="divide-y divide-gray-200">
                             {filteredProducts.map((product) => (
                                 <tr key={product.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedProducts.includes(product.id)}
+                                            onChange={(e) => handleSelectOne(e, product.id)}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 font-medium">{product.name}</td>
                                     <td className="px-6 py-4 text-sm">{product.sellerName}</td>
                                     <td className="px-6 py-4 text-sm font-medium">{formatPrice(product.price)}</td>
