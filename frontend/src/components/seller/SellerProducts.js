@@ -20,6 +20,7 @@ const SellerProducts = (props) => {
       images: [],
     });
     const [selectedFiles, setSelectedFiles] = useState([]);
+    const [availableCategories, setAvailableCategories] = useState([]);
 
     const fetchProducts = async () => {
       if (props.user) {
@@ -54,6 +55,24 @@ const SellerProducts = (props) => {
     useEffect(() => {
       fetchProducts();
     }, [props.user, language]);
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/categories`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                setAvailableCategories(data);
+            } catch (error) {
+                console.error("❌ Erreur lors de la récupération des catégories:", error);
+                // Optionally, alert the user or handle the error gracefully
+            }
+        };
+
+        fetchCategories();
+    }, []); // Empty dependency array means this runs once on mount
   
     const handleAddProduct = async (e) => {
       e.preventDefault();
@@ -278,13 +297,9 @@ const SellerProducts = (props) => {
                     onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="clothing_accessories">Vêtements et Accessoires</option>
-                    <option value="food_drinks">Aliments et Boissons</option>
-                    <option value="electronics">Électroniques</option>
-                    <option value="home_garden">Maison & Jardinage</option>
-                    <option value="handicrafts">Artisanat</option>
-                    <option value="beauty_care">Beauté et Soins</option>
-                    {/* Add other categories as needed */}
+                    {availableCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -377,13 +392,9 @@ const SellerProducts = (props) => {
                     onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="clothing_accessories">Vêtements et Accessoires</option>
-                    <option value="food_drinks">Aliments et Boissons</option>
-                    <option value="electronics">Électroniques</option>
-                    <option value="home_garden">Maison & Jardinage</option>
-                    <option value="handicrafts">Artisanat</option>
-                    <option value="beauty_care">Beauté et Soins</option>
-                    {/* Add other categories as needed */}
+                    {availableCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
