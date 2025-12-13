@@ -20,7 +20,46 @@ const SellerProducts = (props) => {
       images: [],
     });
     const [selectedFiles, setSelectedFiles] = useState([]);
+    const [selectedProducts, setSelectedProducts] = useState([]);
     const [availableCategories, setAvailableCategories] = useState([]);
+
+    const handleSelectProduct = (e, id) => {
+        if (e.target.checked) {
+            setSelectedProducts([...selectedProducts, id]);
+        } else {
+            setSelectedProducts(selectedProducts.filter(prodId => prodId !== id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedProducts.length} produits?`)) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/products`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Seller-Id': props.user.id, // Or admin role
+                    },
+                    body: JSON.stringify({ ids: selectedProducts }),
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    try {
+                        const err = JSON.parse(errorText);
+                        throw new Error(err.detail || 'Failed to delete products');
+                    } catch (e) {
+                        throw new Error(errorText || 'Failed to delete products');
+                    }
+                }
+                await fetchProducts();
+                setSelectedProducts([]);
+                alert('🗑️ Produits supprimés avec succès!');
+            } catch (error) {
+                console.error('Error deleting products:', error);
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+    };
 
     const fetchProducts = async () => {
       if (props.user) {
@@ -265,12 +304,21 @@ const SellerProducts = (props) => {
               <h2 className="text-xl font-bold">Mes Produits ({products.length})</h2>
               <p className="text-gray-600">Gérez votre catalogue de produits</p>
             </div>
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
-            >
-              ➕ Ajouter un Produit
-            </button>
+            <div className="flex items-center space-x-2">
+                <button
+                    onClick={handleBulkDelete}
+                    disabled={selectedProducts.length === 0}
+                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold transition-shadow"
+                >
+                    Supprimer la sélection
+                </button>
+                <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
+                >
+                ➕ Ajouter un Produit
+                </button>
+            </div>
           </div>
         </div>
 
@@ -487,12 +535,27 @@ const SellerProducts = (props) => {
             {products.map(product => (
             <div key={product.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
               <div className="relative">
+                <input
+                    type="checkbox"
+                    className="absolute top-2 left-2 z-10 h-6 w-6"
+                    checked={selectedProducts.includes(product.id)}
+                    onChange={(e) => handleSelectProduct(e, product.id)}
+                />
                 <img
                   src={product.image}
                   alt={product.name[language]}
                   className="w-full h-48 object-cover"
                 />
                 <div className="absolute top-2 right-2 flex space-x-1">
+                  {product.inStock ? (
+                    <span className="bg-green-500 text-white px-2 py-1 text-xs rounded">
+                      En Stock
+                    </span>
+                  ) : (
+                    <span className="bg-red-500 text-white px-2 py-1 text-xs rounded">
+                      Rupture
+                    </span>
+                  )}
                   <button
                     onClick={() => setEditingProduct(product)}
                     className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg text-sm transition-colors"
@@ -506,15 +569,6 @@ const SellerProducts = (props) => {
                     🗑️
                   </button>
                 </div>
-                {product.inStock ? (
-                  <span className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 text-xs rounded">
-                    En Stock
-                  </span>
-                ) : (
-                  <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 text-xs rounded">
-                    Rupture
-                  </span>
-                )}
               </div>
               
               <div className="p-4">

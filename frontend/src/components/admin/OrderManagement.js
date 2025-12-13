@@ -7,6 +7,50 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
     const [loading, setLoading] = useState(false); // For update and delete operations
     const [expandedOrderId, setExpandedOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedOrders, setSelectedOrders] = useState([]);
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedOrders(filteredOrders.map(o => o.id));
+        } else {
+            setSelectedOrders([]);
+        }
+    };
+
+    const handleSelectOne = (e, id) => {
+        if (e.target.checked) {
+            setSelectedOrders([...selectedOrders, id]);
+        } else {
+            setSelectedOrders(selectedOrders.filter(orderId => orderId !== id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedOrders.length} commandes? Cette action est irréversible.`)) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/orders`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Role': user.role,
+                    },
+                    body: JSON.stringify({ ids: selectedOrders }),
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to delete orders');
+                }
+                if (onOrderUpdate) {
+                    onOrderUpdate();
+                }
+                setSelectedOrders([]);
+                alert('🗑️ Commandes supprimées avec succès!');
+            } catch (error) {
+                console.error('Error deleting orders:', error);
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+    };
 
     const toggleProducts = (orderId) => {
         setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
@@ -99,14 +143,23 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
         <div>
             <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des commandes ({filteredOrders.length})</h2>
             
-            <div className="mb-4">
+            <div className="mb-4 flex justify-between items-center">
                 <input
                     type="text"
                     placeholder="Rechercher des commandes..."
-                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    className="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                {user && user.role === 'super_admin' && (
+                    <button
+                        onClick={handleBulkDelete}
+                        disabled={selectedOrders.length === 0}
+                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Supprimer la sélection
+                    </button>
+                )}
             </div>
 
             <div className="bg-white rounded-lg shadow-md overflow-auto">
@@ -114,6 +167,13 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b">
                             <tr>
+                                <th className="px-6 py-3 text-left">
+                                    <input 
+                                        type="checkbox"
+                                        onChange={handleSelectAll}
+                                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                                    />
+                                </th>
                                 <th className="px-2 py-3"></th> {/* For expand button */}
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commande</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acheteur</th>
@@ -127,6 +187,13 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                             {filteredOrders.map((order) => (
                                 <React.Fragment key={order.id}>
                                     <tr className="hover:bg-gray-50">
+                                        <td className="px-6 py-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedOrders.includes(order.id)}
+                                                onChange={(e) => handleSelectOne(e, order.id)}
+                                            />
+                                        </td>
                                         <td className="px-2 py-4">
                                             <button onClick={() => toggleProducts(order.id)} className="text-gray-500 hover:text-gray-700">
                                                 <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform duration-200 ${expandedOrderId === order.id ? 'transform rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
@@ -170,7 +237,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                     </tr>
                                     {expandedOrderId === order.id && (
                                         <tr className="bg-gray-50">
-                                            <td colSpan="7" className="px-12 py-4">
+                                            <td colSpan="8" className="px-12 py-4">
                                                 <div>
                                                     <h4 className="font-bold text-md mb-2">Détails de la Commande</h4>
                                                     <p className="text-sm text-gray-600 mb-2">Vendu par : <span className="font-medium">{order.sellerName}</span></p>

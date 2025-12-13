@@ -9,11 +9,53 @@ const SellerManagement = (props) => {
     const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedSellers, setSelectedSellers] = useState([]);
 
     // State for the edit modal
     const [showEditModal, setShowEditModal] = useState(false);
     const [currentSeller, setCurrentSeller] = useState(null);
     const [newPassword, setNewPassword] = useState('');
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedSellers(filteredSellers.map(s => s.id));
+        } else {
+            setSelectedSellers([]);
+        }
+    };
+
+    const handleSelectOne = (e, id) => {
+        if (e.target.checked) {
+            setSelectedSellers([...selectedSellers, id]);
+        } else {
+            setSelectedSellers(selectedSellers.filter(sellerId => sellerId !== id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedSellers.length} vendeurs? Cette action est irréversible.`)) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/sellers`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Role': user.role,
+                    },
+                    body: JSON.stringify({ ids: selectedSellers }),
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to delete sellers');
+                }
+                await fetchSellers();
+                setSelectedSellers([]);
+                alert('🗑️ Vendeurs supprimés avec succès!');
+            } catch (error) {
+                console.error('Error deleting sellers:', error);
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+    };
 
     const fetchSellers = async () => {
         if (!user || !user.role) return;
@@ -160,14 +202,21 @@ const SellerManagement = (props) => {
         <div>
             <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des vendeurs ({filteredSellers.length})</h2>
 
-            <div className="mb-4">
+            <div className="mb-4 flex justify-between items-center">
                 <input
                     type="text"
                     placeholder="Rechercher des vendeurs..."
-                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    className="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                <button
+                    onClick={handleBulkDelete}
+                    disabled={selectedSellers.length === 0}
+                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+                >
+                    Supprimer la sélection
+                </button>
             </div>
 
             {showEditModal && currentSeller && (
@@ -200,6 +249,13 @@ const SellerManagement = (props) => {
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b">
                             <tr>
+                                <th className="px-6 py-3 text-left">
+                                    <input 
+                                        type="checkbox"
+                                        onChange={handleSelectAll}
+                                        checked={selectedSellers.length === filteredSellers.length && filteredSellers.length > 0}
+                                    />
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Boutique</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ville</th>
@@ -211,6 +267,13 @@ const SellerManagement = (props) => {
                         <tbody className="divide-y divide-gray-200">
                             {filteredSellers.map((seller) => (
                                 <tr key={seller.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedSellers.includes(seller.id)}
+                                            onChange={(e) => handleSelectOne(e, seller.id)}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 font-medium">{seller.businessName}</td>
                                     <td className="px-6 py-4 text-sm">{seller.whatsapp} <br/> {seller.email}</td>
                                     <td className="px-6 py-4 text-sm">{seller.city}</td>

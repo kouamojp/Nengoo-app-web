@@ -21,6 +21,48 @@ const PickupPointManagement = (props) => {
         hours: '',
         description: '',
     });
+    const [selectedPickupPoints, setSelectedPickupPoints] = useState([]);
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedPickupPoints(pickupPoints.map(p => p.id));
+        } else {
+            setSelectedPickupPoints([]);
+        }
+    };
+
+    const handleSelectOne = (e, id) => {
+        if (e.target.checked) {
+            setSelectedPickupPoints([...selectedPickupPoints, id]);
+        } else {
+            setSelectedPickupPoints(selectedPickupPoints.filter(pointId => pointId !== id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedPickupPoints.length} points de retrait?`)) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/pickup-points`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Role': 'super_admin',
+                    },
+                    body: JSON.stringify({ ids: selectedPickupPoints }),
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to delete pickup points');
+                }
+                await fetchPickupPoints();
+                setSelectedPickupPoints([]);
+                alert('🗑️ Points de retrait supprimés avec succès!');
+            } catch (error) {
+                console.error('Error deleting pickup points:', error);
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+    };
 
     const fetchPickupPoints = async () => {
         setLoading(true);
@@ -125,9 +167,18 @@ const PickupPointManagement = (props) => {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl md:text-3xl font-bold">Gestion des Points de Retrait ({pickupPoints.length})</h2>
-                <button onClick={() => setShowAddModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
-                    + Ajouter un Point de Retrait
-                </button>
+                <div className="flex items-center space-x-2">
+                    <button 
+                        onClick={handleBulkDelete}
+                        disabled={selectedPickupPoints.length === 0}
+                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Supprimer la sélection
+                    </button>
+                    <button onClick={() => setShowAddModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
+                        + Ajouter un Point de Retrait
+                    </button>
+                </div>
             </div>
 
             {showAddModal && (
@@ -187,6 +238,13 @@ const PickupPointManagement = (props) => {
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b">
                             <tr>
+                                <th className="px-6 py-3 text-left">
+                                    <input
+                                        type="checkbox"
+                                        onChange={handleSelectAll}
+                                        checked={selectedPickupPoints.length === pickupPoints.length && pickupPoints.length > 0}
+                                    />
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Adresse</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gestionnaire</th>
@@ -197,6 +255,13 @@ const PickupPointManagement = (props) => {
                         <tbody className="divide-y divide-gray-200">
                             {pickupPoints.map((point) => (
                                 <tr key={point.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedPickupPoints.includes(point.id)}
+                                            onChange={(e) => handleSelectOne(e, point.id)}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 font-medium">{point.name}</td>
                                     <td className="px-6 py-4 text-sm">{point.address}, {point.city}</td>
                                     <td className="px-6 py-4 text-sm">{point.managerName}</td>

@@ -13,14 +13,59 @@ const AdminManagement = (props) => {
   const [editingAdmin, setEditingAdmin] = useState(null);
   const [passwordChangeAdmin, setPasswordChangeAdmin] = useState(null);
   const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [formData, setFormData] = useState({
-    name: '',
+      const [confirmPassword, setConfirmPassword] = useState('');
+      const [selectedAdmins, setSelectedAdmins] = useState([]);
+      const [formData, setFormData] = useState({    name: '',
     whatsapp: '',
     email: '',
     role: 'support',
     accessCode: ''
   });
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedAdmins(admins.map(a => a.id));
+        } else {
+            setSelectedAdmins([]);
+        }
+    };
+
+    const handleSelectOne = (e, id) => {
+        if (e.target.checked) {
+            setSelectedAdmins([...selectedAdmins, id]);
+        } else {
+            setSelectedAdmins(selectedAdmins.filter(adminId => adminId !== id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedAdmins.includes(user.id)) {
+            alert("Vous ne pouvez pas vous supprimer vous-même.");
+            return;
+        }
+        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedAdmins.length} administrateurs? Cette action est irréversible.`)) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/admins`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Role': 'super_admin',
+                    },
+                    body: JSON.stringify({ ids: selectedAdmins }),
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to delete admins');
+                }
+                await fetchAdmins();
+                setSelectedAdmins([]);
+                alert('🗑️ Administrateurs supprimés avec succès!');
+            } catch (error) {
+                console.error('Error deleting admins:', error);
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+    };
 
   const isSuperAdmin = user && user.type === 'admin' && user.whatsapp === '+237600000000';
 
@@ -465,8 +510,17 @@ const AdminManagement = (props) => {
         {/* Admins List */}
         {isSuperAdmin && (
           <div className="bg-white rounded-lg shadow-md overflow-auto">
-          <div className="p-6 border-b">
+          <div className="p-6 border-b flex justify-between items-center">
             <h3 className="text-xl font-bold">Liste des Administrateurs ({admins.length})</h3>
+            {isSuperAdmin && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={selectedAdmins.length === 0}
+                className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+              >
+                Supprimer la sélection
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             {loading ? (
@@ -475,6 +529,13 @@ const AdminManagement = (props) => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
+                  <th className="px-6 py-3 text-left">
+                    <input
+                        type="checkbox"
+                        onChange={handleSelectAll}
+                        checked={selectedAdmins.length === admins.length && admins.length > 0}
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Administrateur</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rôle</th>
@@ -489,6 +550,14 @@ const AdminManagement = (props) => {
                   const roleInfo = adminRoles[admin.role];
                   return (
                     <tr key={admin.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                            <input
+                                type="checkbox"
+                                checked={selectedAdmins.includes(admin.id)}
+                                onChange={(e) => handleSelectOne(e, admin.id)}
+                                disabled={admin.id === user.id}
+                            />
+                        </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-3">
                           <div className="text-2xl">{roleInfo?.icon}</div>

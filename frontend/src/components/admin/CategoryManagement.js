@@ -11,6 +11,7 @@ const CategoryManagement = (props) => {
         name: '',
         description: '',
     });
+    const [selectedCategories, setSelectedCategories] = useState([]);
 
     const getRoleForHeader = () => {
         if (user && user.whatsapp === '+237600000000') {
@@ -41,6 +42,53 @@ const CategoryManagement = (props) => {
         const { name, value } = e.target;
         setNewCategoryData({ ...newCategoryData, [name]: value });
     };
+
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedCategories(categories.map(c => c.id));
+        } else {
+            setSelectedCategories([]);
+        }
+    };
+
+    const handleSelectOne = (e, id) => {
+        if (e.target.checked) {
+            setSelectedCategories([...selectedCategories, id]);
+        } else {
+            setSelectedCategories(selectedCategories.filter(catId => catId !== id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedCategories.length} catégories?`)) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/categories`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Role': getRoleForHeader(),
+                    },
+                    body: JSON.stringify({ ids: selectedCategories }),
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    try {
+                        const err = JSON.parse(errorText);
+                        throw new Error(err.detail || 'Failed to delete categories');
+                    } catch (e) {
+                        throw new Error(errorText || 'Failed to delete categories');
+                    }
+                }
+                await fetchCategories();
+                setSelectedCategories([]);
+                alert('🗑️ Catégories supprimées avec succès!');
+            } catch (error) {
+                console.error('Error deleting categories:', error);
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+    };
+
 
     const handleAddCategory = async (e) => {
         e.preventDefault();
@@ -101,9 +149,18 @@ const CategoryManagement = (props) => {
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl md:text-3xl font-bold">Gestion des Catégories ({categories.length})</h2>
-                <button onClick={() => setShowAddModal(true)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded">
-                    + Ajouter une Catégorie
-                </button>
+                <div className="flex items-center space-x-2">
+                    <button 
+                        onClick={handleBulkDelete}
+                        disabled={selectedCategories.length === 0}
+                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Supprimer la sélection
+                    </button>
+                    <button onClick={() => setShowAddModal(true)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded">
+                        + Ajouter une Catégorie
+                    </button>
+                </div>
             </div>
 
             {showAddModal && (
@@ -127,6 +184,13 @@ const CategoryManagement = (props) => {
                     <table className="w-full">
                         <thead className="bg-gray-50 border-b">
                             <tr>
+                                <th className="px-6 py-3 text-left">
+                                    <input 
+                                        type="checkbox"
+                                        onChange={handleSelectAll}
+                                        checked={selectedCategories.length === categories.length && categories.length > 0}
+                                    />
+                                </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
@@ -137,6 +201,13 @@ const CategoryManagement = (props) => {
                         <tbody className="divide-y divide-gray-200">
                             {categories.map((cat) => (
                                 <tr key={cat.id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">
+                                        <input 
+                                            type="checkbox"
+                                            checked={selectedCategories.includes(cat.id)}
+                                            onChange={(e) => handleSelectOne(e, cat.id)}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 font-mono text-sm">{cat.id}</td>
                                     <td className="px-6 py-4 font-medium">{cat.name}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600">{cat.description}</td>

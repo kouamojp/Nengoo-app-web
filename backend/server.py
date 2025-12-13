@@ -422,6 +422,9 @@ class Conversation(BaseModel):
     seller_unread: bool = False
     buyer_unread: bool = False
 
+class BulkDeleteRequest(BaseModel):
+    ids: List[str]
+
 # --- Messaging Endpoints ---
 
 class MessageCreate(BaseModel):
@@ -594,6 +597,14 @@ async def list_buyers():
     buyers = await buyers_cursor.to_list(1000)
     return [Buyer(**b) for b in buyers]
 
+@api_router.delete("/buyers", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+async def bulk_delete_buyers(request: BulkDeleteRequest):
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="No buyer IDs provided for deletion.")
+    
+    await db.users.delete_many({"id": {"$in": request.ids}, "type": "buyer"})
+    return
+
 @api_router.put("/buyers/{buyer_id}", response_model=Buyer, dependencies=[Depends(admin_or_higher_required)])
 async def update_buyer(buyer_id: str, buyer_data: BuyerUpdate):
     update_data = buyer_data.dict(exclude_unset=True)
@@ -697,6 +708,26 @@ async def update_product(product_id: str, product_data: ProductUpdate):
         raise HTTPException(status_code=404, detail="Product not found")
     return Product(**updated_product)
 
+@api_router.delete("/products", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(seller_or_moderator_or_higher_required)])
+async def bulk_delete_products(request: BulkDeleteRequest, 
+                             current_seller_id: Optional[str] = Depends(get_current_seller_optional),
+                             admin_role: Optional[str] = Depends(get_current_admin_role)):
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="No product IDs provided for deletion.")
+
+    query = {"id": {"$in": request.ids}}
+
+    # Security check: If the user is a seller, they can only delete their own products.
+    if current_seller_id and admin_role not in ["super_admin", "admin", "moderator"]:
+        query["sellerId"] = current_seller_id
+
+    result = await db.products.delete_many(query)
+    
+    # Even if some products were not found or did not belong to the seller,
+    # we return a success response, as the desired state (deletion of authorized products) is achieved.
+    # We could add a check on result.deleted_count if we wanted to be more strict.
+    return
+
 @api_router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(seller_or_moderator_or_higher_required)])
 async def delete_product(product_id: str):
     result = await db.products.delete_one({"id": product_id})
@@ -799,6 +830,14 @@ async def update_seller(
         raise HTTPException(status_code=404, detail="Seller not found")
     return Seller(**updated_seller)
 
+@api_router.delete("/sellers", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(admin_or_higher_required)])
+async def bulk_delete_sellers(request: BulkDeleteRequest):
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="No seller IDs provided for deletion.")
+    
+    await db.sellers.delete_many({"id": {"$in": request.ids}})
+    return
+
 @api_router.delete("/sellers/{seller_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(admin_or_higher_required)])
 async def delete_seller(seller_id: str):
     result = await db.sellers.delete_one({"id": seller_id})
@@ -895,6 +934,42 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
     if not order_before_update:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    # Stock management
+    if 'status' in update_data and update_data['status'] != order_before_update.get('status'):
+        # If status changes to 'delivered', decrease stock
+        if update_data['status'] == 'delivered':
+            for product_in_order in order_before_update['products']:
+                await db.products.update_one(
+                    {"id": product_in_order['productId']},
+                    {"$inc": {"stock": -product_in_order['quantity']}}
+                )
+                
+                # After decrementing, check the new stock level
+                updated_product_stock = await db.products.find_one({"id": product_in_order['productId']})
+                
+                if updated_product_stock and updated_product_stock.get('stock') == 3:
+                    seller = await db.sellers.find_one({"id": updated_product_stock['sellerId']})
+                    if seller and seller.get("email"):
+                        # Prepare and send email notification
+                        message = MessageSchema(
+                            subject=f"Alerte de stock bas pour votre produit: {updated_product_stock['name']}",
+                            recipients=[seller["email"]],
+                            template_body={
+                                "seller_name": seller["businessName"],
+                                "product_name": updated_product_stock['name'],
+                                "stock_level": 3,
+                            },
+                            subtype="html"
+                        )
+                        background_tasks.add_task(fm.send_message, message, template_name="low_stock_alert.html")
+        # If status changes from 'delivered' to something else, restock
+        elif order_before_update.get('status') == 'delivered':
+            for product_in_order in order_before_update['products']:
+                await db.products.update_one(
+                    {"id": product_in_order['productId']},
+                    {"$inc": {"stock": product_in_order['quantity']}}
+                )
+
     await db.orders.update_one({"id": order_id}, {"$set": update_data})
     updated_order = await db.orders.find_one({"id": order_id})
     
@@ -915,6 +990,14 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
             background_tasks.add_task(fm.send_message, message, template_name="status_update_buyer.html")
 
     return Order(**updated_order)
+
+@api_router.delete("/orders", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+async def bulk_delete_orders(request: BulkDeleteRequest):
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="No order IDs provided for deletion.")
+    
+    await db.orders.delete_many({"id": {"$in": request.ids}})
+    return
 
 @api_router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
 async def delete_order(order_id: str):
@@ -1073,6 +1156,14 @@ async def update_pickup_point(pickup_point_id: str, pickup_data: PickupPointUpda
         raise HTTPException(status_code=404, detail="Pickup point not found")
     return PickupPoint(**updated_pickup_point)
 
+@api_router.delete("/pickup-points", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+async def bulk_delete_pickup_points(request: BulkDeleteRequest):
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="No pickup point IDs provided for deletion.")
+    
+    await db.pickupPoints.delete_many({"id": {"$in": request.ids}})
+    return
+
 @api_router.delete("/pickup-points/{pickup_point_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
 async def delete_pickup_point(pickup_point_id: str):
     result = await db.pickupPoints.delete_one({"id": pickup_point_id})
@@ -1124,6 +1215,22 @@ async def update_category(category_id: str, category_data: CategoryUpdate):
     if not updated_category:
         raise HTTPException(status_code=404, detail="Category not found")
     return Category(**updated_category)
+
+@api_router.delete("/categories", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(moderator_or_higher_required)])
+async def bulk_delete_categories(request: BulkDeleteRequest):
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="No category IDs provided for deletion.")
+    
+    result = await db.categories.delete_many({"id": {"$in": request.ids}})
+    
+    if result.deleted_count == 0:
+        # This can happen if the IDs are not found, which is not necessarily a client error.
+        # Returning 204 is acceptable as the state is what the client wanted (the items are gone).
+        pass
+
+    # Note: We could also check if result.deleted_count matches len(request.ids) and handle discrepancies.
+    # For now, a 204 response is sufficient.
+    return
 
 @api_router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(moderator_or_higher_required)])
 async def delete_category(category_id: str):
@@ -1268,6 +1375,17 @@ async def update_admin_password(admin_id: str, password_data: AdminPasswordUpdat
         {"id": admin_id},
         {"$set": {"accessCode": hashed_password}}
     )
+    return
+
+@api_router.delete("/admins", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
+async def bulk_delete_admins(request: BulkDeleteRequest):
+    if not request.ids:
+        raise HTTPException(status_code=400, detail="No admin IDs provided for deletion.")
+    
+    # Prevent deletion of super admins
+    query = {"id": {"$in": request.ids}, "role": {"$ne": "super_admin"}}
+    
+    await db.admins.delete_many(query)
     return
 
 @api_router.delete("/admins/{admin_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
