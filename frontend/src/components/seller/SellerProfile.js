@@ -27,6 +27,7 @@ const SellerProfile = (props) => {
         rating: user.rating || 4.5, // Mock data for now
         totalSales: user.totalSales || 120, // Mock data for now
         socialMedia: user.socialMedia || { whatsapp: user.whatsapp || '' },
+        deliveryPrice: user.deliveryPrice || 0,
       });
     }
   }, [user, isEditing]);
@@ -51,7 +52,8 @@ const SellerProfile = (props) => {
       city: profileData?.city,
       description: profileData?.description,
       logoUrl: profileData?.logo,
-      socialMedia: profileData?.socialMedia
+      socialMedia: profileData?.socialMedia,
+      deliveryPrice: profileData?.deliveryPrice
     };
 
     try {
@@ -199,6 +201,19 @@ const SellerProfile = (props) => {
                 </div>
               ) : (
                 <p className="text-lg text-gray-800">{profileData.address}{profileData.city ? `, ${profileData.city}` : ''}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">Prix de livraison</label>
+              {isEditing ? (
+                <input
+                  type="number"
+                  value={profileData.deliveryPrice}
+                  onChange={(e) => setProfileData({ ...profileData, deliveryPrice: parseFloat(e.target.value) })}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              ) : (
+                <p className="text-lg text-gray-800">{new Intl.NumberFormat('fr-CM', { style: 'currency', currency: 'XAF' }).format(profileData.deliveryPrice)}</p>
               )}
             </div>
           </div>

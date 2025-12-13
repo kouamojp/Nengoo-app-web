@@ -168,6 +168,7 @@ sellers_data = [
         "lastPasswordChange": datetime(2024, 1, 15, tzinfo=timezone.utc),
         "loginAttempts": 0,
         "accountLocked": False,
+        "deliveryPrice": 1500,
         "createdAt": datetime(2024, 1, 15, tzinfo=timezone.utc),
         "updatedAt": datetime.now(timezone.utc)
     },
@@ -200,6 +201,7 @@ sellers_data = [
         "lastPasswordChange": datetime(2024, 2, 1, tzinfo=timezone.utc),
         "loginAttempts": 0,
         "accountLocked": False,
+        "deliveryPrice": 2000,
         "createdAt": datetime(2024, 2, 1, tzinfo=timezone.utc),
         "updatedAt": datetime.now(timezone.utc)
     },
@@ -232,6 +234,7 @@ sellers_data = [
         "lastPasswordChange": datetime(2025, 1, 25, tzinfo=timezone.utc),
         "loginAttempts": 0,
         "accountLocked": False,
+        "deliveryPrice": None,
         "createdAt": datetime(2025, 1, 25, tzinfo=timezone.utc),
         "updatedAt": datetime.now(timezone.utc)
     }

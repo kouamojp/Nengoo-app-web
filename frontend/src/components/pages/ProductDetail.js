@@ -45,6 +45,7 @@ const ProductDetail = (props) => {
         // Adapter les données pour le frontend
         const adaptedProduct = {
           ...data,
+          sellerId: data.sellerId, // Ensure sellerId is explicitly passed
           name: { [language]: data.name },
           description: { [language]: data.description },
           image: data.images && data.images.length > 0 ? data.images[0] : 'https://via.placeholder.com/300',

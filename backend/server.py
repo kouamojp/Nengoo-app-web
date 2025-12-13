@@ -189,6 +189,7 @@ class Seller(BaseModel):
     description: str
     status: str = "pending"
     type: str = "seller"
+    deliveryPrice: Optional[float] = None
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
     logoUrl: Optional[str] = None
@@ -219,6 +220,7 @@ class SellerUpdate(BaseModel):
     whatsapp: Optional[str] = None
     logoUrl: Optional[str] = None
     socialMedia: Optional[dict] = None
+    deliveryPrice: Optional[float] = None
 
 class SellerAnalyticsData(BaseModel):
     total_revenue: float
@@ -242,6 +244,7 @@ class Order(BaseModel):
     sellerName: str
     products: List[OrderProduct]
     totalAmount: float
+    shippingCost: Optional[float] = None
     currency: str = "XAF"
     status: str
     paymentStatus: str
@@ -942,13 +945,17 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
     buyer_name = buyer["name"]
     buyer_email = buyer["email"]
 
+    # Get the global shipping price as a fallback
+    shipping_setting = await db.settings.find_one({"_id": "shipping_price"})
+    global_shipping_price = shipping_setting['price'] if shipping_setting else 2500
+
     # Fetch all products from cart to get seller info
     product_ids = [item.id for item in checkout_data.cartItems]
     products_from_db_cursor = db.products.find({"id": {"$in": product_ids}})
     products_from_db = {p["id"]: p for p in await products_from_db_cursor.to_list(len(product_ids))}
 
     # Group cart items by seller
-    seller_orders = {} # {seller_id: [products]}
+    seller_orders = {} # {seller_id: {sellerName: str, products: []}}
     for item in checkout_data.cartItems:
         product_info = products_from_db.get(item.id)
         if not product_info:
@@ -970,7 +977,17 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
 
     created_orders = []
     for seller_id, order_details in seller_orders.items():
-        total_amount = sum(p.price * p.quantity for p in order_details["products"])
+        # Fetch seller to get their delivery price
+        seller = await db.sellers.find_one({"id": seller_id})
+        if not seller:
+            # This should ideally not happen if products are well-managed
+            raise HTTPException(status_code=404, detail=f"Seller {seller_id} not found.")
+
+        # Determine shipping cost
+        shipping_cost = seller.get("deliveryPrice") if seller.get("deliveryPrice") is not None else global_shipping_price
+
+        products_total = sum(p.price * p.quantity for p in order_details["products"])
+        total_amount = products_total + shipping_cost
         
         new_order = Order(
             id=f"ord_{str(uuid.uuid4())[:8]}",
@@ -980,6 +997,7 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             sellerName=order_details["sellerName"],
             products=order_details["products"],
             totalAmount=total_amount,
+            shippingCost=shipping_cost,
             status="pending",
             paymentStatus="pending" if checkout_data.paymentMethod != 'cashOnDelivery' else 'unpaid',
             pickupPointId=checkout_data.selectedPickupPoint if checkout_data.deliveryOption == 'pickup' else None,
@@ -1011,7 +1029,6 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             background_tasks.add_task(fm.send_message, message_buyer, template_name="new_order_buyer.html")
 
         # 2. To Seller
-        seller = await db.sellers.find_one({"id": seller_id})
         if seller and seller.get("email"):
             message_seller = MessageSchema(
                 subject=f"Nouvelle commande sur Nengoo - #{new_order.id}",

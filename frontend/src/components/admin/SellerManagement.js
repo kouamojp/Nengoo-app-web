@@ -186,6 +186,7 @@ const SellerManagement = (props) => {
                             <input type="text" name="address" value={currentSeller.address} onChange={handleEditInputChange} placeholder="Adresse" className="w-full px-4 py-3 border rounded-lg" required />
                             <input type="text" name="city" value={currentSeller.city} onChange={handleEditInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
                             <input type="text" name="region" value={currentSeller.region} onChange={handleEditInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="number" name="deliveryPrice" value={currentSeller.deliveryPrice} onChange={handleEditInputChange} placeholder="Prix de livraison" className="w-full px-4 py-3 border rounded-lg" required />
                             <textarea name="description" value={currentSeller.description} onChange={handleEditInputChange} placeholder="Description de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
                             {/* Note: Category editing can be complex. For now, we are not including it in the edit form. */}
                             <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold">Mettre à jour</button>
@@ -202,6 +203,7 @@ const SellerManagement = (props) => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Boutique</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ville</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix Livr.</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
@@ -212,6 +214,9 @@ const SellerManagement = (props) => {
                                     <td className="px-6 py-4 font-medium">{seller.businessName}</td>
                                     <td className="px-6 py-4 text-sm">{seller.whatsapp} <br/> {seller.email}</td>
                                     <td className="px-6 py-4 text-sm">{seller.city}</td>
+                                    <td className="px-6 py-4 text-sm font-medium">
+                                        {new Intl.NumberFormat('fr-CM', { style: 'currency', currency: 'XAF' }).format(seller.deliveryPrice || 0)}
+                                    </td>
                                     <td className="px-6 py-4">
                                         <select
                                             value={seller.status}

@@ -24,28 +24,53 @@ const Checkout = (props) => {
     selectedPickupPoint: ''
   });
   const [pickupPoints, setPickupPoints] = useState([]);
-  const [backendShippingPrice, setBackendShippingPrice] = useState(0); // Default value
+  const [shippingCost, setShippingCost] = useState(0);
+
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
   useEffect(() => {
-    const fetchShippingPrice = async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/settings/shipping`);
-            if (response.ok) {
-                const data = await response.json();
-                setBackendShippingPrice(data.price);
-            } else {
-                console.error('Failed to fetch shipping price');
-            }
-        } catch (error) {
-            console.error('Error fetching shipping price:', error);
-        }
-    };
-    fetchShippingPrice();
+    const fetchAndCalculateShipping = async () => {
+      if (formData.deliveryOption === 'pickup') {
+        setShippingCost(0);
+        return;
+      }
 
+      // 1. Get unique seller IDs from cart
+      const sellerIds = [...new Set(cartItems.map(item => item.sellerId))];
+
+      // 2. Fetch each seller and determine their shipping cost
+      const sellerShippingPromises = sellerIds.map(async (sellerId) => {
+        try {
+          const sellerRes = await fetch(`${API_BASE_URL}/sellers/${sellerId}`);
+          if (sellerRes.ok) {
+            const seller = await sellerRes.json();
+            // Use seller's price if it exists as a number and is greater than 0
+            if (typeof seller.deliveryPrice === 'number' && seller.deliveryPrice > 0) {
+              return seller.deliveryPrice;
+            }
+          }
+          return 0; // Fallback for this seller
+        } catch (e) {
+          console.error(`Could not fetch seller ${sellerId}`, e);
+          return 0; // Fallback on error
+        }
+      });
+
+      // 3. Sum up all shipping costs
+      const shippingCosts = await Promise.all(sellerShippingPromises);
+      const totalShipping = shippingCosts.reduce((acc, cost) => acc + cost, 0);
+
+      setShippingCost(totalShipping);
+    };
+
+    fetchAndCalculateShipping();
+  }, [cartItems, formData.deliveryOption, API_BASE_URL]);
+
+  useEffect(() => {
     const fetchPickupPoints = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/pickup-points`, {
-          headers: { 'X-Admin-Role': 'super_admin' }
+          headers: { 'X-Admin-Role': 'super_admin' } // TODO: Should this be public?
         });
         if (response.ok) {
           const data = await response.json();
@@ -58,7 +83,7 @@ const Checkout = (props) => {
       }
     };
     fetchPickupPoints();
-  }, []);
+  }, [API_BASE_URL]);
   
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -69,9 +94,8 @@ const Checkout = (props) => {
   };
   
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = formData.deliveryOption === 'pickup' ? 0 : (subtotal > 1000 ? 0 : backendShippingPrice); // Free shipping for pickup or orders over 50,000 XAF
   const tax = 0;
-  const total = subtotal + shipping;
+  const total = subtotal + shippingCost;
   
   const handleInputChange = (e) => {
     setFormData({
@@ -79,8 +103,6 @@ const Checkout = (props) => {
       [e.target.name]: e.target.value
     });
   };
-  
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -357,7 +379,7 @@ const Checkout = (props) => {
                   <span>
                     {formData.deliveryOption === 'pickup' ? 'Retrait gratuit' : t.shipping}
                   </span>
-                  <span>{shipping === 0 ? 'Gratuit' : formatPrice(shipping)}</span>
+                  <span>{shippingCost === 0 ? 'Gratuit' : formatPrice(shippingCost)}</span>
                 </div>
                 {formData.deliveryOption === 'pickup' && formData.selectedPickupPoint && (
                   <div className="pt-2 border-t">

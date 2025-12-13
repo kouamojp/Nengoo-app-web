@@ -11,24 +11,40 @@ const ShoppingCart = (props) => {
   const t = translations[language];
   
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
-  const [backendShippingPrice, setBackendShippingPrice] = useState(2500);
+  const [shippingCost, setShippingCost] = useState(0);
 
   useEffect(() => {
-    const fetchShippingPrice = async () => {
+    const fetchAndCalculateShipping = async () => {
+      // 1. Get unique seller IDs from cart
+      const sellerIds = [...new Set(cartItems.map(item => item.sellerId))];
+
+      // 2. Fetch each seller and determine their shipping cost
+      const sellerShippingPromises = sellerIds.map(async (sellerId) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/settings/shipping`);
-            if (response.ok) {
-                const data = await response.json();
-                setBackendShippingPrice(data.price);
-            } else {
-                console.error('Failed to fetch shipping price');
+          const sellerRes = await fetch(`${API_BASE_URL}/sellers/${sellerId}`);
+          if (sellerRes.ok) {
+            const seller = await sellerRes.json();
+            // Use seller's price if it exists as a number and is greater than 0
+            if (typeof seller.deliveryPrice === 'number' && seller.deliveryPrice > 0) {
+              return seller.deliveryPrice;
             }
-        } catch (error) {
-            console.error('Error fetching shipping price:', error);
+          }
+          return 0; // Fallback for this seller
+        } catch (e) {
+          console.error(`Could not fetch seller ${sellerId}`, e);
+          return 0; // Fallback on error
         }
+      });
+
+      // 3. Sum up all shipping costs
+      const shippingCosts = await Promise.all(sellerShippingPromises);
+      const totalShipping = shippingCosts.reduce((acc, cost) => acc + cost, 0);
+
+      setShippingCost(totalShipping);
     };
-    fetchShippingPrice();
-  }, []);
+
+    fetchAndCalculateShipping();
+  }, [cartItems, API_BASE_URL]);
   
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -39,7 +55,7 @@ const ShoppingCart = (props) => {
   };
   
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shipping = subtotal > 50000 ? 0 : backendShippingPrice; // Free shipping over 50,000 XAF
+  const shipping = shippingCost;
   const tax = 0; // 10% tax
   const total = subtotal + shipping + tax;
 

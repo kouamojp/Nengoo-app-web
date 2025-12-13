@@ -8,7 +8,7 @@ const SellerSidebar = ({ onNavigate, currentPage, language, user }) => {
     { key: 'orders', icon: '📋', label: 'Commandes' },
     { key: 'analytics', icon: '📈', label: 'Analyses' },
     { key: 'messages', icon: '💬', label: 'Messages' },
-    { key: 'profile', icon: '⚙️', label: 'Profil' }
+    { key: 'profile', icon: '⚙️', label: 'Profil & Livraison' }
   ];
 
   const sellerName = user?.businessName || 'Vendeur';
