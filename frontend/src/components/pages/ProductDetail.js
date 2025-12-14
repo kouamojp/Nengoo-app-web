@@ -358,6 +358,28 @@ const ProductDetail = (props) => {
                     <span>Contacter le vendeur</span>
                   </button>
                 )}
+                
+                {/* Share Buttons */}
+                <div className="flex space-x-2 mt-4">
+                  <a
+                    href={`https://www.facebook.com/sharer/sharer.php?u=${window.location.href}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    <span>📘</span>
+                    <span>Partager sur Facebook</span>
+                  </a>
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(product.name[language])}%20${encodeURIComponent(window.location.href)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
+                  >
+                    <span>💬</span>
+                    <span>Partager sur WhatsApp</span>
+                  </a>
+                </div>
               </div>
               
               {/* Seller Info Card */}
