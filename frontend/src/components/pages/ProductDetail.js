@@ -378,8 +378,8 @@ const ProductDetail = (props) => {
                       rel="noopener noreferrer"
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
                     >
-                      <span>📘</span>
-                      <span>Partager sur Facebook</span>
+                      <span>📤</span>
+                      <span>Facebook</span>
                     </a>
                     <a
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent(product.name[language])}%20${encodeURIComponent(window.location.href)}`}
@@ -387,8 +387,8 @@ const ProductDetail = (props) => {
                       rel="noopener noreferrer"
                       className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
                     >
-                      <span>💬</span>
-                      <span>Partager sur WhatsApp</span>
+                      <span>📤</span>
+                      <span>WhatsApp</span>
                     </a>
                   </div>
                 </div>
