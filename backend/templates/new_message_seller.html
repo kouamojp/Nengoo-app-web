@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nouveau Message sur Nengoo</title>
+</head>
+<body>
+    <p>Bonjour {{ seller_name }},</p>
+    <p>Vous avez reçu un nouveau message de <strong>{{ buyer_name }}</strong>.</p>
+    <p>Message :</p>
+    <blockquote style="border-left: 2px solid #ccc; padding-left: 10px; margin-left: 10px;">
+        <p>{{ message_content }}</p>
+    </blockquote>
+    <p>Pour répondre, veuillez vous connecter à votre tableau de bord vendeur et accéder à vos messages.</p>
+    <p><a href="{{ conversation_url }}">Cliquez ici pour voir la conversation</a></p>
+    <p>Merci,</p>
+    <p>L'équipe Nengoo</p>
+</body>
+</html>

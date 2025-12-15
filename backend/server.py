@@ -433,7 +433,7 @@ class MessageCreate(BaseModel):
     product_id: Optional[str] = None # Needed to create a new conversation
 
 @api_router.post("/messages", response_model=Message)
-async def create_message(message_data: MessageCreate, sender_id: str = Header(...), sender_type: str = Header(...)):
+async def create_message(message_data: MessageCreate, background_tasks: BackgroundTasks, sender_id: str = Header(...), sender_type: str = Header(...)):
     if sender_type not in ['buyer', 'seller']:
         raise HTTPException(status_code=400, detail="Invalid sender_type")
 
@@ -484,6 +484,25 @@ async def create_message(message_data: MessageCreate, sender_id: str = Header(..
         message=message_data.message
     )
     await db.messages.insert_one(new_message.dict())
+
+    # Send email notification to seller
+    if receiver_type == 'seller':
+        seller = await db.sellers.find_one({"id": message_data.receiver_id})
+        buyer = await db.users.find_one({"id": sender_id})
+        if seller and seller.get("email") and buyer:
+            email_message = MessageSchema(
+                subject=f"Nouveau message de {buyer.get('name')} sur Nengoo",
+                recipients=[seller["email"]],
+                template_body={
+                    "seller_name": seller["businessName"],
+                    "buyer_name": buyer.get('name'),
+                    "message_content": new_message.message,
+                    "conversation_url": f"https://www.nengoo.com/seller/dashboard/messages/{conversation['id']}"
+                },
+                subtype="html"
+            )
+            background_tasks.add_task(fm.send_message, email_message, template_name="new_message_seller.html")
+
     return new_message
 
 @api_router.get("/conversations", response_model=List[Conversation])
