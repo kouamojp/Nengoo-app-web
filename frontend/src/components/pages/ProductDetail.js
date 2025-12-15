@@ -259,7 +259,7 @@ const ProductDetail = (props) => {
                         key={index}
                         src={img}
                         alt={`${product.name[language]} ${index + 1}`}
-                        className={`w-20 h-20 object-cover rounded cursor-pointer border-2 ${
+                        className={`w-20 h-20 md:h-[30rem] object-cover rounded cursor-pointer border-2 ${
                           selectedImage === index ? 'border-purple-500' : 'border-gray-200'
                         }`}
                         onClick={() => setSelectedImage(index)}
