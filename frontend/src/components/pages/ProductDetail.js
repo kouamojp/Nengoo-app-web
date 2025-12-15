@@ -245,7 +245,7 @@ const ProductDetail = (props) => {
                   <img
                     src={images[selectedImage]}
                     alt={product.name[language]}
-                    className="w-full h-96 object-cover rounded-lg"
+                    className="w-full h-96 md:h-[30rem] object-cover rounded-lg"
                     onError={(e) => {
                       e.target.onerror = null;
                       e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
@@ -259,7 +259,7 @@ const ProductDetail = (props) => {
                         key={index}
                         src={img}
                         alt={`${product.name[language]} ${index + 1}`}
-                        className={`w-20 h-20 md:h-[30rem] object-cover rounded cursor-pointer border-2 ${
+                        className={`w-20 h-20 object-cover rounded cursor-pointer border-2 ${
                           selectedImage === index ? 'border-purple-500' : 'border-gray-200'
                         }`}
                         onClick={() => setSelectedImage(index)}
