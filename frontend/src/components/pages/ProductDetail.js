@@ -7,6 +7,8 @@ import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
+import Lightbox from "yet-another-react-lightbox";
+import "yet-another-react-lightbox/styles.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -22,6 +24,7 @@ const ProductDetail = (props) => {
   const [loading, setLoading] = useState(true);
   const [showSendMessageModal, setShowSendMessageModal] = useState(false);
   const [messageToSend, setMessageToSend] = useState('');
+  const [open, setOpen] = React.useState(false);
 
   const t = translations[language];
 
@@ -176,6 +179,7 @@ const ProductDetail = (props) => {
   };
 
   const images = product.images || [product.image];
+  const lightboxSlides = images.map(img => ({ src: img }));
 
   return (
     <>
@@ -241,16 +245,16 @@ const ProductDetail = (props) => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Product Images */}
               <div className="p-6">
-                <div className="mb-4">
-                  <img
-                    src={images[selectedImage]}
-                    alt={product.name[language]}
-                    className="w-full h-96 md:h-[30rem] object-cover rounded-lg"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
-                    }}
-                  />
+                <div className="mb-4" onClick={() => setOpen(true)} style={{ cursor: 'pointer' }}>
+                    <img
+                        src={images[selectedImage]}
+                        alt={product.name[language]}
+                        className="w-full h-96 md:h-[30rem] object-cover rounded-lg"
+                        onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
+                        }}
+                    />
                 </div>
                 {images.length > 1 && (
                   <div className="flex space-x-2 overflow-x-auto">
@@ -467,6 +471,13 @@ const ProductDetail = (props) => {
           )}
         </div>
         
+        <Lightbox
+            open={open}
+            close={() => setOpen(false)}
+            slides={lightboxSlides}
+            initialIndex={selectedImage}
+        />
+
         <Footer language={language} />
       </div>
     </>
