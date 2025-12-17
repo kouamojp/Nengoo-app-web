@@ -316,7 +316,7 @@ const Homepage = (props) => {
               <p className="text-lg text-gray-600">Chargement des produits...</p>
             </div>
           ) : featuredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-6">
               {featuredProducts.map(product => (
                 <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
               ))}
