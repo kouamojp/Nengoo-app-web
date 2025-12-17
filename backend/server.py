@@ -114,6 +114,34 @@ async def seller_or_moderator_or_higher_required(seller_id: Optional[str] = Depe
             detail="Seller, Moderator, Admin, or Super admin privileges required."
         )
 
+async def product_owner_or_moderator_required(
+    product_id: str,
+    seller_id: Optional[str] = Depends(get_current_seller_optional),
+    role: Optional[str] = Header(None, alias="X-Admin-Role")
+):
+    # If the user is a moderator or higher, they are authorized.
+    if role in ["super_admin", "admin", "moderator"]:
+        return
+
+    # If not an admin, they must be a seller trying to edit their own product.
+    if not seller_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized. Seller ID header is missing.",
+        )
+
+    # Find the product in the database
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Check if the seller ID from the header matches the product's sellerId
+    if product.get("sellerId") != seller_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not the owner of this product.",
+        )
+
 # --- Hashing Utility ---
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -715,7 +743,7 @@ async def create_product(product_data: ProductCreate,
     await db.products.insert_one(product.dict())
     return product
 
-@api_router.put("/products/{product_id}", response_model=Product, dependencies=[Depends(moderator_or_higher_required)])
+@api_router.put("/products/{product_id}", response_model=Product, dependencies=[Depends(product_owner_or_moderator_required)])
 async def update_product(product_id: str, product_data: ProductUpdate):
     update_data = product_data.dict(exclude_unset=True)
     if not update_data:
