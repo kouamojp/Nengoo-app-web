@@ -54,7 +54,10 @@ const ShoppingCart = (props) => {
     }).format(price);
   };
   
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => {
+    const priceToUse = item.promoPrice && item.promoPrice > 0 ? item.promoPrice : item.price;
+    return sum + (priceToUse * item.quantity);
+  }, 0);
   const shipping = shippingCost;
   const tax = 0; // 10% tax
   const total = subtotal + shipping + tax;
@@ -92,50 +95,60 @@ const ShoppingCart = (props) => {
           {/* Cart Items */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-md">
-              {cartItems.map((item, index) => (
-                <div key={item.id} className={`p-6 ${index !== cartItems.length - 1 ? 'border-b' : ''}`}>
-                  <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
-                    <img
-                      src={item.image}
-                      alt={item.name[language]}
-                      className="w-20 h-20 object-cover rounded-lg"
-                    />
-                    
-                    <div className="flex-1 text-center sm:text-left">
-                      <h3 className="font-semibold text-lg">{item.name[language]}</h3>
-                      <p className="text-gray-600">{formatPrice(item.price)}</p>
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
-                        className="bg-gray-200 hover:bg-gray-300 w-8 h-8 rounded-lg flex items-center justify-center"
-                      >
-                        -
-                      </button>
-                      <span className="font-semibold w-8 text-center">{item.quantity}</span>
-                      <button
-                        onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
-                        className="bg-gray-200 hover:bg-gray-300 w-8 h-8 rounded-lg flex items-center justify-center"
-                      >
-                        +
-                      </button>
-                    </div>
-                    
-                    <div className="text-right">
-                      <p className="font-semibold text-lg">
-                        {formatPrice(item.price * item.quantity)}
-                      </p>
-                      <button
-                        onClick={() => removeFromCart(item.id)}
-                        className="text-red-500 hover:text-red-700 text-sm mt-1"
-                      >
-                        {t.removeItem}
-                      </button>
+              {cartItems.map((item, index) => {
+                const priceToUse = item.promoPrice && item.promoPrice > 0 ? item.promoPrice : item.price;
+                return (
+                  <div key={item.id} className={`p-6 ${index !== cartItems.length - 1 ? 'border-b' : ''}`}>
+                    <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                      <img
+                        src={item.image}
+                        alt={item.name[language]}
+                        className="w-20 h-20 object-cover rounded-lg"
+                      />
+                      
+                      <div className="flex-1 text-center sm:text-left">
+                        <h3 className="font-semibold text-lg">{item.name[language]}</h3>
+                        {item.promoPrice && item.promoPrice > 0 ? (
+                          <div className="flex items-baseline justify-center sm:justify-start">
+                            <p className="text-red-600 font-semibold mr-2">{formatPrice(item.promoPrice)}</p>
+                            <p className="text-gray-500 line-through text-sm">{formatPrice(item.price)}</p>
+                          </div>
+                        ) : (
+                          <p className="text-gray-600">{formatPrice(item.price)}</p>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center space-x-3">
+                        <button
+                          onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                          className="bg-gray-200 hover:bg-gray-300 w-8 h-8 rounded-lg flex items-center justify-center"
+                        >
+                          -
+                        </button>
+                        <span className="font-semibold w-8 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                          className="bg-gray-200 hover:bg-gray-300 w-8 h-8 rounded-lg flex items-center justify-center"
+                        >
+                          +
+                        </button>
+                      </div>
+                      
+                      <div className="text-right">
+                        <p className="font-semibold text-lg">
+                          {formatPrice(priceToUse * item.quantity)}
+                        </p>
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-red-500 hover:text-red-700 text-sm mt-1"
+                        >
+                          {t.removeItem}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               
               <div className="p-6">
                 <button

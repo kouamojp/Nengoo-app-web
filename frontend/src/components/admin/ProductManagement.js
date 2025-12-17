@@ -21,6 +21,7 @@ const ProductManagement = (props) => {
         description: '',
         category: '',
         price: 0,
+        promoPrice: 0,
         sellerId: '',
         sellerName: '',
         stock: 0,
@@ -211,6 +212,7 @@ const ProductManagement = (props) => {
                 name: editingProduct.name,
                 description: editingProduct.description,
                 price: parseFloat(editingProduct.price),
+                promoPrice: parseFloat(editingProduct.promoPrice),
                 stock: parseInt(editingProduct.stock, 10),
                 category: editingProduct.category,
                 status: editingProduct.status,
@@ -328,7 +330,7 @@ const ProductManagement = (props) => {
             await fetchProducts();
             setShowAddModal(false);
             setNewProductData({
-                name: '', description: '', category: '', price: 0, sellerId: '', sellerName: '', stock: 0, images: [''],
+                name: '', description: '', category: '', price: 0, promoPrice: 0, sellerId: '', sellerName: '', stock: 0, images: [''],
             });
             setSelectedFile(null);
             setImageUrl('');
@@ -478,6 +480,10 @@ const ProductManagement = (props) => {
                                     <input type="number" name="price" value={editingProduct.price} onChange={handleEditInputChange} className="w-full px-4 py-3 border rounded-lg" />
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Prix Promo (XAF)</label>
+                                    <input type="number" name="promoPrice" value={editingProduct.promoPrice || ''} onChange={handleEditInputChange} className="w-full px-4 py-3 border rounded-lg" />
+                                </div>
+                                <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Stock</label>
                                     <input type="number" name="stock" value={editingProduct.stock} onChange={handleEditInputChange} className="w-full px-4 py-3 border rounded-lg" />
                                 </div>
@@ -540,6 +546,10 @@ const ProductManagement = (props) => {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">Prix (XAF) *</label>
                                     <input type="number" name="price" value={newProductData.price} onChange={handleInputChange} placeholder="0" min="0" className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Prix Promo (XAF)</label>
+                                    <input type="number" name="promoPrice" value={newProductData.promoPrice} onChange={handleInputChange} placeholder="0" min="0" className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500" />
                                 </div>
 
                                 <div>
@@ -662,6 +672,7 @@ const ProductManagement = (props) => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendeur</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix Promo</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -680,6 +691,7 @@ const ProductManagement = (props) => {
                                     <td className="px-6 py-4 font-medium">{product.name}</td>
                                     <td className="px-6 py-4 text-sm">{product.sellerName}</td>
                                     <td className="px-6 py-4 text-sm font-medium">{formatPrice(product.price)}</td>
+                                    <td className="px-6 py-4 text-sm">{product.promoPrice && product.promoPrice > 0 ? formatPrice(product.promoPrice) : '-'}</td>
                                     <td className="px-6 py-4 text-sm">{product.stock}</td>
                                     <td className="px-6 py-4">
                                         <span className={`px-2 py-1 text-xs rounded-full ${product.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>

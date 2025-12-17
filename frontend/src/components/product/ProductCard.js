@@ -82,9 +82,22 @@ const ProductCard = ({ product, language, addToCart }) => {
           {product.reviews} {t.reviews} • {product.rating} ⭐
         </p> */}
         <div className="max-sm:flex-col flex justify-between items-center mb-3 mt-3">
-          <span className=" text-lg sm:text-xl font-bold text-purple-600">
-            {formatPrice(product.price)}
-          </span>
+          <div className="flex items-baseline">
+            {product.promoPrice && product.promoPrice > 0 ? (
+              <>
+                <span className="text-xl font-bold text-red-600 mr-2">
+                  {formatPrice(product.promoPrice)}
+                </span>
+                <span className="text-sm text-gray-500 line-through">
+                  {formatPrice(product.price)}
+                </span>
+              </>
+            ) : (
+              <span className="text-xl font-bold text-purple-600">
+                {formatPrice(product.price)}
+              </span>
+            )}
+          </div>
           <button
             onClick={() => addToCart(product)}
             disabled={!product.inStock}

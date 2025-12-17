@@ -161,6 +161,7 @@ class Product(BaseModel):
     description: str
     category: str
     price: float
+    promoPrice: Optional[float] = None
     oldPrice: Optional[float] = None
     sellerId: str
     sellerName: str
@@ -185,6 +186,7 @@ class ProductCreate(BaseModel):
     description: str
     category: str
     price: float
+    promoPrice: Optional[float] = None
     oldPrice: Optional[float] = None
     sellerId: str
     sellerName: str
@@ -197,6 +199,7 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     price: Optional[float] = None
+    promoPrice: Optional[float] = None
     oldPrice: Optional[float] = None
     stock: Optional[int] = None
     images: Optional[List[str]] = None

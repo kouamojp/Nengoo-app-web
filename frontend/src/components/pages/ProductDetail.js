@@ -294,10 +294,21 @@ const ProductDetail = (props) => {
                 </div>
                  */}
                 {/* Price */}
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-purple-600">
-                    {formatPrice(product.price)}
-                  </span>
+                <div className="mb-6 flex items-baseline">
+                  {product.promoPrice && product.promoPrice > 0 ? (
+                    <>
+                      <span className="text-5xl font-bold text-red-600 mr-4">
+                        {formatPrice(product.promoPrice)}
+                      </span>
+                      <span className="text-2xl text-gray-500 line-through">
+                        {formatPrice(product.price)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-4xl font-bold text-purple-600">
+                      {formatPrice(product.price)}
+                    </span>
+                  )}
                 </div>
                 
                 {/* Stock Status */}

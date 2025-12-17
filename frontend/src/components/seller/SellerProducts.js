@@ -16,6 +16,7 @@ const SellerProducts = (props) => {
       description: '',
       category: 'clothing_accessories',
       price: 0,
+      promoPrice: 0,
       stock: 0,
       images: [],
     });
@@ -186,6 +187,7 @@ const SellerProducts = (props) => {
             description: '',
             category: 'clothing_accessories',
             price: 0,
+            promoPrice: 0,
             stock: 0,
             images: [],
         });
@@ -361,6 +363,15 @@ const SellerProducts = (props) => {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium mb-2">Prix Promotionnel (XAF)</label>
+                  <input
+                    type="number"
+                    value={editingProduct.promoPrice}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, promoPrice: parseInt(e.target.value) || 0 })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium mb-2">Stock</label>
                   <input
                     type="number"
@@ -452,6 +463,15 @@ const SellerProducts = (props) => {
                     required
                     value={newProduct.price}
                     onChange={(e) => setNewProduct({ ...newProduct, price: parseInt(e.target.value) || 0 })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Prix Promotionnel (XAF)</label>
+                  <input
+                    type="number"
+                    value={newProduct.promoPrice}
+                    onChange={(e) => setNewProduct({ ...newProduct, promoPrice: parseInt(e.target.value) || 0 })}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
@@ -574,9 +594,20 @@ const SellerProducts = (props) => {
               <div className="p-4">
                 <h3 className="font-semibold text-lg mb-2">{product.name[language]}</h3>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-xl font-bold text-purple-600">
-                    {formatPrice(product.price)}
-                  </span>
+                  {product.promoPrice && product.promoPrice > 0 ? (
+                    <div className="flex items-baseline">
+                      <span className="text-xl font-bold text-red-600 mr-2">
+                        {formatPrice(product.promoPrice)}
+                      </span>
+                      <span className="text-sm text-gray-500 line-through">
+                        {formatPrice(product.price)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xl font-bold text-purple-600">
+                      {formatPrice(product.price)}
+                    </span>
+                  )}
                   <div className="flex items-center">
                     <span className="text-yellow-400 mr-1">⭐</span>
                     <span className="text-sm">{product.rating} ({product.reviews})</span>
