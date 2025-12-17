@@ -28,6 +28,15 @@ const ProductCard = ({ product, language, addToCart }) => {
     openWhatsApp(product.sellerWhatsApp, message);
   };
 
+  const isNew = (creationDate) => {
+    if (!creationDate) return false;
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    return new Date(creationDate) > twoDaysAgo;
+  };
+
+  const isProductNew = isNew(product.createdAt);
+
   return (
     <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden group">
       <div className="relative overflow-hidden">
@@ -41,7 +50,11 @@ const ProductCard = ({ product, language, addToCart }) => {
             e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
           }}
         />
-        {product.inStock ? (
+        {isProductNew ? (
+          <span className="absolute top-2 left-2 bg-blue-500 text-white px-2 py-1 text-xs rounded">
+            New
+          </span>
+        ) : product.inStock ? (
           <span className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 text-xs rounded">
             {t.inStock}
           </span>

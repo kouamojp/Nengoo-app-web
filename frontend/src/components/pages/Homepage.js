@@ -92,16 +92,11 @@ const Homepage = (props) => {
 
         const data = await response.json();
 
-        // Trier les produits par date de mise à jour (du plus récent au plus ancien)
-        const sortedData = data.sort((a, b) => {
-          // Utiliser 0 comme fallback si updatedAt est null ou undefined
-          const dateA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
-          const dateB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
-          return dateB - dateA;
-        });
+        // Mélanger les produits de manière aléatoire
+        const shuffledData = data.sort(() => Math.random() - 0.5);
 
         // Adapter les données du backend
-        const adaptedProducts = sortedData.map(p => ({
+        const adaptedProducts = shuffledData.map(p => ({
           ...p,
           name: { [language]: p.name },
           description: { [language]: p.description },
