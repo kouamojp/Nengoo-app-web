@@ -85,10 +85,10 @@ const ProductCard = ({ product, language, addToCart }) => {
           <div className="flex items-baseline">
             {product.promoPrice && product.promoPrice > 0 ? (
               <>
-                <span className="text-xl font-bold text-red-600 mr-2">
+                <span className="text-xl max-md:text-[1rem] font-bold text-red-600 mr-2">
                   {formatPrice(product.promoPrice)}
                 </span>
-                <span className="text-sm text-gray-500 line-through">
+                <span className="text-sm max-md:text-[.6rem] text-gray-500 line-through">
                   {formatPrice(product.price)}
                 </span>
               </>
