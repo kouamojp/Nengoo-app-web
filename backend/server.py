@@ -1221,7 +1221,7 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
                     "email": admin["email"]
                 }
             else:
-                raise HTTPException(status_code=400, detail=f"Le vendeur pour le produit '{product_info['name']}' est invalide. Veuillez retirer ce produit de votre panier.")
+                raise HTTPException(status_code=400, detail=f"Le vendeur avec l'ID '{seller_id}' pour le produit '{product_info['name']}' est invalide. Veuillez retirer ce produit de votre panier.")
 
         if seller_id not in seller_orders:
             seller_orders[seller_id] = {
