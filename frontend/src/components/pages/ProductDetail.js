@@ -12,6 +12,31 @@ import "yet-another-react-lightbox/styles.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
+const StarRating = ({ rating, setRating, interactive = true }) => {
+    const [hover, setHover] = useState(0);
+    return (
+        <div className="flex space-x-1">
+            {[...Array(5)].map((_, index) => {
+                const starValue = index + 1;
+                return (
+                    <button
+                        type="button"
+                        key={starValue}
+                        className={`text-2xl ${interactive ? 'cursor-pointer' : ''}`}
+                        onClick={() => interactive && setRating(starValue)}
+                        onMouseEnter={() => interactive && setHover(starValue)}
+                        onMouseLeave={() => interactive && setHover(0)}
+                    >
+                        <span className={starValue <= (hover || rating) ? 'text-yellow-400' : 'text-gray-300'}>
+                            ★
+                        </span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+};
+
 const ProductDetail = (props) => {
   const { language, addToCart, user } = props;
   const { id } = useParams();
@@ -25,60 +50,74 @@ const ProductDetail = (props) => {
   const [showSendMessageModal, setShowSendMessageModal] = useState(false);
   const [messageToSend, setMessageToSend] = useState('');
   const [open, setOpen] = React.useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [canReview, setCanReview] = useState(false);
+  const [hasAlreadyReviewed, setHasAlreadyReviewed] = useState(false);
+  const [newReviewRating, setNewReviewRating] = useState(0);
+  const [newReviewComment, setNewReviewComment] = useState('');
 
   const t = translations[language];
 
-  useEffect(() => {
-    const fetchProduct = async () => {
-      try {
-        setLoading(true);
+  const fetchProductData = async () => {
+    try {
+      setLoading(true);
 
-        const response = await fetch(`${API_BASE_URL}/products/${id}`);
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            console.warn("⚠️ [ProductDetail] Produit non trouvé");
-            setProduct(null);
-            return;
-          }
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Adapter les données pour le frontend
-        const adaptedProduct = {
-          ...data,
-          sellerId: data.sellerId, // Ensure sellerId is explicitly passed
-          name: { [language]: data.name },
-          description: { [language]: data.description },
-          image: data.images && data.images.length > 0 ? data.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
-          images: data.images || [data.images && data.images.length > 0 ? data.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png'],
-          inStock: data.stock > 0,
-          reviews: data.reviewsCount || 0,
-          rating: data.rating || 0,
-        };
-
-        setProduct(adaptedProduct);
-
-        // Récupérer les produits similaires (même catégorie)
-        if (data.category) {
-          fetchRelatedProducts(data.category, data.id);
-        }
-
-        // Récupérer les informations du vendeur
-        if (data.sellerId) {
-          fetchSeller(data.sellerId);
-        }
-      } catch (error) {
-        console.error("❌ [ProductDetail] Erreur lors de la récupération du produit:", error);
-        setProduct(null);
-      } finally {
-        setLoading(false);
+      // Fetch product details
+      const productResponse = await fetch(`${API_BASE_URL}/products/${id}`);
+      if (!productResponse.ok) {
+        if (productResponse.status === 404) setProduct(null);
+        else throw new Error(`HTTP error! status: ${productResponse.status}`);
+        return;
       }
-    };
+      const productData = await productResponse.json();
+      const adaptedProduct = {
+        ...productData,
+        name: { [language]: productData.name },
+        description: { [language]: productData.description },
+        image: productData.images && productData.images.length > 0 ? productData.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
+        images: productData.images || [],
+        inStock: productData.stock > 0,
+        reviews: productData.reviewsCount || 0,
+        rating: productData.rating || 0,
+      };
+      setProduct(adaptedProduct);
 
-    const fetchRelatedProducts = async (category, currentProductId) => {
+      // Fetch related info
+      if (productData.category) fetchRelatedProducts(productData.category, productData.id);
+      if (productData.sellerId) fetchSeller(productData.sellerId);
+      
+      // Fetch reviews
+      const reviewsResponse = await fetch(`${API_BASE_URL}/products/${id}/reviews`);
+      if (reviewsResponse.ok) {
+        const reviewsData = await reviewsResponse.json();
+        setReviews(reviewsData);
+      }
+
+      // Check if user can review
+      if (user && user.type === 'buyer') {
+        const canReviewResponse = await fetch(`${API_BASE_URL}/products/${id}/can-review`, {
+          headers: { 'X-Buyer-Id': user.id }
+        });
+        if (canReviewResponse.ok) {
+          const canReviewData = await canReviewResponse.json();
+          setCanReview(canReviewData.canReview);
+          setHasAlreadyReviewed(canReviewData.hasAlreadyReviewed);
+        }
+      }
+
+    } catch (error) {
+      console.error("❌ [ProductDetail] Error fetching product data:", error);
+      setProduct(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProductData();
+  }, [id, language, user]);
+  
+  const fetchRelatedProducts = async (category, currentProductId) => {
       try {
         const response = await fetch(`${API_BASE_URL}/products`);
 
@@ -103,8 +142,7 @@ const ProductDetail = (props) => {
         console.error("❌ [ProductDetail] Erreur produits similaires:", error);
       }
     };
-
-    const fetchSeller = async (sellerId) => {
+  const fetchSeller = async (sellerId) => {
       try {
         const response = await fetch(`${API_BASE_URL}/sellers/${sellerId}`);
 
@@ -119,10 +157,6 @@ const ProductDetail = (props) => {
         console.error("❌ [ProductDetail] Erreur récupération vendeur:", error);
       }
     };
-
-    fetchProduct();
-  }, [id, language]);
-  
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!user) {
@@ -155,6 +189,42 @@ const ProductDetail = (props) => {
     }
   };
 
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (newReviewRating === 0) {
+        alert("Veuillez sélectionner une note.");
+        return;
+    }
+    try {
+        const response = await fetch(`${API_BASE_URL}/products/${id}/reviews`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Buyer-Id': user.id,
+            },
+            body: JSON.stringify({
+                rating: newReviewRating,
+                comment: newReviewComment,
+            }),
+        });
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to submit review');
+        }
+        // Refresh product data to show new review and rating
+        fetchProductData(); 
+        setNewReviewRating(0);
+        setNewReviewComment('');
+    } catch (error) {
+        console.error('Error submitting review:', error);
+        alert(`Erreur: ${error.message}`);
+    }
+  };
+
+  if (loading) {
+      return <div>Chargement...</div>;
+  }
+
   if (!product) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -178,7 +248,7 @@ const ProductDetail = (props) => {
     }).format(price);
   };
 
-  const images = product.images || [product.image];
+  const images = product.images.length > 0 ? product.images : [process.env.PUBLIC_URL + '/images/logo-nengoo.png'];
   const lightboxSlides = images.map(img => ({ src: img }));
 
   return (
@@ -188,47 +258,15 @@ const ProductDetail = (props) => {
         <meta name="description" content={product.description[language]} />
         <meta property="og:title" content={product.name[language]} />
         <meta property="og:description" content={product.description[language]} />
-        <meta property="og:image" content={product.image} />
+        <meta property="og:image" content={images[0]} />
         <meta property="og:url" content={window.location.href} />
         <meta name="twitter:card" content="summary_large_image" />
       </Helmet>
       <div className="min-h-screen bg-gray-50">
         <Header {...props} />
         
-        {showSendMessageModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-              <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="text-xl font-bold">Contacter {seller.businessName}</h3>
-                <button onClick={() => setShowSendMessageModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-              </div>
-              <div className="p-4">
-                <form onSubmit={handleSendMessage}>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium mb-2">Votre message</label>
-                    <textarea
-                      value={messageToSend}
-                      onChange={(e) => setMessageToSend(e.target.value)}
-                      placeholder="Tapez votre message ici..."
-                      rows={6}
-                      required
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                    >
-                      Envoyer
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* Modal, Breadcrumb, etc. */}
+        
         <div className="container mx-auto px-4 py-8">
           {/* Breadcrumb */}
           <nav className="mb-8 text-sm">
@@ -280,19 +318,12 @@ const ProductDetail = (props) => {
               {/* Product Info */}
               <div className="p-6">
                 <h1 className="text-3xl font-bold mb-4">{product.name[language]}</h1>
-                
-                {/* Rating */}
-               {/*  <div className="flex items-center mb-4">
-                  <div className="flex mr-2">
-                    {[...Array(5)].map((_, i) => (
-                      <span key={i} className={`text-lg ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`}>
-                        ⭐
-                      </span>
-                    ))}
-                  </div>
-                  <span className="text-gray-600">({product.reviews} {t.reviews})</span>
+                        
+                <div className="flex items-center mb-4">
+                    <StarRating rating={product.rating} interactive={false} />
+                    <span className="text-gray-600 ml-2">({product.reviewsCount} avis)</span>
                 </div>
-                 */}
+
                 {/* Price */}
                 <div className="mb-6 flex items-baseline">
                   {product.promoPrice && product.promoPrice > 0 ? (
@@ -468,6 +499,55 @@ const ProductDetail = (props) => {
               </div>
             </div>
           </div>
+
+            {/* Reviews Section */}
+            <div className="mt-16">
+                <h3 className="text-2xl font-bold mb-8">Avis des clients</h3>
+                {canReview && !hasAlreadyReviewed && (
+                    <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                        <h4 className="text-xl font-semibold mb-4">Laissez votre avis</h4>
+                        <form onSubmit={handleSubmitReview}>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2">Votre note</label>
+                                <StarRating rating={newReviewRating} setRating={setNewReviewRating} />
+                            </div>
+                            <div className="mb-4">
+                                <label className="block text-sm font-medium mb-2">Votre commentaire</label>
+                                <textarea
+                                    value={newReviewComment}
+                                    onChange={(e) => setNewReviewComment(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                                    rows="4"
+                                />
+                            </div>
+                            <button type="submit" className="bg-purple-600 text-white px-6 py-2 rounded-lg">
+                                Soumettre l'avis
+                            </button>
+                        </form>
+                    </div>
+                )}
+                {hasAlreadyReviewed && (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4 mb-8">
+                        Vous avez déjà laissé un avis pour ce produit.
+                    </div>
+                )}
+                <div className="space-y-6">
+                    {reviews.length > 0 ? (
+                        reviews.map(review => (
+                            <div key={review.id} className="bg-white rounded-lg shadow-md p-6">
+                                <div className="flex items-center mb-2">
+                                    <StarRating rating={review.rating} interactive={false} />
+                                    <span className="font-bold ml-4">{review.buyerName}</span>
+                                </div>
+                                <p className="text-gray-600">{review.comment}</p>
+                                <p className="text-xs text-gray-400 mt-2">{new Date(review.createdAt).toLocaleDateString()}</p>
+                            </div>
+                        ))
+                    ) : (
+                        <p>Aucun avis pour ce produit pour le moment.</p>
+                    )}
+                </div>
+            </div>
           
           {/* Related Products */}
           {relatedProducts.length > 0 && (

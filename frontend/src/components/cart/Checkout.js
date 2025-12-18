@@ -6,7 +6,7 @@ import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 
 const Checkout = (props) => {
-  const { language, cartItems, clearCart } = props;
+  const { language, cartItems, clearCart, user } = props;
   const navigate = useNavigate();
   const t = translations[language];
   
@@ -27,6 +27,22 @@ const Checkout = (props) => {
   const [shippingCost, setShippingCost] = useState(0);
 
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+  useEffect(() => {
+    if (user) {
+      const nameParts = user.name ? user.name.split(' ') : [];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      setFormData(prevData => ({
+        ...prevData,
+        firstName: firstName,
+        lastName: lastName,
+        email: user.email || '',
+        phone: user.whatsapp || ''
+      }));
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchAndCalculateShipping = async () => {
@@ -168,6 +184,7 @@ const Checkout = (props) => {
                     onChange={handleInputChange}
                     placeholder={t.firstName}
                     required
+                    readOnly={!!user}
                     className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <input
@@ -177,6 +194,7 @@ const Checkout = (props) => {
                     onChange={handleInputChange}
                     placeholder={t.lastName}
                     required
+                    readOnly={!!user}
                     className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <input
@@ -186,6 +204,7 @@ const Checkout = (props) => {
                     onChange={handleInputChange}
                     placeholder={t.email}
                     required
+                    readOnly={!!user}
                     className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <input
@@ -195,6 +214,7 @@ const Checkout = (props) => {
                     onChange={handleInputChange}
                     placeholder={t.phone}
                     required
+                    readOnly={!!user}
                     className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>

@@ -44,6 +44,7 @@ db = client[os.environ['DB_NAME']]
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
+
 origins = [
     "https://www.nengoo.com",
     "https://nengoo.com",
@@ -417,6 +418,7 @@ class Buyer(BaseModel):
     whatsapp: str
     name: str
     email: str
+    password: Optional[str] = None # Hashed password
     type: str = "buyer"
     joinDate: datetime
     status: str
@@ -427,6 +429,7 @@ class BuyerUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     status: Optional[str] = None
+    password: Optional[str] = None
 
 class NewsletterSubscription(BaseModel):
     email: str
@@ -455,6 +458,19 @@ class Conversation(BaseModel):
 
 class BulkDeleteRequest(BaseModel):
     ids: List[str]
+
+class Review(BaseModel):
+    id: str = Field(default_factory=lambda: f"rev_{uuid.uuid4().hex[:8]}")
+    productId: str
+    buyerId: str
+    buyerName: str
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+
+class ReviewCreate(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
 
 # --- Messaging Endpoints ---
 
@@ -661,6 +677,9 @@ async def update_buyer(buyer_id: str, buyer_data: BuyerUpdate):
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
     
+    if "password" in update_data and update_data["password"]:
+        update_data["password"] = hash_password(update_data["password"])
+    
     await db.users.update_one({"id": buyer_id, "type": "buyer"}, {"$set": update_data})
     updated_buyer = await db.users.find_one({"id": buyer_id, "type": "buyer"})
     if not updated_buyer:
@@ -729,12 +748,13 @@ async def create_product(product_data: ProductCreate,
         seller_id_to_use = current_seller_id
         seller_name_to_use = seller["businessName"]
     elif admin_role in ["super_admin", "admin", "moderator"]:
-        # For admins/moderators creating products, we can use a generic admin seller or require a sellerId in product_data
-        # For simplicity, let's assume if an admin creates, they specify the sellerId in product_data
-        # Or, we could assign it to a default admin seller.
-        # For now, if admin creates, sellerId and sellerName must be present in product_data.
         if not product_data.sellerId or not product_data.sellerName:
             raise HTTPException(status_code=400, detail="Seller ID and Name must be provided in product data when created by an admin role.")
+        
+        seller = await db.sellers.find_one({"id": product_data.sellerId})
+        if not seller:
+            raise HTTPException(status_code=404, detail=f"Seller with ID {product_data.sellerId} not found.")
+
         seller_id_to_use = product_data.sellerId
         seller_name_to_use = product_data.sellerName
     else:
@@ -784,6 +804,96 @@ async def delete_product(product_id: str):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
     return
+
+@api_router.get("/products/{product_id}/reviews", response_model=List[Review])
+async def get_product_reviews(product_id: str):
+    reviews_cursor = db.reviews.find({"productId": product_id}).sort("createdAt", -1)
+    reviews = await reviews_cursor.to_list(1000)
+    return [Review(**r) for r in reviews]
+
+@api_router.post("/products/{product_id}/reviews", response_model=Review)
+async def create_product_review(
+    product_id: str,
+    review_data: ReviewCreate,
+    x_buyer_id: str = Header(..., alias="X-Buyer-Id")
+):
+    buyer_id = x_buyer_id
+    
+    # 1. Check if product exists
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # 2. Check if buyer exists
+    buyer = await db.users.find_one({"id": buyer_id, "type": "buyer"})
+    if not buyer:
+        raise HTTPException(status_code=404, detail="Buyer not found")
+
+    # 3. Check if buyer has purchased the product
+    order = await db.orders.find_one({
+        "buyerId": buyer_id,
+        "products.productId": product_id,
+        "status": "delivered" # or whatever status confirms a completed order
+    })
+    if not order:
+        raise HTTPException(status_code=403, detail="You can only review products you have purchased and received.")
+
+    # 4. Check if buyer has already reviewed this product
+    existing_review = await db.reviews.find_one({"productId": product_id, "buyerId": buyer_id})
+    if existing_review:
+        raise HTTPException(status_code=400, detail="You have already reviewed this product.")
+
+    # 5. Create the new review
+    new_review = Review(
+        productId=product_id,
+        buyerId=buyer_id,
+        buyerName=buyer["name"],
+        rating=review_data.rating,
+        comment=review_data.comment
+    )
+    await db.reviews.insert_one(new_review.dict())
+
+    # 6. Update the product's average rating and review count
+    reviews_for_product_cursor = db.reviews.find({"productId": product_id})
+    reviews_for_product = await reviews_for_product_cursor.to_list(None)
+    total_reviews = len(reviews_for_product)
+    average_rating = sum(r['rating'] for r in reviews_for_product) / total_reviews
+
+    await db.products.update_one(
+        {"id": product_id},
+        {"$set": {"rating": round(average_rating, 1), "reviewsCount": total_reviews}}
+    )
+
+    return new_review
+
+class CanReviewResponse(BaseModel):
+    canReview: bool
+    hasAlreadyReviewed: bool
+
+@api_router.get("/products/{product_id}/can-review", response_model=CanReviewResponse)
+async def can_user_review_product(
+    product_id: str,
+    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id")
+):
+    if not x_buyer_id:
+        return CanReviewResponse(canReview=False, hasAlreadyReviewed=False)
+
+    # Check if buyer has purchased the product
+    order = await db.orders.find_one({
+        "buyerId": x_buyer_id,
+        "products.productId": product_id,
+        "status": "delivered"
+    })
+    
+    if not order:
+        return CanReviewResponse(canReview=False, hasAlreadyReviewed=False)
+
+    # Check if buyer has already reviewed this product
+    existing_review = await db.reviews.find_one({"productId": product_id, "buyerId": x_buyer_id})
+    if existing_review:
+        return CanReviewResponse(canReview=True, hasAlreadyReviewed=True)
+
+    return CanReviewResponse(canReview=True, hasAlreadyReviewed=False)
 
 # --- Seller Management ---
 @api_router.post("/sellers", response_model=Seller)
@@ -1098,6 +1208,21 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             raise HTTPException(status_code=404, detail=f"Product with id {item.id} not found in database.")
         
         seller_id = product_info["sellerId"]
+        
+        # Check if seller exists
+        seller = await db.sellers.find_one({"id": seller_id})
+        if not seller:
+            admin = await db.admins.find_one({"id": seller_id})
+            if admin:
+                seller = {
+                    "id": admin["id"],
+                    "businessName": admin["name"],
+                    "deliveryPrice": 0,
+                    "email": admin["email"]
+                }
+            else:
+                raise HTTPException(status_code=400, detail=f"Le vendeur pour le produit '{product_info['name']}' est invalide. Veuillez retirer ce produit de votre panier.")
+
         if seller_id not in seller_orders:
             seller_orders[seller_id] = {
                 "sellerName": product_info["sellerName"],
@@ -1116,8 +1241,16 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
         # Fetch seller to get their delivery price
         seller = await db.sellers.find_one({"id": seller_id})
         if not seller:
-            # This should ideally not happen if products are well-managed
-            raise HTTPException(status_code=404, detail=f"Seller {seller_id} not found.")
+            admin = await db.admins.find_one({"id": seller_id})
+            if admin:
+                seller = {
+                    "id": admin["id"],
+                    "businessName": admin["name"],
+                    "deliveryPrice": 0,
+                    "email": admin["email"]
+                }
+            else:
+                raise HTTPException(status_code=404, detail=f"Seller {seller_id} not found.")
 
         # Determine shipping cost
         shipping_cost = seller.get("deliveryPrice") if seller.get("deliveryPrice") is not None else global_shipping_price
@@ -1461,6 +1594,10 @@ async def subscribe_newsletter(subscription: NewsletterSubscription):
     
     await db.newsletter_subscriptions.insert_one(subscription.dict())
     return {"message": "Successfully subscribed to the newsletter."}
+
+# --- Router Inclusion ---
+from routers.buyers import router as buyers_router
+api_router.include_router(buyers_router)
 
 # --- App Initialization ---
 app.include_router(api_router)

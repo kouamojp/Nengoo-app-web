@@ -13,7 +13,9 @@ const BuyerSignup = (props) => {
   const t = translations[language];
   const [formData, setFormData] = useState({
     whatsapp: '',
-    name: ''
+    name: '',
+    password: '',
+    email: ''
   });
   const [isLogin, setIsLogin] = useState(isLoginDefault);
 
@@ -24,15 +26,31 @@ const BuyerSignup = (props) => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
     
     if (isLogin) {
-      // Check if user exists
-      const existingUser = mockUsers.buyers.find(user => user.whatsapp === formData.whatsapp);
-      if (existingUser) {
-        setUser(existingUser);
-        localStorage.setItem('nengoo-user', JSON.stringify(existingUser));
+      try {
+        const response = await fetch(`${API_BASE_URL}/buyers/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            whatsapp: formData.whatsapp,
+            password: formData.password,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to login');
+        }
+
+        const loggedInUser = await response.json();
+        setUser(loggedInUser);
+        localStorage.setItem('nengoo-user', JSON.stringify(loggedInUser));
         Swal.fire({
           icon: 'success',
           title: 'Connecté!',
@@ -41,34 +59,55 @@ const BuyerSignup = (props) => {
           timer: 1500
         });
         navigate('/');
-      } else {
+      } catch (error) {
         Swal.fire({
           icon: 'error',
           title: 'Erreur de connexion',
-          text: 'Numéro WhatsApp non trouvé. Veuillez vous inscrire d\'abord.',
+          text: error.message,
         });
       }
     } else {
-      // Register new buyer
-      const newBuyer = {
-        id: mockUsers.buyers.length + 1,
-        whatsapp: formData.whatsapp,
-        name: formData.name,
-        joinDate: new Date().toISOString().split('T')[0],
-        type: "buyer"
-      };
-      
-      mockUsers.buyers.push(newBuyer);
-      setUser(newBuyer);
-      localStorage.setItem('nengoo-user', JSON.stringify(newBuyer));
-      Swal.fire({
-        icon: 'success',
-        title: 'Inscription réussie!',
-        text: 'Votre compte acheteur a été créé avec succès.',
-        showConfirmButton: false,
-        timer: 1500
-      });
-      navigate('/');
+      // Register new buyer by calling the backend
+      try {
+        const newBuyerData = {
+          whatsapp: formData.whatsapp,
+          name: formData.name,
+          password: formData.password,
+          email: formData.email,
+        };
+
+        const response = await fetch(`${API_BASE_URL}/buyers/signup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newBuyerData),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to register');
+        }
+
+        const newBuyer = await response.json();
+        
+        setUser(newBuyer);
+        localStorage.setItem('nengoo-user', JSON.stringify(newBuyer));
+        Swal.fire({
+          icon: 'success',
+          title: 'Inscription réussie!',
+          text: 'Votre compte acheteur a été créé avec succès.',
+          showConfirmButton: false,
+          timer: 1500
+        });
+        navigate('/');
+      } catch (error) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Erreur d\'inscription',
+          text: error.message,
+        });
+      }
     }
   };
 
@@ -117,6 +156,34 @@ const BuyerSignup = (props) => {
                   />
                 </div>
               )}
+
+              {!isLogin && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Adresse e-mail</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="Votre adresse e-mail"
+                    required
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2">{isLogin ? "Mot de passe" : "Créer un mot de passe"}</label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  placeholder="********"
+                  required
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
               <button
                 type="submit"

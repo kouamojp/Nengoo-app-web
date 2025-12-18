@@ -11,6 +11,76 @@ const BuyerManagement = (props) => {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedBuyers, setSelectedBuyers] = useState([]);
+    const [editingBuyerId, setEditingBuyerId] = useState(null);
+    const [editingData, setEditingData] = useState({ name: '', email: '' });
+    const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+    const [selectedBuyerForPassword, setSelectedBuyerForPassword] = useState(null);
+    const [newPassword, setNewPassword] = useState('');
+
+    const openPasswordModal = (buyer) => {
+        setSelectedBuyerForPassword(buyer);
+        setPasswordModalOpen(true);
+    };
+
+    const handlePasswordChange = async () => {
+        if (!newPassword) {
+            alert("Le nouveau mot de passe ne peut pas être vide.");
+            return;
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/buyers/${selectedBuyerForPassword.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Role': user.role,
+                },
+                body: JSON.stringify({ password: newPassword }),
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Failed to update password');
+            }
+            setPasswordModalOpen(false);
+            setNewPassword('');
+            alert(`✅ Mot de passe pour ${selectedBuyerForPassword.name} mis à jour!`);
+        } catch (error) {
+            console.error('Error updating password:', error);
+            alert(`Erreur: ${error.message}`);
+        }
+    };
+
+    const handleEditClick = (buyer) => {
+        setEditingBuyerId(buyer.id);
+        setEditingData({ name: buyer.name, email: buyer.email });
+    };
+
+    const handleCancelClick = () => {
+        setEditingBuyerId(null);
+        setEditingData({ name: '', email: '' });
+    };
+
+    const handleSaveClick = async (buyerId) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/buyers/${buyerId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Role': user.role,
+                },
+                body: JSON.stringify(editingData),
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Failed to update buyer');
+            }
+            await fetchBuyers(); // Refetch to get the updated list
+            setEditingBuyerId(null);
+            alert('✅ Informations de l\'acheteur mises à jour!');
+        } catch (error) {
+            console.error('Error updating buyer:', error);
+            alert(`Erreur: ${error.message}`);
+        }
+    };
 
     const handleSelectAll = (e) => {
         if (e.target.checked) {
@@ -91,14 +161,12 @@ const BuyerManagement = (props) => {
                 throw new Error(err.detail || 'Failed to update buyer status');
             }
             
-            // Optimistic update of the local state
             setBuyers(buyers.map(b => b.id === buyer.id ? { ...b, status: newStatus } : b));
             alert(`✅ Statut de l'acheteur mis à jour à "${newStatus}".`);
 
         } catch (error) {
             console.error("Error updating buyer status:", error);
             alert(`Erreur: ${error.message}`);
-            // Revert optimistic update on failure
             fetchBuyers();
         }
     };
@@ -133,7 +201,7 @@ const BuyerManagement = (props) => {
         <div>
             <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des acheteurs ({filteredBuyers.length})</h2>
 
-            <div className="mb-4 flex justify-between items-center">
+            <div className="mb-4 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
                 <input
                     type="text"
                     placeholder="Rechercher des acheteurs..."
@@ -141,13 +209,21 @@ const BuyerManagement = (props) => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <button
-                    onClick={handleBulkDelete}
-                    disabled={selectedBuyers.length === 0}
-                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
-                >
-                    Supprimer la sélection
-                </button>
+                <div className="flex space-x-2">
+                    <button
+                        onClick={fetchBuyers}
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Rafraîchir
+                    </button>
+                    <button
+                        onClick={handleBulkDelete}
+                        disabled={selectedBuyers.length === 0}
+                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Supprimer la sélection
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-md overflow-auto">
@@ -168,6 +244,7 @@ const BuyerManagement = (props) => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commandes</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total dépensé</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -180,9 +257,31 @@ const BuyerManagement = (props) => {
                                             onChange={(e) => handleSelectOne(e, buyer.id)}
                                         />
                                     </td>
-                                    <td className="px-6 py-4 font-medium">{buyer.name}</td>
+                                    <td className="px-6 py-4 font-medium">
+                                        {editingBuyerId === buyer.id ? (
+                                            <input 
+                                                type="text"
+                                                value={editingData.name}
+                                                onChange={(e) => setEditingData({...editingData, name: e.target.value})}
+                                                className="border rounded px-2 py-1"
+                                            />
+                                        ) : (
+                                            buyer.name
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 text-sm">{buyer.whatsapp}</td>
-                                    <td className="px-6 py-4 text-sm">{buyer.email}</td>
+                                    <td className="px-6 py-4 text-sm">
+                                        {editingBuyerId === buyer.id ? (
+                                            <input 
+                                                type="email"
+                                                value={editingData.email}
+                                                onChange={(e) => setEditingData({...editingData, email: e.target.value})}
+                                                className="border rounded px-2 py-1"
+                                            />
+                                        ) : (
+                                            buyer.email
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 text-sm">{buyer.totalOrders}</td>
                                     <td className="px-6 py-4 text-sm font-medium">{formatPrice(buyer.totalSpent)}</td>
                                     <td className="px-6 py-4">
@@ -200,15 +299,46 @@ const BuyerManagement = (props) => {
                                             <option value="pending">En attente</option>
                                         </select>
                                     </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
-        </div>
-    );
-};
+                                    <td className="px-6 py-4 text-sm space-x-2">
+                                                                                 {editingBuyerId === buyer.id ? (
+                                                                                    <>
+                                                                                        <button onClick={() => handleSaveClick(buyer.id)} className="text-green-600 hover:text-green-900">Enregistrer</button>
+                                                                                        <button onClick={handleCancelClick} className="text-red-600 hover:text-red-900">Annuler</button>
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <>
+                                                                                        <button onClick={() => handleEditClick(buyer)} className="text-blue-600 hover:text-blue-900">Modifier</button>
+                                                                                        <button onClick={() => openPasswordModal(buyer)} className="text-gray-600 hover:text-gray-900">Mot de passe</button>
+                                                                                    </>
+                                                                                )}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        )}
+                                                    </div>
+                                        
+                                                    {passwordModalOpen && (
+                                                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                                                            <div className="bg-white p-6 rounded-lg shadow-xl">
+                                                                <h3 className="text-lg font-bold mb-4">Changer le mot de passe pour {selectedBuyerForPassword?.name}</h3>
+                                                                <input
+                                                                    type="password"
+                                                                    placeholder="Nouveau mot de passe"
+                                                                    value={newPassword}
+                                                                    onChange={(e) => setNewPassword(e.target.value)}
+                                                                    className="w-full px-4 py-2 border rounded-lg mb-4"
+                                                                />
+                                                                <div className="flex justify-end space-x-2">
+                                                                    <button onClick={() => setPasswordModalOpen(false)} className="bg-gray-300 hover:bg-gray-400 text-black font-bold py-2 px-4 rounded">Annuler</button>
+                                                                    <button onClick={handlePasswordChange} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">Enregistrer</button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );};
 
 export default BuyerManagement;
 
