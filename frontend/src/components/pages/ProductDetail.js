@@ -251,6 +251,10 @@ const ProductDetail = (props) => {
   const images = product.images.length > 0 ? product.images : [process.env.PUBLIC_URL + '/images/logo-nengoo.png'];
   const lightboxSlides = images.map(img => ({ src: img }));
 
+  const discountPercentage = product.promoPrice && product.price > product.promoPrice
+    ? Math.round(((product.price - product.promoPrice) / product.price) * 100)
+    : 0;
+
   return (
     <>
       <Helmet>
@@ -334,6 +338,11 @@ const ProductDetail = (props) => {
                       <span className="text-2xl text-gray-500 line-through">
                         {formatPrice(product.price)}
                       </span>
+                      {discountPercentage > 0 && (
+                        <span className="ml-4 px-3 py-1 bg-red-500 text-white text-lg font-semibold rounded-lg">
+                          -{discountPercentage}%
+                        </span>
+                      )}
                     </>
                   ) : (
                     <span className="text-4xl font-bold text-purple-600">

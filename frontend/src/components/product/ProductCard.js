@@ -36,6 +36,9 @@ const ProductCard = ({ product, language, addToCart }) => {
   };
 
   const isProductNew = isNew(product.createdAt);
+  const discountPercentage = product.promoPrice && product.price > product.promoPrice
+    ? Math.round(((product.price - product.promoPrice) / product.price) * 100)
+    : 0;
 
   return (
     <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden group">
@@ -63,6 +66,11 @@ const ProductCard = ({ product, language, addToCart }) => {
             {t.outOfStock}
           </span>
         )}
+        {discountPercentage > 0 && (
+          <span className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 text-xs rounded">
+            -{discountPercentage}%
+          </span>
+        )}
         {/* <div className="absolute top-2 right-2 flex space-x-1">
           {[...Array(5)].map((_, i) => (
             <span key={i} className={`text-sm ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`}>
@@ -71,7 +79,7 @@ const ProductCard = ({ product, language, addToCart }) => {
           ))}
         </div> */}
       </div>
-      
+            
       <div className="p-4">
                 <h3
                   className="font-semibold tracking-[.01rem] text-[.95rem] leading-[1.3rem] line- sm:text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors max-sm:min-h-10"

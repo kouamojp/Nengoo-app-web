@@ -1149,6 +1149,26 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
             )
             background_tasks.add_task(fm.send_message, message, template_name="status_update_buyer.html")
 
+            # If order is delivered, send a review request email
+            if updated_order.get('status') == 'delivered':
+                products_for_review = []
+                for product in updated_order['products']:
+                    products_for_review.append({
+                        "name": product['name'],
+                        "url": f"https://www.nengoo.com/product/{product['productId']}" # Adjust URL as needed
+                    })
+                
+                review_message = MessageSchema(
+                    subject="Laissez votre avis sur votre commande Nengoo",
+                    recipients=[buyer["email"]],
+                    template_body={
+                        "buyer_name": buyer["name"],
+                        "products": products_for_review
+                    },
+                    subtype="html"
+                )
+                background_tasks.add_task(fm.send_message, review_message, template_name="review_request_buyer.html")
+
     return Order(**updated_order)
 
 @api_router.delete("/orders", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])

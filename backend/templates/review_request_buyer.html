@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Laissez votre avis sur votre commande Nengoo</title>
+</head>
+<body>
+    <h1>Bonjour {{ buyer_name }},</h1>
+    <p>Merci pour votre commande sur Nengoo ! Nous espérons que vous appréciez vos produits.</p>
+    <p>Votre avis est très important pour nous et pour les autres clients. Pourriez-vous prendre un moment pour laisser un avis sur les produits que vous avez commandés ?</p>
+    <ul>
+        {% for product in products %}
+        <li><a href="{{ product.url }}">{{ product.name }}</a></li>
+        {% endfor %}
+    </ul>
+    <p>Merci de nous aider à nous améliorer !</p>
+    <p>L'équipe Nengoo</p>
+</body>
+</html>
