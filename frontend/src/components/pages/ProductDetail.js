@@ -168,8 +168,8 @@ const ProductDetail = (props) => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'sender_id': user.id,
-                'sender_type': user.type,
+                'sender-id': user.id,
+                'sender-type': user.type,
             },
             body: JSON.stringify({
                 receiver_id: seller.id,
@@ -577,6 +577,39 @@ const ProductDetail = (props) => {
             slides={lightboxSlides}
             initialIndex={selectedImage}
         />
+
+        {showSendMessageModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+                <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+                    <h2 className="text-2xl font-bold mb-4">Contacter {seller.businessName}</h2>
+                    <form onSubmit={handleSendMessage}>
+                        <textarea
+                            className="w-full border border-gray-300 rounded-lg p-2 mb-4"
+                            rows="5"
+                            placeholder="Votre message..."
+                            value={messageToSend}
+                            onChange={(e) => setMessageToSend(e.target.value)}
+                            required
+                        ></textarea>
+                        <div className="flex justify-end gap-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowSendMessageModal(false)}
+                                className="bg-gray-300 hover:bg-gray-400 text-black py-2 px-4 rounded-lg"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                type="submit"
+                                className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg"
+                            >
+                                Envoyer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )}
 
         <Footer language={language} />
       </div>
