@@ -6,6 +6,8 @@ export { default as BuyerSignup } from './auth/BuyerSignup';
 export { default as Login } from './auth/Login';
 export { default as PendingApproval } from './auth/PendingApproval';
 export { default as SellerSignup } from './auth/SellerSignup';
+export { default as ForgotPassword } from './auth/ForgotPassword';
+export { default as ResetPassword } from './auth/ResetPassword';
 export { default as Checkout } from './cart/Checkout';
 export { default as ShoppingCart } from './cart/ShoppingCart';
 export { default as Footer } from './layout/Footer';

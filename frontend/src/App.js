@@ -22,6 +22,8 @@ import {
   BuyerSignup,
   SellerSignup,
   PendingApproval,
+  ForgotPassword,
+  ResetPassword,
   AdminLogin,
   AdminDashboard,
   AdminManagement,
@@ -169,6 +171,8 @@ function App() {
           <Route path="/signup/seller" element={<SellerSignup {...appProps} />} />
           <Route path="/login/buyer" element={<BuyerSignup {...appProps} isLoginDefault={true} />} />
           <Route path="/login/seller" element={<SellerSignup {...appProps} isLoginDefault={true} />} />
+          <Route path="/forgot-password" element={<ForgotPassword {...appProps} />} />
+          <Route path="/reset-password" element={<ResetPassword {...appProps} />} />
           <Route path="/pending-approval" element={<PendingApproval {...appProps} />} />
           
           {/* Seller Routes */}

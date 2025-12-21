@@ -157,6 +157,13 @@ const SellerSignup = (props) => {
                     required
                     className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
+                  {isLogin && (
+                    <div className="text-right mt-1">
+                        <Link to="/forgot-password?type=seller" className="text-sm text-purple-600 hover:text-purple-700">
+                            Mot de passe oublié ?
+                        </Link>
+                    </div>
+                  )}
                 </div>
 
                 {!isLogin && (

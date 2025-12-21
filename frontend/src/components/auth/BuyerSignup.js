@@ -183,6 +183,13 @@ const BuyerSignup = (props) => {
                   required
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                {isLogin && (
+                    <div className="text-right mt-1">
+                        <Link to="/forgot-password?type=buyer" className="text-sm text-blue-600 hover:text-blue-700">
+                            Mot de passe oublié ?
+                        </Link>
+                    </div>
+                )}
               </div>
 
               <button

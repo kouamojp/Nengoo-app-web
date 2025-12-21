@@ -10,7 +10,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 import bcrypt
 import boto3
@@ -223,9 +223,10 @@ class Seller(BaseModel):
     type: str = "seller"
     deliveryPrice: Optional[float] = None
     createdAt: datetime = Field(default_factory=datetime.utcnow)
-    updatedAt: datetime = Field(default_factory=datetime.utcnow)
     logoUrl: Optional[str] = None
     socialMedia: Optional[dict] = None
+    reset_token: Optional[str] = None
+    reset_token_expiry: Optional[datetime] = None
 
 class SellerCreate(BaseModel):
     whatsapp: str
@@ -424,6 +425,8 @@ class Buyer(BaseModel):
     status: str
     totalOrders: int = 0
     totalSpent: float = 0.0
+    reset_token: Optional[str] = None
+    reset_token_expiry: Optional[datetime] = None
 
 class BuyerUpdate(BaseModel):
     name: Optional[str] = None
@@ -471,6 +474,89 @@ class Review(BaseModel):
 class ReviewCreate(BaseModel):
     rating: int = Field(..., ge=1, le=5)
     comment: Optional[str] = None
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+    user_type: str # 'buyer' or 'seller'
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+    user_type: str
+
+# --- Auth Endpoints (Forgot Password) ---
+
+@api_router.post("/auth/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+    if request.user_type not in ['buyer', 'seller']:
+        raise HTTPException(status_code=400, detail="Invalid user type")
+
+    collection = db.sellers if request.user_type == 'seller' else db.users
+    query = {"email": request.email}
+    if request.user_type == 'buyer':
+        query["type"] = "buyer"
+
+    user = await collection.find_one(query)
+    if not user:
+        # Don't reveal if user exists
+        return {"message": "If an account exists with this email, a password reset link has been sent."}
+
+    reset_token = str(uuid.uuid4())
+    expiry = datetime.utcnow() + timedelta(hours=1)
+
+    await collection.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"reset_token": reset_token, "reset_token_expiry": expiry}}
+    )
+
+    # Determine frontend URL (Assuming it's running on the same domain or configured)
+    # Ideally, this should be an environment variable
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000") # Fallback to local
+    if "nengoo" in str(origins[0]): # simplistic check
+         frontend_url = "https://www.nengoo.com"
+
+    reset_link = f"{frontend_url}/reset-password?token={reset_token}&type={request.user_type}"
+
+    message = MessageSchema(
+        subject="Réinitialisation de votre mot de passe Nengoo",
+        recipients=[user["email"]],
+        template_body={
+            "name": user.get("name") or user.get("businessName"),
+            "reset_link": reset_link
+        },
+        subtype="html"
+    )
+    background_tasks.add_task(fm.send_message, message, template_name="reset_password.html")
+
+    return {"message": "If an account exists with this email, a password reset link has been sent."}
+
+@api_router.post("/auth/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(request: ResetPasswordRequest):
+    if request.user_type not in ['buyer', 'seller']:
+        raise HTTPException(status_code=400, detail="Invalid user type")
+
+    collection = db.sellers if request.user_type == 'seller' else db.users
+    
+    user = await collection.find_one({
+        "reset_token": request.token,
+        "reset_token_expiry": {"$gt": datetime.utcnow()}
+    })
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    hashed_password = hash_password(request.new_password)
+
+    await collection.update_one(
+        {"_id": user["_id"]},
+        {"$set": {
+            "password": hashed_password,
+            "reset_token": None,
+            "reset_token_expiry": None
+        }}
+    )
+
+    return {"message": "Password successfully reset"}
 
 # --- Messaging Endpoints ---
 
