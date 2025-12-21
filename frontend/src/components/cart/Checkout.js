@@ -109,7 +109,10 @@ const Checkout = (props) => {
     }).format(price);
   };
   
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => {
+    const priceToUse = (item.promoPrice && item.promoPrice > 0) ? item.promoPrice : item.price;
+    return sum + (priceToUse * item.quantity);
+  }, 0);
   const tax = 0;
   const total = subtotal + shippingCost;
   
@@ -382,7 +385,9 @@ const Checkout = (props) => {
                         <p className="text-gray-600 text-xs">Qty: {item.quantity}</p>
                       </div>
                     </div>
-                    <span className="font-medium">{formatPrice(item.price * item.quantity)}</span>
+                    <span className="font-medium">
+                      {formatPrice(((item.promoPrice && item.promoPrice > 0) ? item.promoPrice : item.price) * item.quantity)}
+                    </span>
                   </div>
                 ))}
               </div>

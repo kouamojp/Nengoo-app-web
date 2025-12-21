@@ -1339,7 +1339,7 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             productId=item.id,
             name=product_info["name"],
             quantity=item.quantity,
-            price=product_info["price"]
+            price=product_info.get("promoPrice") if product_info.get("promoPrice") and product_info.get("promoPrice") > 0 else product_info["price"]
         ))
 
     created_orders = []
