@@ -255,16 +255,36 @@ const ProductDetail = (props) => {
     ? Math.round(((product.price - product.promoPrice) / product.price) * 100)
     : 0;
 
+  const getAbsoluteImageUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
+
+  const ogImageUrl = getAbsoluteImageUrl(images[0]);
+
   return (
     <>
       <Helmet>
         <title>{product.name[language]}</title>
         <meta name="description" content={product.description[language]} />
+        
+        {/* Open Graph / Facebook / WhatsApp */}
+        <meta property="og:type" content="product" />
+        <meta property="og:site_name" content="Nengoo" />
         <meta property="og:title" content={product.name[language]} />
         <meta property="og:description" content={product.description[language]} />
-        <meta property="og:image" content={images[0]} />
+        <meta property="og:image" content={ogImageUrl} />
+        <meta property="og:image:secure_url" content={ogImageUrl} />
         <meta property="og:url" content={window.location.href} />
+        <meta property="og:price:amount" content={product.promoPrice || product.price} />
+        <meta property="og:price:currency" content="XAF" />
+        
+        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={product.name[language]} />
+        <meta name="twitter:description" content={product.description[language]} />
+        <meta name="twitter:image" content={ogImageUrl} />
       </Helmet>
       <div className="min-h-screen bg-gray-50">
         <Header {...props} />
