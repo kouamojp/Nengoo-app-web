@@ -157,7 +157,7 @@ const ProductCatalog = (props) => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Filters Sidebar */}
           <div className="lg:w-1/4">
-            <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
+            <div className="bg-white rounded-lg shadow-md p-6 max-sm:sticky top-24">
               <h3 className="text-xl font-bold mb-6 text-left">Filtres</h3>
               
               {/* Category Filter */}
