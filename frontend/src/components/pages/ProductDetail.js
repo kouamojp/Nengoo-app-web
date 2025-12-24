@@ -311,7 +311,7 @@ const ProductDetail = (props) => {
                     <img
                         src={images[selectedImage]}
                         alt={product.name[language]}
-                        className="w-full h-96 md:h-[30rem] object-contain rounded-lg"
+                        className="w-full h-96 md:h-[30rem] object-cover rounded-lg"
                         onError={(e) => {
                             e.target.onerror = null;
                             e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
