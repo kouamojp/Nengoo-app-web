@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+import NotificationList from '../ui/NotificationList';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -248,49 +249,12 @@ const UserProfile = (props) => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [loadingOrders, setLoadingOrders] = useState(true);
     
-    // Mock saved addresses
-    const [savedAddresses, setSavedAddresses] = useState([
-      {
-        id: 1,
-        label: 'Domicile',
-        name: 'Marie Kouam',
-        address: 'Avenue de la Liberté, Akwa',
-        city: 'Douala',
-        phone: '+237655123456',
-        isDefault: true
-      },
-      {
-        id: 2,
-        label: 'Bureau',
-        name: 'Marie Kouam',
-        address: 'Quartier des Affaires, Bonanjo',
-        city: 'Douala',
-        phone: '+237655123456',
-        isDefault: false
-      }
-    ]);
+    // Real data state
+    const [savedAddresses, setSavedAddresses] = useState([]);
+    const [favoritePickupPoints, setFavoritePickupPoints] = useState([]);
+    const [loadingInfo, setLoadingInfo] = useState(false);
   
-    // Mock favorite pickup points
-    const [favoritePickupPoints, setFavoritePickupPoints] = useState([
-      {
-        id: 1,
-        name: 'Nengoo Point Douala Centre',
-        address: 'Avenue de la Liberté, Douala',
-        phone: '+237 233 456 789',
-        hours: 'Lun-Sam: 8h-18h',
-        city: 'Douala'
-      },
-      {
-        id: 2,
-        name: 'Nengoo Point Yaoundé Mvan',
-        address: 'Quartier Mvan, Yaoundé',
-        phone: '+237 222 345 678',
-        hours: 'Lun-Sam: 8h-18h',
-        city: 'Yaoundé'
-      }
-    ]);
-  
-    // Mock payment methods
+    // Mock payment methods (keep as mock for now unless requested)
     const [paymentMethods, setPaymentMethods] = useState([
       {
         id: 1,
@@ -334,9 +298,48 @@ const UserProfile = (props) => {
                 }
             }
         };
+        
+        const fetchSavedInfo = async () => {
+            if (user && user.id) {
+                setLoadingInfo(true);
+                try {
+                    const response = await fetch(`${API_BASE_URL}/buyers/${user.id}/saved-info`, {
+                         headers: {
+                            'X-User-Id': user.id
+                        }
+                    });
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch saved info');
+                    }
+                    const data = await response.json();
+                    
+                    // Transform addresses
+                    const addresses = data.addresses.map((addr, index) => ({
+                        id: index,
+                        label: index === 0 ? 'Dernière adresse utilisée' : `Adresse ${index + 1}`,
+                        name: user.name, // Assuming the buyer name is constant for now
+                        address: addr.address,
+                        city: addr.city,
+                        phone: addr.phone,
+                        isDefault: index === 0
+                    }));
+                    setSavedAddresses(addresses);
+
+                    // Transform pickup points
+                    setFavoritePickupPoints(data.pickupPoints);
+
+                } catch (error) {
+                    console.error("Error fetching saved info:", error);
+                } finally {
+                    setLoadingInfo(false);
+                }
+            }
+        };
 
         if (activeTab === 'orders') {
             fetchOrders();
+        } else if (activeTab === 'addresses' || activeTab === 'pickup') {
+            fetchSavedInfo();
         }
     }, [user, activeTab]);
   
@@ -455,6 +458,16 @@ const UserProfile = (props) => {
                     <span className="text-xl">💬</span>
                     <span className="font-medium">Mes messages</span>
                   </button>
+
+                  <button
+                    onClick={() => handleNavigate('notifications')}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                      activeTab === 'notifications' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xl">🔔</span>
+                    <span className="font-medium">Notifications</span>
+                  </button>
                   
                   <button
                     onClick={() => handleNavigate('addresses')}
@@ -544,6 +557,23 @@ const UserProfile = (props) => {
               <div id="messages-section" className={`${activeTab === 'messages' ? '' : 'hidden'}`}>
                 <BuyerMessages user={user} language={language} />
               </div>
+
+              {/* Notifications Tab */}
+              <div id="notifications-section" className={`${activeTab === 'notifications' ? '' : 'hidden'}`}>
+                <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div className="p-6 border-b border-gray-100">
+                        <h2 className="text-2xl font-bold">Historique des notifications</h2>
+                    </div>
+                    <div className="w-full">
+                        <NotificationList 
+                            userId={user.id} 
+                            userType={user.type} 
+                            onClose={() => {}} 
+                            isFullPage={true} 
+                        />
+                    </div>
+                </div>
+              </div>
   
               {/* Orders History Tab */}
               <div id="orders-section" className={`${activeTab === 'orders' ? '' : 'hidden'}`}>
@@ -599,17 +629,16 @@ const UserProfile = (props) => {
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold">Adresses de livraison</h2>
-                    <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
-                      + Ajouter une adresse
-                    </button>
+                    {/* We can hide 'Add' button since it's auto-generated from orders for now */}
                   </div>
   
+                  {loadingInfo ? <p>Chargement des adresses...</p> : savedAddresses.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {savedAddresses.map((address) => (
                       <div key={address.id} className="border rounded-lg p-4 relative">
                         {address.isDefault && (
                           <span className="absolute top-2 right-2 bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-medium">
-                            Par défaut
+                            Dernière utilisée
                           </span>
                         )}
                         <div className="mb-4">
@@ -633,6 +662,9 @@ const UserProfile = (props) => {
                       </div>
                     ))}
                   </div>
+                  ) : (
+                    <p className="text-gray-500">Aucune adresse enregistrée. Vos adresses de livraison apparaîtront ici après votre première commande.</p>
+                  )}
                 </div>
               </div>
   
@@ -640,12 +672,11 @@ const UserProfile = (props) => {
               <div id="pickup-section" className={`${activeTab === 'pickup' ? '' : 'hidden'}`}>
                 <div className="bg-white rounded-lg shadow-md p-6">
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold">Points de retrait favoris</h2>
-                    <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
-                      + Ajouter un point
-                    </button>
+                    <h2 className="text-2xl font-bold">Points de retrait récents</h2>
+                    {/* Hide add button */}
                   </div>
   
+                  {loadingInfo ? <p>Chargement des points de retrait...</p> : favoritePickupPoints.length > 0 ? (
                   <div className="space-y-4">
                     {favoritePickupPoints.map((point) => (
                       <div key={point.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -656,9 +687,9 @@ const UserProfile = (props) => {
                             <p className="text-sm text-gray-600 mb-1">📍 {point.address}</p>
                             <p className="text-sm text-gray-600 mb-1">📞 {point.phone}</p>
                             <p className="text-sm text-gray-600 mb-1">🕐 {point.hours}</p>
-                            <span className="inline-block mt-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                            {/* <span className="inline-block mt-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
                               {point.city}
-                            </span>
+                            </span> */}
                           </div>
                           <button className="text-red-600 hover:text-red-700">
                             <span className="text-xl">🗑️</span>
@@ -667,6 +698,9 @@ const UserProfile = (props) => {
                       </div>
                     ))}
                   </div>
+                  ) : (
+                    <p className="text-gray-500">Aucun point de retrait utilisé récemment.</p>
+                  )}
                 </div>
               </div>
   

@@ -27,7 +27,8 @@ import {
   AdminLogin,
   AdminDashboard,
   AdminManagement,
-  PickupPointsMap
+  PickupPointsMap,
+  NotificationsPage
 } from './components';
 import BottomNav from './components/layout/BottomNav';
 
@@ -161,6 +162,7 @@ function App() {
           <Route path="/cart" element={<ShoppingCart {...appProps} />} />
           <Route path="/checkout" element={<Checkout {...appProps} />} />
           <Route path="/profile" element={<UserProfile {...appProps} />} />
+          <Route path="/notifications" element={<NotificationsPage {...appProps} />} />
           <Route path="/about" element={<About {...appProps} />} />
           <Route path="/search" element={<SearchResults {...appProps} />} />
           <Route path="/pickup-points" element={<PickupPointsMap {...appProps} />} />

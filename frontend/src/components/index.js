@@ -19,6 +19,7 @@ export { default as ProductCatalog } from './pages/ProductCatalog';
 export { default as ProductDetail } from './pages/ProductDetail';
 export { default as SearchResults } from './pages/SearchResults';
 export { default as UserProfile } from './pages/UserProfile';
+export { default as NotificationsPage } from './pages/NotificationsPage';
 export { default as ProductCard } from './product/ProductCard';
 export { default as InstallAppButton } from './pwa/InstallAppButton';
 export { default as InstallButton } from './pwa/InstallButton';

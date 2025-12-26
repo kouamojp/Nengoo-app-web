@@ -1,16 +1,35 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { getUnreadNotificationsCount } from '../../lib/notifications';
 
 const BottomNav = ({ cartItemCount, user }) => {
   const location = useLocation();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (user) {
+      const fetchUnreadCount = async () => {
+        const count = await getUnreadNotificationsCount(user.id, user.type);
+        setUnreadCount(count);
+      };
+      fetchUnreadCount();
+      
+      const interval = setInterval(fetchUnreadCount, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
 
   const navItems = [
     { path: '/', icon: '🏠', label: 'Accueil' },
     { path: '/catalog', icon: '📚', label: 'Catalogue' },
     { path: '/cart', icon: '🛒', label: 'Panier', count: cartItemCount },
+    { path: '/notifications', icon: '🔔', label: 'Notifs', count: unreadCount },
     { path: user ? (user.type === 'seller' ? '/seller' : '/profile') : '/login', icon: '👤', label: 'Profil' }
   ];
+
+  // Adjust width if 5 items
+  const itemWidthClass = navItems.length === 5 ? 'w-1/5' : 'w-1/4';
 
   // Do not show on certain pages
   const hiddenPaths = ['/login', '/seller-signup', '/buyer-signup', '/admin'];
@@ -24,7 +43,7 @@ const BottomNav = ({ cartItemCount, user }) => {
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
-            <Link key={item.label} to={item.path} className={`flex flex-col items-center justify-center w-1/4 transition-colors duration-200 ${isActive ? 'text-purple-600' : 'text-gray-600'}`}>
+            <Link key={item.label} to={item.path} className={`flex flex-col items-center justify-center ${itemWidthClass} transition-colors duration-200 ${isActive ? 'text-purple-600' : 'text-gray-600'}`}>
               <div className="relative">
                 <span className="text-2xl">{item.icon}</span>
                 {item.count > 0 && (

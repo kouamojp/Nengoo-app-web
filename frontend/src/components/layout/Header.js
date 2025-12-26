@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import InstallButton from '../pwa/InstallButton';
+import NotificationList from '../ui/NotificationList';
+import { getUnreadNotificationsCount } from '../../lib/notifications';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -11,6 +13,8 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
   const [categories, setCategories] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const t = translations[language];
 
   // Mapping des icônes pour les catégories
@@ -28,6 +32,33 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
     'Services': '🛠️',
     'Voyages et Billets': '✈️'
   };
+
+  useEffect(() => {
+    if (user) {
+      const fetchUnreadCount = async () => {
+        const count = await getUnreadNotificationsCount(user.id, user.type);
+        setUnreadCount(count);
+      };
+      fetchUnreadCount();
+      
+      // Poll every minute
+      const interval = setInterval(fetchUnreadCount, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showNotifications && !event.target.closest('.notifications-container')) {
+        setShowNotifications(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -167,6 +198,30 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
           <div className="hidden md:flex items-end space-x-4">
             {/* <InstallButton /> */}
             
+            {user && (
+              <div className="relative notifications-container">
+                <button 
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="relative hover:text-yellow-300 transition-colors flex flex-col items-center"
+                >
+                  <span className="text-2xl">🔔</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                      {unreadCount}
+                    </span>
+                  )}
+                  <div className="text-sm">Notifs</div>
+                </button>
+                {showNotifications && (
+                  <NotificationList 
+                    userId={user.id} 
+                    userType={user.type} 
+                    onClose={() => setShowNotifications(false)}
+                  />
+                )}
+              </div>
+            )}
+
             <Link to="/cart" className="relative hover:text-yellow-300 transition-colors">
               <span className="text-2xl">🛒</span>
               {cartItems.length > 0 && (

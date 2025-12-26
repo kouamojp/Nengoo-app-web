@@ -1,4 +1,6 @@
 
+export const API_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
 export const openWhatsApp = (phoneNumber, message = '') => {
   const encodedMessage = encodeURIComponent(message);
   const url = `https://wa.me/${phoneNumber.replace(/\D/g, '')}?text=${encodedMessage}`;

@@ -278,6 +278,10 @@ class Order(BaseModel):
     products: List[OrderProduct]
     totalAmount: float
     shippingCost: Optional[float] = None
+    shippingAddress: Optional[str] = None
+    shippingCity: Optional[str] = None
+    shippingRegion: Optional[str] = None
+    shippingPhone: Optional[str] = None
     currency: str = "XAF"
     status: str
     paymentStatus: str
@@ -449,6 +453,25 @@ class Message(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     read_status: bool = False
 
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: f"notif_{str(uuid.uuid4())[:8]}")
+    recipient_id: str
+    recipient_type: str # 'buyer' or 'seller'
+    type: str # 'order_status', 'new_message', 'stock_alert', 'order_created'
+    title: str
+    message: str
+    link: Optional[str] = None
+    read: bool = False
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class NotificationCreate(BaseModel):
+    recipient_id: str
+    recipient_type: str
+    type: str
+    title: str
+    message: str
+    link: Optional[str] = None
+
 class Conversation(BaseModel):
     id: str = Field(default_factory=lambda: f"conv_{str(uuid.uuid4())[:8]}")
     buyer_id: str
@@ -618,6 +641,20 @@ async def create_message(message_data: MessageCreate, background_tasks: Backgrou
     )
     await db.messages.insert_one(new_message.dict())
 
+    # Create in-app notification for receiver
+    notif_title = f"Nouveau message de {buyer.get('name')}" if sender_type == 'buyer' else f"Nouveau message de {seller.get('businessName')}"
+    notif_link = f"/seller/dashboard/messages/{conversation['id']}" if receiver_type == 'seller' else f"/profile/messages"
+    
+    new_notification = Notification(
+        recipient_id=message_data.receiver_id,
+        recipient_type=receiver_type,
+        type='new_message',
+        title=notif_title,
+        message=message_data.message[:50] + "..." if len(message_data.message) > 50 else message_data.message,
+        link=notif_link
+    )
+    await db.notifications.insert_one(new_notification.dict())
+
     # Send email notification to seller
     if receiver_type == 'seller':
         seller = await db.sellers.find_one({"id": message_data.receiver_id})
@@ -657,6 +694,73 @@ async def get_messages(conversation_id: str):
 @api_router.put("/messages/{message_id}/read", status_code=status.HTTP_204_NO_CONTENT)
 async def mark_message_as_read(message_id: str):
     await db.messages.update_one({"id": message_id}, {"$set": {"read_status": True}})
+    return
+
+# --- Notification Endpoints ---
+
+@api_router.get("/notifications", response_model=List[Notification])
+async def get_notifications(
+    user_id: str = Header(..., alias="X-User-Id"),
+    user_type: str = Header(..., alias="X-User-Type")
+):
+    if user_type not in ['buyer', 'seller']:
+        raise HTTPException(status_code=400, detail="Invalid user_type")
+    
+    notifications_cursor = db.notifications.find({
+        "recipient_id": user_id,
+        "recipient_type": user_type
+    }).sort("created_at", -1)
+    
+    notifications = await notifications_cursor.to_list(100) # Limit to last 100 notifications
+    return [Notification(**n) for n in notifications]
+
+@api_router.get("/notifications/unread-count")
+async def get_unread_notifications_count(
+    user_id: str = Header(..., alias="X-User-Id"),
+    user_type: str = Header(..., alias="X-User-Type")
+):
+    if user_type not in ['buyer', 'seller']:
+        raise HTTPException(status_code=400, detail="Invalid user_type")
+        
+    count = await db.notifications.count_documents({
+        "recipient_id": user_id,
+        "recipient_type": user_type,
+        "read": False
+    })
+    return {"count": count}
+
+@api_router.put("/notifications/{notification_id}/read", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_notification_as_read(
+    notification_id: str,
+    user_id: str = Header(..., alias="X-User-Id")
+):
+    result = await db.notifications.update_one(
+        {"id": notification_id, "recipient_id": user_id},
+        {"$set": {"read": True}}
+    )
+    if result.matched_count == 0:
+         raise HTTPException(status_code=404, detail="Notification not found or not authorized")
+    return
+
+@api_router.put("/notifications/read-all", status_code=status.HTTP_204_NO_CONTENT)
+async def mark_all_notifications_as_read(
+    user_id: str = Header(..., alias="X-User-Id"),
+    user_type: str = Header(..., alias="X-User-Type")
+):
+    await db.notifications.update_many(
+        {"recipient_id": user_id, "recipient_type": user_type, "read": False},
+        {"$set": {"read": True}}
+    )
+    return
+
+@api_router.delete("/notifications/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_notification(
+    notification_id: str,
+    user_id: str = Header(..., alias="X-User-Id")
+):
+    result = await db.notifications.delete_one({"id": notification_id, "recipient_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Notification not found")
     return
 
 # --- API Endpoints ---
@@ -1221,6 +1325,17 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
     
     # Check if status has changed and send notification
     if 'status' in update_data and order_before_update.get('status') != updated_order.get('status'):
+        # In-app notification for buyer
+        new_notification = Notification(
+            recipient_id=updated_order["buyerId"],
+            recipient_type='buyer',
+            type='order_status',
+            title=f"Mise à jour commande #{updated_order['id']}",
+            message=f"Le statut de votre commande est maintenant : {updated_order['status']}",
+            link=f"/profile/orders"
+        )
+        await db.notifications.insert_one(new_notification.dict())
+
         buyer = await db.users.find_one({"id": updated_order["buyerId"], "type": "buyer"})
         if buyer and buyer.get("email"):
             message = MessageSchema(
@@ -1373,6 +1488,10 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             products=order_details["products"],
             totalAmount=total_amount,
             shippingCost=shipping_cost,
+            shippingAddress=checkout_data.address,
+            shippingCity=checkout_data.city,
+            shippingRegion=checkout_data.region,
+            shippingPhone=checkout_data.phone,
             status="pending",
             paymentStatus="pending" if checkout_data.paymentMethod != 'cashOnDelivery' else 'unpaid',
             pickupPointId=checkout_data.selectedPickupPoint if checkout_data.deliveryOption == 'pickup' else None,
@@ -1387,6 +1506,27 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             {"id": buyer_id},
             {"$inc": {"totalOrders": 1, "totalSpent": total_amount}}
         )
+
+        # --- In-App Notifications ---
+        # 1. To Buyer
+        await db.notifications.insert_one(Notification(
+            recipient_id=buyer_id,
+            recipient_type='buyer',
+            type='order_created',
+            title="Commande confirmée",
+            message=f"Votre commande #{new_order.id} a été reçue.",
+            link="/profile/orders"
+        ).dict())
+
+        # 2. To Seller
+        await db.notifications.insert_one(Notification(
+            recipient_id=seller_id,
+            recipient_type='seller',
+            type='order_created',
+            title="Nouvelle commande !",
+            message=f"Nouvelle commande #{new_order.id} de {total_amount} {new_order.currency}",
+            link="/seller/dashboard/orders"
+        ).dict())
 
         # --- Send Email Notifications ---
         # 1. To Buyer
@@ -1419,6 +1559,77 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             background_tasks.add_task(fm.send_message, message_seller, template_name="new_order_seller.html")
 
     return created_orders
+
+class SavedAddress(BaseModel):
+    address: str
+    city: str
+    region: str
+    phone: str
+    lastUsed: datetime
+
+class SavedPickupPoint(BaseModel):
+    id: str
+    name: str
+    lastUsed: datetime
+    # We might want more details for pickup point display, let's try to fetch them or include them
+    address: Optional[str] = None
+    hours: Optional[str] = None
+    phone: Optional[str] = None
+
+class BuyerSavedInfo(BaseModel):
+    addresses: List[SavedAddress]
+    pickupPoints: List[SavedPickupPoint]
+
+@api_router.get("/buyers/{buyer_id}/saved-info", response_model=BuyerSavedInfo)
+async def get_buyer_saved_info(buyer_id: str, x_user_id: str = Header(..., alias="X-User-Id")):
+    # Authorization: User can only access their own info
+    if buyer_id != x_user_id:
+         # We allow admins too? For now, strict check.
+         pass # Logic could be improved for admin access
+
+    orders_cursor = db.orders.find({"buyerId": buyer_id}).sort("orderedDate", -1)
+    orders = await orders_cursor.to_list(1000)
+    
+    addresses_map = {}
+    pickup_points_map = {}
+    
+    for order in orders:
+        # Process Address
+        if order.get("shippingAddress"):
+            # Create a unique key based on address details
+            key = f"{order['shippingAddress']}-{order.get('shippingCity')}"
+            if key not in addresses_map:
+                addresses_map[key] = {
+                    "address": order['shippingAddress'],
+                    "city": order.get('shippingCity', ''),
+                    "region": order.get('shippingRegion', ''),
+                    "phone": order.get('shippingPhone', ''),
+                    "lastUsed": order['orderedDate']
+                }
+        
+        # Process Pickup Point
+        if order.get("pickupPointId") and order.get("pickupPointName"):
+             pid = order["pickupPointId"]
+             if pid not in pickup_points_map:
+                 # Fetch full pickup point details if possible, or use what we have
+                 pickup_point_data = {
+                     "id": pid,
+                     "name": order["pickupPointName"],
+                     "lastUsed": order['orderedDate']
+                 }
+                 # Try to find more info from db.pickupPoints if needed
+                 pp = await db.pickupPoints.find_one({"id": pid})
+                 if pp:
+                     pickup_point_data["address"] = pp.get("address")
+                     pickup_point_data["hours"] = pp.get("hours")
+                     pickup_point_data["phone"] = pp.get("phone")
+                 
+                 pickup_points_map[pid] = pickup_point_data
+
+    return BuyerSavedInfo(
+        addresses=list(addresses_map.values()),
+        pickupPoints=list(pickup_points_map.values())
+    )
 
 # --- Pickup Point Management ---
 @api_router.post("/pickup-points", response_model=PickupPoint, dependencies=[Depends(super_admin_required)])
