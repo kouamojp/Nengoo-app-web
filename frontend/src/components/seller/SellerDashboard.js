@@ -11,6 +11,8 @@ import SellerAnalytics from './SellerAnalytics';
 import SellerMessages from './SellerMessages';
 import SellerProfile from './SellerProfile';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
 const SellerDashboard = (props) => {
   const { language, user } = props;
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -33,36 +35,44 @@ const SellerDashboard = (props) => {
   };
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchData = async () => {
       if (!user) return;
 
       try {
         const sellerId = user.id;
-        const response = await fetch(`http://localhost:8000/api/orders?seller_id=${sellerId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
-        const orders = await response.json();
-        setRecentOrders(orders.slice(0, 5));
         
-        const totalSales = orders.length;
-        const pendingOrders = orders.filter(o => o.status === 'pending').length;
-        const monthlyRevenue = orders.reduce((acc, o) => acc + o.totalAmount, 0);
-        const activeProducts = 0; 
+        // Fetch Orders for pending count and recent list
+        const ordersResponse = await fetch(`${API_BASE_URL}/orders?seller_id=${sellerId}`);
+        let pendingOrdersCount = 0;
+        if (ordersResponse.ok) {
+          const orders = await ordersResponse.json();
+          setRecentOrders(orders.slice(0, 5));
+          pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
+        }
 
-        setStats([
-          { title: "Ventes Totales", value: totalSales, icon: "💰", color: "from-green-400 to-green-600", change: "" },
-          { title: "Commandes en Attente", value: pendingOrders, icon: "📋", color: "from-yellow-400 to-orange-500", change: "" },
-          { title: "Revenus du Mois", value: `${monthlyRevenue.toLocaleString()} XAF`, icon: "📈", color: "from-blue-400 to-blue-600", change: "" },
-          { title: "Produits Actifs", value: activeProducts, icon: "📦", color: "from-purple-400 to-purple-600", change: "" }
-        ]);
+        // Fetch Analytics
+        const analyticsResponse = await fetch(`${API_BASE_URL}/sellers/${sellerId}/analytics`);
+        if (analyticsResponse.ok) {
+          const analytics = await analyticsResponse.json();
+          
+          // Get current month short name (e.g., "Jan", "Feb") matching backend format
+          const currentMonth = new Date().toLocaleString('en-US', { month: 'short' }); 
+          const currentMonthRevenue = analytics.monthly_revenue.find(m => m.month === currentMonth)?.revenue || 0;
+
+          setStats([
+            { title: "Ventes Totales", value: analytics.total_orders, icon: "💰", color: "from-green-400 to-green-600", change: "" },
+            { title: "Commandes en Attente", value: pendingOrdersCount, icon: "📋", color: "from-yellow-400 to-orange-500", change: "" },
+            { title: "Revenus du Mois", value: `${currentMonthRevenue.toLocaleString()} XAF`, icon: "📈", color: "from-blue-400 to-blue-600", change: "" },
+            { title: "Produits Actifs", value: analytics.total_products, icon: "📦", color: "from-purple-400 to-purple-600", change: "" }
+          ]);
+        }
 
       } catch (error) {
-        console.error("Error fetching orders:", error);
+        console.error("Error fetching dashboard data:", error);
       }
     };
 
-    fetchOrders();
+    fetchData();
   }, [user]);
 
   return (

@@ -86,7 +86,7 @@ const SellerOrders = (props) => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          // TODO: Add authorization headers if required
+          'X-Seller-Id': user.id,
         },
         body: JSON.stringify({ status: newStatus }),
       });

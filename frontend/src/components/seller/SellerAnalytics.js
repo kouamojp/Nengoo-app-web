@@ -85,7 +85,11 @@ const SellerAnalytics = (props) => {
                   {value.month}
                 </span>
                 <span className="text-xs text-purple-600 font-semibold">
-                  {(value.revenue / 1000000).toFixed(1)}M
+                  {value.revenue >= 1000000 
+                    ? `${(value.revenue / 1000000).toFixed(1)}M` 
+                    : value.revenue >= 1000 
+                      ? `${(value.revenue / 1000).toFixed(0)}K` 
+                      : value.revenue}
                 </span>
               </div>
             ))}

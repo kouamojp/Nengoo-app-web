@@ -143,6 +143,34 @@ async def product_owner_or_moderator_required(
             detail="You are not the owner of this product.",
         )
 
+async def order_owner_or_support_required(
+    order_id: str,
+    seller_id: Optional[str] = Header(None, alias="X-Seller-Id"),
+    role: Optional[str] = Header(None, alias="X-Admin-Role")
+):
+    # If the user is support or higher, they are authorized.
+    if role in ["super_admin", "admin", "moderator", "support"]:
+        return
+
+    # If not an admin, they must be a seller trying to edit their own order.
+    if not seller_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized. Seller ID header is missing.",
+        )
+
+    # Find the order in the database
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Check if the seller ID from the header matches the order's sellerId
+    if order.get("sellerId") != seller_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not the owner of this order.",
+        )
+
 # --- Hashing Utility ---
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -258,6 +286,7 @@ class SellerUpdate(BaseModel):
 class SellerAnalyticsData(BaseModel):
     total_revenue: float
     total_orders: int
+    total_products: int
     total_customers: int
     monthly_revenue: List[dict]
     top_products: List[dict]
@@ -1228,9 +1257,12 @@ async def get_seller_analytics(seller_id: str):
 
     top_products = sorted(product_sales.values(), key=lambda x: x['revenue'], reverse=True)[:5]
 
+    total_products = await db.products.count_documents({"sellerId": seller_id})
+
     return SellerAnalyticsData(
         total_revenue=total_revenue,
         total_orders=total_orders,
+        total_products=total_products,
         total_customers=total_customers,
         monthly_revenue=monthly_revenue_list,
         top_products=top_products
@@ -1273,7 +1305,7 @@ async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] =
     
     return enriched_orders
 
-@api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(support_or_higher_required)])
+@api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(order_owner_or_support_required)])
 async def update_order(order_id: str, order_data: OrderUpdate, background_tasks: BackgroundTasks):
     update_data = order_data.dict(exclude_unset=True)
     if not update_data:
