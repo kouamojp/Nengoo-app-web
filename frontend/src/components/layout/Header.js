@@ -5,6 +5,7 @@ import { translations } from '../../lib/translations';
 import InstallButton from '../pwa/InstallButton';
 import NotificationList from '../ui/NotificationList';
 import { getUnreadNotificationsCount } from '../../lib/notifications';
+import { createSlug } from '../../lib/utils';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -178,7 +179,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                   {suggestions.map(product => (
                     <Link
                       key={product.id}
-                      to={`/product/${product.id}`}
+                      to={`/product/${product.slug || product.id}`}
                       className="flex items-center px-4 py-2 text-black hover:bg-gray-100"
                       onClick={() => {
                         setShowSuggestions(false);
@@ -279,7 +280,7 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                 {suggestions.map(product => (
                   <Link
                     key={product.id}
-                    to={`/product/${product.id}`}
+                    to={`/product/${product.slug || product.id}`}
                     className="flex items-center px-4 py-2 text-black hover:bg-gray-100"
                     onClick={() => {
                       setShowSuggestions(false);

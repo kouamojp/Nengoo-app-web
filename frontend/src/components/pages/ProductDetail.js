@@ -39,7 +39,7 @@ const StarRating = ({ rating, setRating, interactive = true }) => {
 
 const ProductDetail = (props) => {
   const { language, addToCart, user } = props;
-  const { id } = useParams();
+  const { idOrSlug } = useParams();
   const navigate = useNavigate();
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
@@ -63,7 +63,7 @@ const ProductDetail = (props) => {
       setLoading(true);
 
       // Fetch product details
-      const productResponse = await fetch(`${API_BASE_URL}/products/${id}`);
+      const productResponse = await fetch(`${API_BASE_URL}/products/${idOrSlug}`);
       if (!productResponse.ok) {
         if (productResponse.status === 404) setProduct(null);
         else throw new Error(`HTTP error! status: ${productResponse.status}`);
@@ -87,7 +87,7 @@ const ProductDetail = (props) => {
       if (productData.sellerId) fetchSeller(productData.sellerId);
       
       // Fetch reviews
-      const reviewsResponse = await fetch(`${API_BASE_URL}/products/${id}/reviews`);
+      const reviewsResponse = await fetch(`${API_BASE_URL}/products/${idOrSlug}/reviews`);
       if (reviewsResponse.ok) {
         const reviewsData = await reviewsResponse.json();
         setReviews(reviewsData);
@@ -95,7 +95,7 @@ const ProductDetail = (props) => {
 
       // Check if user can review
       if (user && user.type === 'buyer') {
-        const canReviewResponse = await fetch(`${API_BASE_URL}/products/${id}/can-review`, {
+        const canReviewResponse = await fetch(`${API_BASE_URL}/products/${idOrSlug}/can-review`, {
           headers: { 'X-Buyer-Id': user.id }
         });
         if (canReviewResponse.ok) {
@@ -115,7 +115,7 @@ const ProductDetail = (props) => {
 
   useEffect(() => {
     fetchProductData();
-  }, [id, language, user]);
+  }, [idOrSlug, language, user]);
   
   const fetchRelatedProducts = async (category, currentProductId) => {
       try {
@@ -196,7 +196,7 @@ const ProductDetail = (props) => {
         return;
     }
     try {
-        const response = await fetch(`${API_BASE_URL}/products/${id}/reviews`, {
+        const response = await fetch(`${API_BASE_URL}/products/${idOrSlug}/reviews`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

@@ -186,6 +186,7 @@ class AdminRole(str, Enum):
 
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: f"prod_{str(uuid.uuid4())[:8]}")
+    slug: Optional[str] = None
     name: str
     description: str
     category: str
@@ -792,6 +793,24 @@ async def delete_notification(
         raise HTTPException(status_code=404, detail="Notification not found")
     return
 
+# --- Slug Utility ---
+import re
+import unicodedata
+
+def generate_slug(text: str) -> str:
+    text = unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode('utf-8')
+    text = re.sub(r'[^\w\s-]', '', text).lower().strip()
+    return re.sub(r'[-\s]+', '-', text)
+
+async def get_unique_slug(name: str) -> str:
+    base_slug = generate_slug(name)
+    slug = base_slug
+    counter = 1
+    while await db.products.find_one({"slug": slug}):
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+    return slug
+
 # --- API Endpoints ---
 # ... (existing endpoints)
 
@@ -945,9 +964,14 @@ async def get_max_product_price():
     logger.info("💰 [Backend] No products found, returning max price 0.0")
     return MaxPriceResponse(maxPrice=0.0)
 
-@api_router.get("/products/{product_id}", response_model=Product)
-async def get_product(product_id: str):
-    product = await db.products.find_one({"id": product_id})
+@api_router.get("/products/{product_identifier}", response_model=Product)
+async def get_product(product_identifier: str):
+    # Try looking up by ID first
+    product = await db.products.find_one({"id": product_identifier})
+    if not product:
+        # If not found by ID, try looking up by slug
+        product = await db.products.find_one({"slug": product_identifier})
+        
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return Product(**product)
@@ -979,7 +1003,9 @@ async def create_product(product_data: ProductCreate,
     else:
         raise HTTPException(status_code=403, detail="Not authorized to create products.")
 
-    product = Product(**product_data.dict())
+    product_dict = product_data.dict()
+    product_dict["slug"] = await get_unique_slug(product_data.name)
+    product = Product(**product_dict)
     product.sellerId = seller_id_to_use
     product.sellerName = seller_name_to_use
     await db.products.insert_one(product.dict())
@@ -1943,6 +1969,17 @@ async def subscribe_newsletter(subscription: NewsletterSubscription):
     
     await db.newsletter_subscriptions.insert_one(subscription.dict())
     return {"message": "Successfully subscribed to the newsletter."}
+
+@api_router.post("/admin/migrate-slugs", dependencies=[Depends(super_admin_required)])
+async def migrate_product_slugs():
+    products_cursor = db.products.find({"slug": {"$exists": False}})
+    products = await products_cursor.to_list(1000)
+    count = 0
+    for p in products:
+        slug = await get_unique_slug(p["name"])
+        await db.products.update_one({"_id": p["_id"]}, {"$set": {"slug": slug}})
+        count += 1
+    return {"message": f"Successfully migrated {count} products."}
 
 # --- Router Inclusion ---
 from routers.buyers import router as buyers_router

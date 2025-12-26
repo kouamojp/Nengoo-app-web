@@ -14,3 +14,16 @@ export const formatPhoneForWhatsApp = (phone) => {
 export const generateProductWhatsAppMessage = (product, language) => {
   return `Bonjour! Je suis intéressé(e) par votre produit "${product.name[language]}" sur Nengoo. Pourriez-vous me donner plus d'informations? Merci!`;
 };
+
+export const createSlug = (text) => {
+  if (!text) return "";
+  return text
+    .toString()
+    .toLowerCase()
+    .normalize("NFD") // Remove accents
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, "-") // Replace spaces with -
+    .replace(/[^\w-]+/g, "") // Remove all non-word chars
+    .replace(/--+/g, "-"); // Replace multiple - with single -
+};

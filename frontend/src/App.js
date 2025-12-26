@@ -158,7 +158,7 @@ function App() {
           <Route path="/" element={<Homepage {...appProps} />} />
           <Route path="/catalog" element={<ProductCatalog {...appProps} />} />
           <Route path="/catalog/:category" element={<ProductCatalog {...appProps} />} />
-          <Route path="/product/:id" element={<ProductDetail {...appProps} />} />
+          <Route path="/product/:idOrSlug" element={<ProductDetail {...appProps} />} />
           <Route path="/cart" element={<ShoppingCart {...appProps} />} />
           <Route path="/checkout" element={<Checkout {...appProps} />} />
           <Route path="/profile" element={<UserProfile {...appProps} />} />

@@ -2,11 +2,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
-import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
+import { openWhatsApp, generateProductWhatsAppMessage, createSlug } from '../../lib/utils';
 
 const ProductCard = ({ product, language, addToCart }) => {
   const navigate = useNavigate();
   const t = translations[language];
+
+  const handleProductClick = () => {
+    navigate(`/product/${product.slug || product.id}`);
+  };
 
   const truncateProductName = (name, maxLength) => {
     if (name.length > maxLength) {
@@ -47,7 +51,7 @@ const ProductCard = ({ product, language, addToCart }) => {
           src={product.image}
           alt={product.name[language]}
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
-          onClick={() => navigate(`/product/${product.id}`)}
+          onClick={handleProductClick}
           onError={(e) => {
             e.target.onerror = null; // Prevent infinite loop if fallback also fails
             e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
@@ -83,7 +87,7 @@ const ProductCard = ({ product, language, addToCart }) => {
       <div className="p-4">
                 <h3
                   className="font-semibold tracking-[.01rem] text-[.95rem] leading-[1.3rem] line- sm:text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors max-sm:min-h-10"
-                  onClick={() => navigate(`/product/${product.id}`)}
+                  onClick={handleProductClick}
                 >
                   {truncateProductName(product.name[language], 25)}
                 </h3>        {/* <p className="text-gray-600 text-sm mb-2">
