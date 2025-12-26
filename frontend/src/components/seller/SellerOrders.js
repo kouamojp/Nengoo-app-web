@@ -4,10 +4,57 @@ import SellerHeader from './SellerHeader';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
+const OrderDetailModal = ({ order, onClose, formatPrice }) => {
+  if (!order) return null;
+
+  return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold">Détails de la commande #{order.id}</h3>
+                  <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+              </div>
+              <div className="space-y-4">
+                  <p><strong>Date:</strong> {new Date(order.orderedDate).toLocaleDateString()}</p>
+                  <p><strong>Statut:</strong> {order.status}</p>
+                  <p><strong>Acheteur:</strong> {order.buyerName}</p>
+                  <p><strong>Moyen de livraison:</strong> {order.pickupPointName ? `Retrait au point: ${order.pickupPointName}` : 'Livraison à domicile'}</p>
+                  {order.shippingAddress && (
+                     <div className="bg-gray-50 p-3 rounded">
+                       <p className="font-semibold text-sm">Adresse de livraison:</p>
+                       <p className="text-sm">{order.shippingAddress}</p>
+                       <p className="text-sm">{order.shippingCity}, {order.shippingRegion}</p>
+                       <p className="text-sm">Tél: {order.shippingPhone}</p>
+                     </div>
+                  )}
+                  
+                  <div>
+                      <p className="font-bold">Produits:</p>
+                      <ul className="list-disc list-inside space-y-2 mt-2">
+                          {order.products.map(p => (
+                              <li key={p.productId}>
+                                  {p.name} (x{p.quantity}) - <span className="font-medium">{formatPrice(p.price * p.quantity)}</span>
+                              </li>
+                          ))}
+                      </ul>
+                  </div>
+
+                  <div className="text-right font-bold text-lg border-t pt-4">
+                      Total: {formatPrice(order.totalAmount)}
+                  </div>
+              </div>
+          </div>
+      </div>
+  );
+};
+
 const SellerOrders = (props) => {
   const { language, user } = props;
   const [orders, setOrders] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -102,6 +149,7 @@ const SellerOrders = (props) => {
   return (
     <div className="lg:col-span-3">
       <SellerHeader title="Gestion des Commandes" language={language} user={user} />
+      <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} formatPrice={formatPrice} />
       
       {/* Filters and Stats */}
       <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
@@ -161,7 +209,10 @@ const SellerOrders = (props) => {
                   <option value="delivered">Livrée</option>
                   <option value="cancelled">Annulée</option>
                 </select>
-                <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <button 
+                  onClick={() => setSelectedOrder(order)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
                   Détails
                 </button>
               </div>
