@@ -128,6 +128,17 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
         }).format(price);
     };
 
+    const getStatusText = (status) => {
+        switch (status) {
+            case 'pending': return 'En attente';
+            case 'processing': return 'En cours';
+            case 'shipped': return 'Expédiée';
+            case 'delivered': return 'Livrée';
+            case 'cancelled': return 'Annulée';
+            default: return status;
+        }
+    };
+
     const filteredOrders = orders.filter(order => {
         const query = searchQuery.toLowerCase();
         const productNames = order.products ? order.products.map(p => p.name.toLowerCase()).join(' ') : '';
@@ -207,7 +218,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                         <td className="px-6 py-4 text-sm font-medium">{formatPrice(order.totalAmount)}</td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 text-xs rounded-full ${order.status === 'delivered' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                                {order.status}
+                                                {getStatusText(order.status)}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 flex items-center space-x-2">
@@ -217,9 +228,9 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                                 className="border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                                             >
                                                 <option value="pending">En attente</option>
-                                                <option value="processing">En traitement</option>
+                                                <option value="processing">En cours</option>
                                                 <option value="shipped">Expédiée</option>
-                                                <option value="delivered">Livrées</option>
+                                                <option value="delivered">Livrée</option>
                                                 <option value="cancelled">Annulée</option>
                                             </select>
                                             {user && user.role === 'super_admin' && (

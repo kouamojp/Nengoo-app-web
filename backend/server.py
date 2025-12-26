@@ -171,6 +171,16 @@ async def order_owner_or_support_required(
             detail="You are not the owner of this order.",
         )
 
+def get_status_text_fr(status: str) -> str:
+    status_texts = {
+        "pending": "En attente",
+        "processing": "En cours",
+        "shipped": "Expédiée",
+        "delivered": "Livrée",
+        "cancelled": "Annulée"
+    }
+    return status_texts.get(status, status)
+
 # --- Hashing Utility ---
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
@@ -1384,13 +1394,15 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
     
     # Check if status has changed and send notification
     if 'status' in update_data and order_before_update.get('status') != updated_order.get('status'):
+        status_fr = get_status_text_fr(updated_order["status"])
+        
         # In-app notification for buyer
         new_notification = Notification(
             recipient_id=updated_order["buyerId"],
             recipient_type='buyer',
             type='order_status',
             title=f"Mise à jour commande #{updated_order['id']}",
-            message=f"Le statut de votre commande est maintenant : {updated_order['status']}",
+            message=f"Le statut de votre commande est maintenant : {status_fr}",
             link=f"/profile/orders"
         )
         await db.notifications.insert_one(new_notification.dict())
@@ -1403,7 +1415,7 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
                 template_body={
                     "buyer_name": buyer["name"],
                     "order_id": updated_order["id"],
-                    "status": updated_order["status"],
+                    "status": status_fr,
                 },
                 subtype="html"
             )

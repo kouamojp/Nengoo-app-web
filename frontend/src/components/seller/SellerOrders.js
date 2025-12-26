@@ -4,6 +4,16 @@ import SellerHeader from './SellerHeader';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
+const getStatusText = (status) => {
+  switch (status) {
+    case 'pending': return 'En attente';
+    case 'shipped': return 'Expédiée';
+    case 'delivered': return 'Livrée';
+    case 'cancelled': return 'Annulée';
+    default: return status;
+  }
+};
+
 const OrderDetailModal = ({ order, onClose, formatPrice }) => {
   if (!order) return null;
 
@@ -18,7 +28,7 @@ const OrderDetailModal = ({ order, onClose, formatPrice }) => {
               </div>
               <div className="space-y-4">
                   <p><strong>Date:</strong> {new Date(order.orderedDate).toLocaleDateString()}</p>
-                  <p><strong>Statut:</strong> {order.status}</p>
+                  <p><strong>Statut:</strong> {getStatusText(order.status)}</p>
                   <p><strong>Acheteur:</strong> {order.buyerName}</p>
                   <p><strong>Moyen de livraison:</strong> {order.pickupPointName ? `Retrait au point: ${order.pickupPointName}` : 'Livraison à domicile'}</p>
                   {order.shippingAddress && (
@@ -27,6 +37,7 @@ const OrderDetailModal = ({ order, onClose, formatPrice }) => {
                        <p className="text-sm">{order.shippingAddress}</p>
                        <p className="text-sm">{order.shippingCity}, {order.shippingRegion}</p>
                        <p className="text-sm">Tél: {order.shippingPhone}</p>
+                       <p className="text-sm pt-2"><button><a className="bg-green-600 text-white px-6 py-2 rounded-md" href={`https://wa.me/237${order.shippingPhone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">Contactez le client via WhatsApp</a></button> </p>
                      </div>
                   )}
                   
@@ -149,16 +160,6 @@ const SellerOrders = (props) => {
     }
   };
 
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'pending': return 'En attente';
-      case 'shipped': return 'Expédiée';
-      case 'delivered': return 'Livrée';
-      case 'cancelled': return 'Annulée';
-      default: return status;
-    }
-  };
-
   return (
     <div className="lg:col-span-3">
       <SellerHeader title="Gestion des Commandes" language={language} user={user} />
@@ -196,8 +197,8 @@ const SellerOrders = (props) => {
             {/* Order Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
               <div>
-                <div className="flex items-center space-x-4">
-                  <h3 className="text-lg font-bold">Commande {order.id}</h3>
+                <div className="flex items-center space-x-2 justify-between">
+                  <h3 className="text-lg font-bold max-sm:text-left">Commande {order.id}</h3>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
                     {getStatusIcon(order.status)} {getStatusText(order.status)}
                   </span>
