@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
 const SellerOrders = (props) => {
   const { language, user } = props;
   const [orders, setOrders] = useState([]);
@@ -12,7 +14,7 @@ const SellerOrders = (props) => {
       if (!user) return;
       try {
         const sellerId = user.id; 
-        const response = await fetch(`http://localhost:8000/api/orders?seller_id=${sellerId}`);
+        const response = await fetch(`${API_BASE_URL}/orders?seller_id=${sellerId}`);
         if (!response.ok) {
           throw new Error('Failed to fetch orders');
         }
@@ -33,7 +35,7 @@ const SellerOrders = (props) => {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/orders/${orderId}`, {
+      const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
