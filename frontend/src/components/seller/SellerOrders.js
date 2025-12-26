@@ -32,10 +32,23 @@ const OrderDetailModal = ({ order, onClose, formatPrice }) => {
                   
                   <div>
                       <p className="font-bold">Produits:</p>
-                      <ul className="list-disc list-inside space-y-2 mt-2">
+                      <ul className="space-y-3 mt-2">
                           {order.products.map(p => (
-                              <li key={p.productId}>
-                                  {p.name} (x{p.quantity}) - <span className="font-medium">{formatPrice(p.price * p.quantity)}</span>
+                              <li key={p.productId} className="flex items-center space-x-4 bg-gray-50 p-2 rounded-lg">
+                                  <img 
+                                    src={p.image || process.env.PUBLIC_URL + '/images/logo-nengoo.png'} 
+                                    alt={p.name} 
+                                    className="w-12 h-12 object-cover rounded shadow-sm"
+                                    onError={(e) => {
+                                        e.target.onerror = null;
+                                        e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
+                                    }}
+                                  />
+                                  <div className="flex-1">
+                                      <p className="font-medium text-sm">{p.name}</p>
+                                      <p className="text-xs text-gray-500">Quantité: {p.quantity}</p>
+                                  </div>
+                                  <span className="font-semibold text-sm">{formatPrice(p.price * p.quantity)}</span>
                               </li>
                           ))}
                       </ul>

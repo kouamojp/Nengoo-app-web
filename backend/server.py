@@ -297,6 +297,7 @@ class OrderProduct(BaseModel):
     name: str
     quantity: int
     price: float
+    image: Optional[str] = None
 
 class Order(BaseModel):
     id: str
@@ -1512,7 +1513,8 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             productId=item.id,
             name=product_info["name"],
             quantity=item.quantity,
-            price=product_info.get("promoPrice") if product_info.get("promoPrice") and product_info.get("promoPrice") > 0 else product_info["price"]
+            price=product_info.get("promoPrice") if product_info.get("promoPrice") and product_info.get("promoPrice") > 0 else product_info["price"],
+            image=product_info["images"][0] if product_info.get("images") and len(product_info["images"]) > 0 else None
         ))
 
     created_orders = []
