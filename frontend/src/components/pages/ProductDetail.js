@@ -415,7 +415,7 @@ const ProductDetail = (props) => {
                   </button>
                   <button
                     onClick={() => {
-                      //addToCart(product, quantity);
+                      addToCart(product, quantity);
                       navigate('/checkout');
                     }}
                     disabled={!product.inStock}
