@@ -1630,6 +1630,29 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             )
             background_tasks.add_task(fm.send_message, message_seller, template_name="new_order_seller.html")
 
+        # 3. To Super Admins
+        super_admins_cursor = db.admins.find({"role": "super_admin", "status": "active"})
+        super_admins = await super_admins_cursor.to_list(10)
+        super_admin_emails = [admin["email"] for admin in super_admins if admin.get("email")]
+        
+        if super_admin_emails:
+            message_admin = MessageSchema(
+                subject=f"ALERTE : Nouvelle commande Nengoo #{new_order.id}",
+                recipients=super_admin_emails,
+                template_body={
+                    "order_id": new_order.id,
+                    "buyer_name": buyer_name,
+                    "seller_name": order_details["sellerName"],
+                    "total_amount": total_amount,
+                    "admin_url": f"https://www.nengoo.com/admin/dashboard" # Adjust as needed
+                },
+                subtype="html"
+            )
+            # We can reuse the new_order_seller template or create a specific one. 
+            # For now, using seller one or simple body. Let's assume we use a dedicated one if exists, 
+            # but I'll use new_order_seller.html as a base if no specific one is provided.
+            background_tasks.add_task(fm.send_message, message_admin, template_name="new_order_seller.html")
+
     return created_orders
 
 class SavedAddress(BaseModel):
