@@ -1014,6 +1014,17 @@ async def create_product(product_data: ProductCreate,
     else:
         raise HTTPException(status_code=403, detail="Not authorized to create products.")
 
+    # Check for duplicate product name for this seller
+    existing_product = await db.products.find_one({
+        "sellerId": seller_id_to_use,
+        "name": {"$regex": f"^{re.escape(product_data.name)}$", "$options": "i"}
+    })
+    if existing_product:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Vous avez déjà un produit nommé '{product_data.name}'. Veuillez utiliser un nom différent."
+        )
+
     product_dict = product_data.dict()
     product_dict["slug"] = await get_unique_slug(product_data.name)
     product = Product(**product_dict)
@@ -1027,6 +1038,26 @@ async def update_product(product_id: str, product_data: ProductUpdate):
     update_data = product_data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
+    
+    # If name is being updated, check for duplicates
+    if "name" in update_data:
+        # Get current product to find the sellerId
+        current_product = await db.products.find_one({"id": product_id})
+        if current_product:
+            seller_id = current_product["sellerId"]
+            duplicate = await db.products.find_one({
+                "sellerId": seller_id,
+                "name": {"$regex": f"^{re.escape(update_data['name'])}$", "$options": "i"},
+                "id": {"$ne": product_id}
+            })
+            if duplicate:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Vous avez déjà un autre produit nommé '{update_data['name']}'."
+                )
+            
+            # Also update slug if name changes
+            update_data["slug"] = await get_unique_slug(update_data["name"])
     
     await db.products.update_one({"id": product_id}, {"$set": update_data})
     updated_product = await db.products.find_one({"id": product_id})
