@@ -31,6 +31,7 @@ const OrderDetailModal = ({ order, onClose, formatPrice }) => {
                   <p><strong>Statut:</strong> {getStatusText(order.status)}</p>
                   <p><strong>Acheteur:</strong> {order.buyerName}</p>
                   <p><strong>Moyen de livraison:</strong> {order.pickupPointName ? `Retrait au point: ${order.pickupPointName}` : 'Livraison à domicile'}</p>
+                  <p className="text-sm pt-2"><button><a className="bg-green-600 text-white px-6 py-2 rounded-md" href={`https://wa.me/237${order.buyerWhatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">Contactez le client via WhatsApp</a></button> </p>
                   {order.shippingAddress && (
                      <div className="bg-gray-50 p-3 rounded">
                        <p className="font-semibold text-sm">Adresse de livraison:</p>
