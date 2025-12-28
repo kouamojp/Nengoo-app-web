@@ -1007,7 +1007,10 @@ async def create_product(product_data: ProductCreate,
         
         seller = await db.sellers.find_one({"id": product_data.sellerId})
         if not seller:
-            raise HTTPException(status_code=404, detail=f"Seller with ID {product_data.sellerId} not found.")
+            # Check if it is an admin acting as a seller
+            admin = await db.admins.find_one({"id": product_data.sellerId})
+            if not admin:
+                raise HTTPException(status_code=404, detail=f"Seller with ID {product_data.sellerId} not found.")
 
         seller_id_to_use = product_data.sellerId
         seller_name_to_use = product_data.sellerName
@@ -1184,7 +1187,7 @@ async def can_user_review_product(
 
 # --- Seller Management ---
 @api_router.post("/sellers", response_model=Seller)
-async def create_seller(seller_data: SellerCreate):
+async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends(get_current_admin_role)):
     if await db.sellers.find_one({"whatsapp": seller_data.whatsapp}):
         raise HTTPException(status_code=400, detail="Seller with this WhatsApp number already exists.")
 
@@ -1193,7 +1196,13 @@ async def create_seller(seller_data: SellerCreate):
     seller_dict = seller_data.dict()
     seller_dict['password'] = hashed_password
     seller_dict['id'] = f"seller_{str(uuid.uuid4())[:8]}"
-    seller_dict['status'] = "pending"
+    
+    # Auto-approve if created by an admin
+    if role in ["super_admin", "admin", "moderator"]:
+        seller_dict['status'] = "approved"
+    else:
+        seller_dict['status'] = "pending"
+        
     seller_dict['createdAt'] = datetime.utcnow()
     seller_dict['updatedAt'] = datetime.utcnow()
 

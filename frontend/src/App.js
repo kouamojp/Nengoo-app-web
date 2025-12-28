@@ -12,6 +12,7 @@ import {
   UserProfile,
   About,
   SearchResults,
+  SellerShop,
   SellerDashboard,
   SellerProducts,
   SellerOrders,
@@ -177,6 +178,9 @@ function App() {
           <Route path="/reset-password" element={<ResetPassword {...appProps} />} />
           <Route path="/pending-approval" element={<PendingApproval {...appProps} />} />
           
+          {/* Public Seller Shop Route */}
+          <Route path="/seller/:id" element={<SellerShop {...appProps} />} />
+
           {/* Seller Routes */}
           <Route path="/seller" element={<SellerDashboard {...appProps} />} />
           <Route path="/seller/products" element={<SellerProducts {...appProps} />} />

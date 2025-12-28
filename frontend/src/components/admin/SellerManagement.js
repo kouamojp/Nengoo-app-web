@@ -11,6 +11,64 @@ const SellerManagement = (props) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSellers, setSelectedSellers] = useState([]);
 
+    // State for create modal
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [newSeller, setNewSeller] = useState({
+        businessName: '',
+        name: '',
+        whatsapp: '',
+        email: '',
+        password: '',
+        address: '',
+        city: '',
+        region: '',
+        deliveryPrice: 0,
+        description: '',
+        categories: []
+    });
+
+    const handleCreateInputChange = (e) => {
+        const { name, value } = e.target;
+        setNewSeller({ ...newSeller, [name]: value });
+    };
+
+    const handleCreateSeller = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await fetch(`${API_BASE_URL}/sellers`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Role': user.role,
+                },
+                body: JSON.stringify(newSeller),
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Failed to create seller');
+            }
+            await fetchSellers();
+            setShowCreateModal(false);
+            setNewSeller({
+                businessName: '',
+                name: '',
+                whatsapp: '',
+                email: '',
+                password: '',
+                address: '',
+                city: '',
+                region: '',
+                deliveryPrice: 0,
+                description: '',
+                categories: []
+            });
+            alert('✅ Vendeur créé avec succès!');
+        } catch (error) {
+            console.error('Error creating seller:', error);
+            alert(`Erreur: ${error.message}`);
+        }
+    };
+
     // State for the edit modal
     const [showEditModal, setShowEditModal] = useState(false);
     const [currentSeller, setCurrentSeller] = useState(null);
@@ -210,14 +268,46 @@ const SellerManagement = (props) => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
-                <button
-                    onClick={handleBulkDelete}
-                    disabled={selectedSellers.length === 0}
-                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
-                >
-                    Supprimer la sélection
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                    >
+                        + Ajouter un vendeur
+                    </button>
+                    <button
+                        onClick={handleBulkDelete}
+                        disabled={selectedSellers.length === 0}
+                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
+                    >
+                        Supprimer la sélection
+                    </button>
+                </div>
             </div>
+
+            {showCreateModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-gray-900">➕ Ajouter un vendeur</h2>
+                            <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+                        </div>
+                        <form onSubmit={handleCreateSeller} className="space-y-4">
+                            <input type="text" name="businessName" value={newSeller.businessName} onChange={handleCreateInputChange} placeholder="Nom de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="name" value={newSeller.name} onChange={handleCreateInputChange} placeholder="Nom du propriétaire" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="tel" name="whatsapp" value={newSeller.whatsapp} onChange={handleCreateInputChange} placeholder="WhatsApp (ex: 2376xxxxxxxx)" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="email" name="email" value={newSeller.email} onChange={handleCreateInputChange} placeholder="Email" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="password" name="password" value={newSeller.password} onChange={handleCreateInputChange} placeholder="Mot de passe" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="address" value={newSeller.address} onChange={handleCreateInputChange} placeholder="Adresse" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="city" value={newSeller.city} onChange={handleCreateInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="text" name="region" value={newSeller.region} onChange={handleCreateInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
+                            <input type="number" name="deliveryPrice" value={newSeller.deliveryPrice} onChange={handleCreateInputChange} placeholder="Prix de livraison" className="w-full px-4 py-3 border rounded-lg" required />
+                            <textarea name="description" value={newSeller.description} onChange={handleCreateInputChange} placeholder="Description de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
+                            <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold">Créer le vendeur</button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {showEditModal && currentSeller && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">

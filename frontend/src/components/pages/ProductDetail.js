@@ -477,7 +477,9 @@ const ProductDetail = (props) => {
                         {seller.businessName.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-semibold text-lg">{seller.businessName}</h4>
+                        <Link to={`/seller/${seller.id}`} className="font-semibold text-lg hover:text-purple-600 transition-colors">
+                            {seller.businessName}
+                        </Link>
                         <p className="text-sm text-gray-600">{seller.name}</p>
                         <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
                           <span className="flex items-center">

@@ -181,7 +181,7 @@ const Homepage = (props) => {
               <img
                 src={heroImageUrl || "https://images.unsplash.com/photo-1550041499-4c5857d2b508"}
                 alt="Hero"
-                className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full"
+                className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full max-h-96 object-cover"
               />
               {/* <div className="absolute -bottom-4 -left-4 bg-yellow-400 text-black p-3 sm:p-4 rounded-lg font-bold text-center">
                 {t.flashSale} 🔥<br />

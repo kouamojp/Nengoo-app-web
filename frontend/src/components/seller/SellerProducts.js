@@ -608,10 +608,10 @@ const SellerProducts = (props) => {
                       {formatPrice(product.price)}
                     </span>
                   )}
-                  <div className="flex items-center">
+                  {/* <div className="flex items-center">
                     <span className="text-yellow-400 mr-1">⭐</span>
                     <span className="text-sm">{product.rating} ({product.reviews})</span>
-                  </div>
+                  </div> */}
                 </div>
                 <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                   {product.description ? product.description[language] : ''}
