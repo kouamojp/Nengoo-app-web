@@ -129,7 +129,7 @@ const SellerShop = (props) => {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                            <div className="md:col-span-2 max-md:text-left">
+                            <div className="md:col-span-2 text-left">
                                 <h3 className="text-lg font-semibold mb-2">À propos</h3>
                                 <p className="text-gray-700 leading-relaxed">
                                     {seller.description || "Aucune description disponible."}
