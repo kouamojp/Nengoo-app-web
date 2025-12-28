@@ -108,3 +108,5 @@ android-sdk/ -e
 *.env.*
 
 frontend/build/
+
+nengoo-front
