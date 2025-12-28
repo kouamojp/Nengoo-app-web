@@ -110,9 +110,9 @@ const SellerShop = (props) => {
                                         seller.businessName.charAt(0).toUpperCase()
                                     )}
                                 </div>
-                                <div className="ml-4 mb-1">
-                                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{seller.businessName}</h1>
-                                    <p className="text-gray-600">{seller.name}</p>
+                                <div className="ml-4 mb-1 p-4 bg-purple-600 text-white rounded-lg shadow-lg">
+                                    <h1 className="text-2xl md:text-3xl font-bold">{seller.businessName}</h1>
+                                    <p className="">{seller.name}</p>
                                 </div>
                             </div>
                             <div className="hidden md:flex space-x-3">
