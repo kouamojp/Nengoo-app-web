@@ -189,6 +189,31 @@ const ProductDetail = (props) => {
     }
   };
 
+  const handleWhatsAppClick = async () => {
+    // Record the click
+    try {
+        // Fire and forget (don't await strictly for the UI to respond, but it's cleaner to await if it's fast)
+        // We don't want to block the user from opening WhatsApp if the API fails or is slow
+        fetch(`${API_BASE_URL}/analytics/whatsapp-click`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                productId: product.id,
+                productName: product.name[language],
+                sellerId: seller.id,
+                sellerName: seller.businessName
+            }),
+        }).catch(err => console.error("Error recording WhatsApp click:", err));
+    } catch (error) {
+        console.error("Error recording WhatsApp click:", error);
+    }
+    
+    // Open WhatsApp
+    openWhatsApp(seller.whatsapp, generateProductWhatsAppMessage(product, language));
+  };
+
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (newReviewRating === 0) {
@@ -427,7 +452,7 @@ const ProductDetail = (props) => {
                   {/* WhatsApp Contact Button */}
                   {seller && seller.whatsapp && (
                     <button
-                      onClick={() => openWhatsApp(seller.whatsapp, generateProductWhatsAppMessage(product, language))}
+                      onClick={handleWhatsAppClick}
                       className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
                     >
                       <span>📱</span>

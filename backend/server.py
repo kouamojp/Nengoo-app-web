@@ -548,7 +548,45 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
     user_type: str
 
+class WhatsAppClick(BaseModel):
+    id: str = Field(default_factory=lambda: f"wac_{str(uuid.uuid4())[:8]}")
+    productId: str
+    productName: str
+    sellerId: str
+    sellerName: str
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class WhatsAppClickCreate(BaseModel):
+    productId: str
+    productName: str
+    sellerId: str
+    sellerName: str
+
 # --- Auth Endpoints (Forgot Password) ---
+
+@api_router.post("/analytics/whatsapp-click", status_code=status.HTTP_201_CREATED)
+async def record_whatsapp_click(click_data: WhatsAppClickCreate):
+    new_click = WhatsAppClick(**click_data.dict())
+    await db.whatsapp_clicks.insert_one(new_click.dict())
+    return {"message": "Click recorded"}
+
+@api_router.get("/analytics/whatsapp-clicks", dependencies=[Depends(admin_or_higher_required)])
+async def get_whatsapp_clicks_analytics():
+    pipeline = [
+        {
+            "$group": {
+                "_id": "$productId",
+                "productName": { "$first": "$productName" },
+                "sellerName": { "$first": "$sellerName" },
+                "clickCount": { "$sum": 1 },
+                "lastClick": { "$max": "$timestamp" }
+            }
+        },
+        { "$sort": { "clickCount": -1 } }
+    ]
+    clicks_cursor = db.whatsapp_clicks.aggregate(pipeline)
+    clicks = await clicks_cursor.to_list(1000)
+    return clicks
 
 @api_router.post("/auth/forgot-password", status_code=status.HTTP_200_OK)
 async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):

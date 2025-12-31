@@ -10,6 +10,7 @@ import OrderManagement from './OrderManagement';
 import CategoryManagement from './CategoryManagement';
 import ShippingSettingsManagement from './ShippingSettingsManagement';
 import HomepageManagement from './HomepageManagement'; // Importer le nouveau composant
+import WhatsAppAnalytics from './WhatsAppAnalytics';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -141,6 +142,9 @@ const AdminDashboard = (props) => {
                             <button onClick={() => handleNavigate('pickupPoints')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'pickupPoints' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                 <span className="text-xl">📍</span><span className="font-medium text-sm">Points de retrait</span>
                             </button>
+                            <button onClick={() => handleNavigate('whatsappAnalytics')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'whatsappAnalytics' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                                <span className="text-xl">📈</span><span className="font-medium text-sm">Analytics WhatsApp</span>
+                            </button>
                             {user.type === 'admin' && (
                                 <button onClick={() => handleNavigate('categories')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'categories' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                     <span className="text-xl">🏷️</span><span className="font-medium text-sm">Catégories</span>
@@ -183,6 +187,9 @@ const AdminDashboard = (props) => {
                     </div>
                     <div id="pickupPoints-section" className={`${activeSection === 'pickupPoints' ? '' : 'hidden'}`}>
                         <PickupPointManagement {...props} />
+                    </div>
+                    <div id="whatsappAnalytics-section" className={`${activeSection === 'whatsappAnalytics' ? '' : 'hidden'}`}>
+                        <WhatsAppAnalytics {...props} />
                     </div>
                     <div id="buyers-section" className={`${activeSection === 'buyers' ? '' : 'hidden'}`}>
                         <BuyerManagement {...props} />
