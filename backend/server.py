@@ -2515,7 +2515,7 @@ async def get_product_og_html(product_id: str):
     product_image = product.get('images', [''])[0] if product.get('images') else ''
     product_price = product.get('price', 0)
     product_stock = product.get('stock', 0)
-    frontend_url = "http://localhost:3000"  # Change to production URL
+    frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
 
     html_content = f"""
 <!DOCTYPE html>
