@@ -158,6 +158,9 @@ const AdminDashboard = (props) => {
                                     <button onClick={() => handleNavigate('shipping')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'shipping' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                         <span className="text-xl">🚚</span><span className="font-medium text-sm">Frais de livraison</span>
                                     </button>
+                                    <Link to="/admin/privacy-policy" className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors hover:bg-gray-100">
+                                        <span className="text-xl">🔒</span><span className="font-medium text-sm">Politique de confidentialité</span>
+                                    </Link>
                                 </>
                             )}
                             <div className="border-t border-gray-200 my-2"></div>

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks
+from fastapi.responses import HTMLResponse
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr
 from dotenv import load_dotenv
@@ -50,12 +51,21 @@ origins = [
     "https://nengoo.com",
     "https://nengoo-app-web.vercel.app",
     "https://nengoo-app-web.onrender.com",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "http://localhost:8000",
 ]
+
+# En développement, autoriser toutes les origines localhost
+# Pour production, utilisez la liste origins ci-dessus
+if os.getenv("ENVIRONMENT", "development") == "development":
+    allow_origins_list = ["*"]  # Autorise toutes les origines en dev
+else:
+    allow_origins_list = origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=allow_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -479,9 +489,30 @@ class BuyerUpdate(BaseModel):
     status: Optional[str] = None
     password: Optional[str] = None
 
+class BuyerCreate(BaseModel):
+    whatsapp: str
+    password: str  # Plain text password
+    name: str
+    email: str
+
+class BuyerLoginRequest(BaseModel):
+    whatsapp: str
+    password: str
+
 class NewsletterSubscription(BaseModel):
     email: str
     subscribed_at: datetime = Field(default_factory=datetime.utcnow)
+
+class PrivacyPolicy(BaseModel):
+    id: str = Field(default="privacy_policy_v1")
+    title: str = "Politique de confidentialité"
+    content: str
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
+    updated_by: Optional[str] = None  # Admin ID who last updated
+
+class PrivacyPolicyUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
 
 class Message(BaseModel):
     id: str = Field(default_factory=lambda: f"msg_{str(uuid.uuid4())[:8]}")
@@ -538,6 +569,20 @@ class Review(BaseModel):
 class ReviewCreate(BaseModel):
     rating: int = Field(..., ge=1, le=5)
     comment: Optional[str] = None
+
+class ProductInteraction(BaseModel):
+    id: str = Field(default_factory=lambda: f"int_{uuid.uuid4().hex[:8]}")
+    userId: str
+    productId: str
+    isFavourite: bool = False
+    rating: int = Field(default=0, ge=0, le=5)
+    interaction: str = "view"  # "view", "favourite", "rate"
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class ProductInteractionCreate(BaseModel):
+    isFavourite: bool = False
+    rating: int = Field(default=0, ge=0, le=5)
+    interaction: str = "view"
 
 class ForgotPasswordRequest(BaseModel):
     email: str
@@ -944,6 +989,60 @@ async def update_homepage_settings(settings: HomepageSettings):
     return settings
 
 # --- Buyer Management ---
+@api_router.post("/buyers/register", response_model=Buyer)
+async def register_buyer(buyer_data: BuyerCreate):
+    """Register a new buyer account"""
+    # Check if buyer already exists
+    existing_buyer = await db.users.find_one({"whatsapp": buyer_data.whatsapp, "type": "buyer"})
+    if existing_buyer:
+        raise HTTPException(status_code=400, detail="Un compte avec ce numéro WhatsApp existe déjà")
+
+    # Hash password
+    hashed_password = hash_password(buyer_data.password)
+
+    # Create buyer
+    new_buyer = Buyer(
+        id=f"buyer_{str(uuid.uuid4())[:8]}",
+        whatsapp=buyer_data.whatsapp,
+        password=hashed_password,
+        name=buyer_data.name,
+        email=buyer_data.email,
+        type="buyer",
+        joinDate=datetime.utcnow(),
+        status="active",
+        totalOrders=0,
+        totalSpent=0.0
+    )
+
+    await db.users.insert_one(new_buyer.dict())
+    return new_buyer
+
+@api_router.post("/buyers/login", response_model=Buyer)
+async def buyer_login(login_data: BuyerLoginRequest):
+    """Login for buyer accounts"""
+    logging.info(f"[BUYER LOGIN] Attempting login with WhatsApp: {login_data.whatsapp}")
+
+    buyer = await db.users.find_one({"whatsapp": login_data.whatsapp, "type": "buyer"})
+
+    if not buyer:
+        logging.warning(f"[BUYER LOGIN] Buyer not found with WhatsApp: {login_data.whatsapp}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
+
+    if not buyer.get("password"):
+        logging.warning(f"[BUYER LOGIN] Buyer {login_data.whatsapp} has no password")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Ce compte n'a pas de mot de passe. Veuillez vous inscrire.")
+
+    if not verify_password(login_data.password, buyer["password"]):
+        logging.warning(f"[BUYER LOGIN] Invalid password for buyer {login_data.whatsapp}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
+
+    if buyer.get("status") != "active":
+        logging.warning(f"[BUYER LOGIN] Buyer {login_data.whatsapp} account is not active: {buyer.get('status')}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Votre compte est désactivé")
+
+    logging.info(f"[BUYER LOGIN] Login successful for {login_data.whatsapp}")
+    return Buyer(**buyer)
+
 @api_router.get("/buyers", response_model=List[Buyer], dependencies=[Depends(super_admin_required)])
 async def list_buyers():
     buyers_cursor = db.users.find({"type": "buyer"})
@@ -1223,6 +1322,207 @@ async def can_user_review_product(
 
     return CanReviewResponse(canReview=True, hasAlreadyReviewed=False)
 
+# --- Product Interactions ---
+@api_router.post("/interaction/{product_id}")
+async def create_product_interaction(
+    product_id: str,
+    interaction_data: ProductInteractionCreate,
+    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
+    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")
+):
+    """Create or update a product interaction (view, favourite, rating)"""
+    user_id = x_buyer_id or x_seller_id
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User ID required")
+
+    # Check if product exists
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Find existing interaction
+    existing = await db.interactions.find_one({
+        "userId": user_id,
+        "productId": product_id
+    })
+
+    if existing:
+        # Update existing interaction
+        update_data = {
+            "isFavourite": interaction_data.isFavourite,
+            "rating": interaction_data.rating,
+            "interaction": interaction_data.interaction,
+            "timestamp": datetime.utcnow()
+        }
+        await db.interactions.update_one(
+            {"_id": existing["_id"]},
+            {"$set": update_data}
+        )
+        existing.update(update_data)
+        interaction = ProductInteraction(**existing)
+    else:
+        # Create new interaction
+        interaction = ProductInteraction(
+            userId=user_id,
+            productId=product_id,
+            isFavourite=interaction_data.isFavourite,
+            rating=interaction_data.rating,
+            interaction=interaction_data.interaction
+        )
+        await db.interactions.insert_one(interaction.dict())
+
+    # Update product stats
+    if interaction_data.isFavourite:
+        await db.products.update_one(
+            {"id": product_id},
+            {"$inc": {"favorites": 1}}
+        )
+
+    if interaction_data.interaction == "view":
+        await db.products.update_one(
+            {"id": product_id},
+            {"$inc": {"views": 1}}
+        )
+
+    return {
+        "status": "OK",
+        "statusCode": 200,
+        "path": f"/api/interaction/{product_id}",
+        "message": "Interaction created successfully",
+        "detail": None,
+        "data": interaction.dict(),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@api_router.get("/interactions/product/{product_id}")
+async def get_product_interactions(
+    product_id: str,
+    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
+    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")
+):
+    """Get aggregated interaction stats for a product"""
+    user_id = x_buyer_id or x_seller_id
+
+    # Get total views, favorites, and ratings
+    pipeline = [
+        {"$match": {"productId": product_id}},
+        {"$group": {
+            "_id": None,
+            "GIT_Count": {"$sum": 1},  # Total interactions
+            "RaterCount": {
+                "$sum": {"$cond": [{"$gt": ["$rating", 0]}, 1, 0]}
+            },
+            "avgRating": {
+                "$avg": {"$cond": [{"$gt": ["$rating", 0]}, "$rating", None]}
+            }
+        }}
+    ]
+
+    result = await db.interactions.aggregate(pipeline).to_list(1)
+
+    # Check if current user has favourited
+    is_favourite = False
+    if user_id:
+        user_interaction = await db.interactions.find_one({
+            "userId": user_id,
+            "productId": product_id
+        })
+        is_favourite = user_interaction.get("isFavourite", False) if user_interaction else False
+
+    if result:
+        stats = result[0]
+        return {
+            "status": "OK",
+            "statusCode": 200,
+            "path": f"/api/interactions/product/{product_id}",
+            "message": "Product interactions retrieved successfully",
+            "detail": None,
+            "data": {
+                "GIT_Count": stats.get("GIT_Count", 0),
+                "RaterCount": stats.get("RaterCount", 0),
+                "rating": stats.get("avgRating", 0.0) or 0.0,
+                "isFavourite": is_favourite
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    else:
+        return {
+            "status": "OK",
+            "statusCode": 200,
+            "path": f"/api/interactions/product/{product_id}",
+            "message": "No interactions found",
+            "detail": None,
+            "data": {
+                "GIT_Count": 0,
+                "RaterCount": 0,
+                "rating": 0.0,
+                "isFavourite": is_favourite
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@api_router.get("/interactions/user")
+async def get_user_interactions(
+    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
+    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id"),
+    page: int = 0,
+    size: int = 8,
+    sort: str = "timestamp,desc"
+):
+    """Get all interactions for a user (favourites, ratings, etc.)"""
+    user_id = x_buyer_id or x_seller_id
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User ID required")
+
+    # Parse sort parameter
+    sort_field, sort_order = sort.split(",") if "," in sort else (sort, "desc")
+    sort_direction = -1 if sort_order == "desc" else 1
+
+    # Get interactions with product details
+    skip = page * size
+    interactions_cursor = db.interactions.find({"userId": user_id}).sort(
+        sort_field, sort_direction
+    ).skip(skip).limit(size)
+
+    interactions = await interactions_cursor.to_list(size)
+
+    # Enrich with product data
+    enriched_interactions = []
+    for interaction in interactions:
+        product = await db.products.find_one({"id": interaction["productId"]})
+        if product:
+            enriched_interactions.append({
+                "id": interaction["id"],
+                "product": product,
+                "isFavourite": interaction.get("isFavourite", False),
+                "rating": interaction.get("rating", 0),
+                "interaction": interaction.get("interaction", "view"),
+                "timestamp": interaction.get("timestamp", datetime.utcnow()).isoformat()
+            })
+
+    # Get total count
+    total = await db.interactions.count_documents({"userId": user_id})
+
+    return {
+        "status": "OK",
+        "statusCode": 200,
+        "path": "/api/interactions/user",
+        "message": "User interactions retrieved successfully",
+        "detail": None,
+        "data": {
+            "content": enriched_interactions,
+            "totalElements": total,
+            "totalPages": (total + size - 1) // size,
+            "size": size,
+            "number": page,
+            "first": page == 0,
+            "last": (page + 1) * size >= total,
+            "numberOfElements": len(enriched_interactions),
+            "empty": len(enriched_interactions) == 0
+        },
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
 # --- Seller Management ---
 @api_router.post("/sellers", response_model=Seller)
 async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends(get_current_admin_role)):
@@ -1277,17 +1577,23 @@ class SellerLoginRequest(BaseModel):
 
 @api_router.post("/sellers/login", response_model=Seller)
 async def seller_login(login_data: SellerLoginRequest):
+    logging.info(f"[SELLER LOGIN] Attempting login with WhatsApp: {login_data.whatsapp}")
+
     seller = await db.sellers.find_one({"whatsapp": login_data.whatsapp})
 
     if not seller:
+        logging.warning(f"[SELLER LOGIN] Seller not found with WhatsApp: {login_data.whatsapp}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
 
     if not verify_password(login_data.password, seller["password"]):
+        logging.warning(f"[SELLER LOGIN] Invalid password for seller {login_data.whatsapp}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
 
     if seller["status"] != "approved":
+        logging.warning(f"[SELLER LOGIN] Seller {login_data.whatsapp} not approved: {seller['status']}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Votre compte vendeur est en attente d'approbation")
-    
+
+    logging.info(f"[SELLER LOGIN] Login successful for {login_data.whatsapp}")
     return Seller(**seller)
 
 @api_router.put("/sellers/{seller_id}/approve", response_model=Seller, dependencies=[Depends(moderator_or_higher_required)])
@@ -2095,6 +2401,201 @@ async def migrate_product_slugs():
         await db.products.update_one({"_id": p["_id"]}, {"$set": {"slug": slug}})
         count += 1
     return {"message": f"Successfully migrated {count} products."}
+
+# --- Privacy Policy Management ---
+@api_router.get("/privacy-policy", response_model=PrivacyPolicy)
+async def get_privacy_policy():
+    """
+    Get the current privacy policy (public endpoint).
+    """
+    policy = await db.privacy_policy.find_one({"id": "privacy_policy_v1"})
+
+    if not policy:
+        # Create default policy if not exists
+        default_policy = PrivacyPolicy(
+            id="privacy_policy_v1",
+            title="Politique de confidentialité",
+            content="""
+# Politique de confidentialité de Nengoo
+
+## 1. Introduction
+
+Bienvenue sur Nengoo. Nous respectons votre vie privée et nous nous engageons à protéger vos données personnelles.
+
+## 2. Données collectées
+
+Nous collectons les informations suivantes :
+- Nom et prénom
+- Adresse email
+- Numéro de téléphone
+- Adresse de livraison
+
+## 3. Utilisation des données
+
+Vos données sont utilisées pour :
+- Traiter vos commandes
+- Communiquer avec vous
+- Améliorer nos services
+
+## 4. Protection des données
+
+Nous mettons en œuvre des mesures de sécurité appropriées pour protéger vos données.
+
+## 5. Vos droits
+
+Vous avez le droit d'accéder, de modifier ou de supprimer vos données personnelles.
+
+## 6. Contact
+
+Pour toute question concernant cette politique, contactez-nous à contact@nengoo.com
+
+*Dernière mise à jour : {date}*
+            """.format(date=datetime.utcnow().strftime("%d/%m/%Y")),
+            last_updated=datetime.utcnow()
+        )
+        await db.privacy_policy.insert_one(default_policy.dict())
+        return default_policy
+
+    return PrivacyPolicy(**policy)
+
+@api_router.put("/privacy-policy", response_model=PrivacyPolicy, dependencies=[Depends(super_admin_required)])
+async def update_privacy_policy(
+    policy_update: PrivacyPolicyUpdate,
+    x_admin_id: Optional[str] = Header(None, alias="X-Admin-Id")
+):
+    """
+    Update the privacy policy (super admin only).
+    """
+    update_data = policy_update.dict(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided.")
+
+    update_data["last_updated"] = datetime.utcnow()
+    update_data["updated_by"] = x_admin_id
+
+    result = await db.privacy_policy.update_one(
+        {"id": "privacy_policy_v1"},
+        {"$set": update_data},
+        upsert=True
+    )
+
+    updated_policy = await db.privacy_policy.find_one({"id": "privacy_policy_v1"})
+
+    if not updated_policy:
+        raise HTTPException(status_code=404, detail="Failed to update privacy policy.")
+
+    return PrivacyPolicy(**updated_policy)
+
+# --- Open Graph / Social Media Sharing ---
+@api_router.get("/og/product/{product_id}", response_class=HTMLResponse)
+async def get_product_og_html(product_id: str):
+    """
+    Generate HTML with Open Graph meta tags for product sharing on social media.
+    This endpoint is used when crawlers from Facebook, Twitter, WhatsApp, etc. visit the link.
+    """
+    product = await db.products.find_one({"id": product_id})
+
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Escape HTML characters in product data
+    def escape_html(text):
+        if not text:
+            return ""
+        return (str(text)
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace('"', "&quot;")
+                .replace("'", "&#x27;"))
+
+    product_name = escape_html(product.get('name', 'Produit'))
+    product_description = escape_html(product.get('description', ''))[:200]
+    product_image = product.get('images', [''])[0] if product.get('images') else ''
+    product_price = product.get('price', 0)
+    product_stock = product.get('stock', 0)
+    frontend_url = "http://localhost:3000"  # Change to production URL
+
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+    <title>{product_name} - Nengoo</title>
+    <meta name="description" content="{product_description}" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="product" />
+    <meta property="og:title" content="{product_name}" />
+    <meta property="og:description" content="{product_description}" />
+    <meta property="og:image" content="{product_image}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url" content="{frontend_url}/product/{product_id}" />
+    <meta property="og:site_name" content="Nengoo Marketplace" />
+    <meta property="og:locale" content="fr_FR" />
+
+    <!-- Product specific meta tags -->
+    <meta property="product:price:amount" content="{product_price}" />
+    <meta property="product:price:currency" content="XAF" />
+    <meta property="product:availability" content="{'in stock' if product_stock > 0 else 'out of stock'}" />
+    <meta property="product:condition" content="new" />
+    <meta property="product:retailer_item_id" content="{product_id}" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="{product_name}" />
+    <meta name="twitter:description" content="{product_description}" />
+    <meta name="twitter:image" content="{product_image}" />
+
+    <!-- WhatsApp -->
+    <meta property="og:image:type" content="image/jpeg" />
+
+    <!-- Auto-redirect to frontend after meta tags are read -->
+    <meta http-equiv="refresh" content="0; url={frontend_url}/product/{product_id}" />
+
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }}
+        .loading {{
+            text-align: center;
+        }}
+        .spinner {{
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }}
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="loading">
+        <div class="spinner"></div>
+        <p>Redirection vers le produit...</p>
+        <p><a href="{frontend_url}/product/{product_id}">Cliquez ici si la redirection ne fonctionne pas</a></p>
+    </div>
+</body>
+</html>
+    """
+
+    return HTMLResponse(content=html_content)
 
 # --- Router Inclusion ---
 from routers.buyers import router as buyers_router

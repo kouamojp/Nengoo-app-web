@@ -2,6 +2,7 @@
 export { default as AdminDashboard } from './admin/AdminDashboard';
 export { default as AdminLogin } from './admin/AdminLogin';
 export { default as AdminManagement } from './admin/AdminManagement';
+export { default as PrivacyPolicyEditor } from './admin/PrivacyPolicyEditor';
 export { default as BuyerSignup } from './auth/BuyerSignup';
 export { default as Login } from './auth/Login';
 export { default as PendingApproval } from './auth/PendingApproval';
@@ -15,6 +16,7 @@ export { default as Header } from './layout/Header';
 export { default as About } from './pages/About';
 export { default as Homepage } from './pages/Homepage';
 export { default as PickupPointsMap } from './pages/PickupPointsMap';
+export { default as PrivacyPolicy } from './pages/PrivacyPolicy';
 export { default as ProductCatalog } from './pages/ProductCatalog';
 export { default as ProductDetail } from './pages/ProductDetail';
 export { default as SellerShop } from './pages/SellerShop';

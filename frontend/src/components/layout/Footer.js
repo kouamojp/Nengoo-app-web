@@ -128,7 +128,12 @@ const Footer = ({ language }) => {
         </div>
 
         <div className="border-t border-gray-700 md:mt-8 pt-8 text-center text-gray-400">
-          <p>&copy; 2025 Nengoo. Tous droits réservés.</p>
+          <p>
+            &copy; 2025 Nengoo. Tous droits réservés. | {' '}
+            <Link to="/privacy-policy" className="text-gray-300 hover:text-white transition-colors underline">
+              Politique de confidentialité
+            </Link>
+          </p>
         </div>
       </div>
     </footer>

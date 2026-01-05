@@ -29,7 +29,9 @@ import {
   AdminDashboard,
   AdminManagement,
   PickupPointsMap,
-  NotificationsPage
+  NotificationsPage,
+  PrivacyPolicy,
+  PrivacyPolicyEditor
 } from './components';
 import BottomNav from './components/layout/BottomNav';
 
@@ -167,7 +169,8 @@ function App() {
           <Route path="/about" element={<About {...appProps} />} />
           <Route path="/search" element={<SearchResults {...appProps} />} />
           <Route path="/pickup-points" element={<PickupPointsMap {...appProps} />} />
-          
+          <Route path="/privacy-policy" element={<PrivacyPolicy {...appProps} />} />
+
           {/* Authentication Routes */}
           <Route path="/login" element={<Login {...appProps} />} />
           <Route path="/signup/buyer" element={<BuyerSignup {...appProps} />} />
@@ -193,6 +196,7 @@ function App() {
           <Route path="/admin/login" element={<AdminLogin {...appProps} />} />
           <Route path="/admin/dashboard" element={<AdminDashboard {...appProps} />} />
           <Route path="/admin/management" element={<AdminManagement {...appProps} />} />
+          <Route path="/admin/privacy-policy" element={<PrivacyPolicyEditor {...appProps} />} />
           {/* Catch-all route for unmatched paths */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
