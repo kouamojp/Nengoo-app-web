@@ -303,6 +303,7 @@ class SellerUpdate(BaseModel):
     logoUrl: Optional[str] = None
     socialMedia: Optional[dict] = None
     deliveryPrice: Optional[float] = None
+    password: Optional[str] = None
 
 class SellerAnalyticsData(BaseModel):
     total_revenue: float
@@ -1623,6 +1624,9 @@ async def update_seller(
     
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
+    
+    if "password" in update_data and update_data["password"]:
+        update_data["password"] = hash_password(update_data["password"])
     
     await db.sellers.update_one({"id": seller_id}, {"$set": update_data})
     updated_seller = await db.sellers.find_one({"id": seller_id})
