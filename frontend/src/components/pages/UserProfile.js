@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import NotificationList from '../ui/NotificationList';
@@ -336,7 +337,7 @@ const UserProfile = (props) => {
             }
         };
 
-        if (activeTab === 'orders') {
+        if (activeTab === 'orders' || activeTab === 'qrcode') {
             fetchOrders();
         } else if (activeTab === 'addresses' || activeTab === 'pickup') {
             fetchSavedInfo();
@@ -487,6 +488,16 @@ const UserProfile = (props) => {
                   >
                     <span className="text-xl">📍</span>
                     <span className="font-medium">Points de retrait</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleNavigate('qrcode')}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                      activeTab === 'qrcode' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xl">📱</span>
+                    <span className="font-medium">Mon QR Code</span>
                   </button>
                 </nav>
               </div>
@@ -701,6 +712,57 @@ const UserProfile = (props) => {
                   ) : (
                     <p className="text-gray-500">Aucun point de retrait utilisé récemment.</p>
                   )}
+                </div>
+              </div>
+
+              {/* QR Code Tab */}
+              <div id="qrcode-section" className={`${activeTab === 'qrcode' ? '' : 'hidden'}`}>
+                <div className="bg-white rounded-lg shadow-md p-6 flex flex-col items-center">
+                    <h2 className="text-2xl font-bold mb-6">Mon Code QR</h2>
+                    {loadingOrders ? (
+                        <div className="flex flex-col items-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+                            <p>Chargement des données...</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="p-4 border-4 border-black rounded-xl bg-white shadow-lg">
+                                <QRCodeSVG
+                                    value={JSON.stringify({
+                                        user: {
+                                            id: user.id,
+                                            name: user.name,
+                                            whatsapp: user.whatsapp,
+                                            email: user.email,
+                                            type: user.type
+                                        },
+                                        orders: userOrders.map(o => ({
+                                            id: o.id,
+                                            date: o.orderedDate,
+                                            status: o.status,
+                                            total: o.totalAmount,
+                                            products: o.products.map(p => ({
+                                                name: p.name,
+                                                quantity: p.quantity,
+                                                price: p.price
+                                            }))
+                                        }))
+                                    })}
+                                    size={256}
+                                    level={"M"}
+                                    includeMargin={true}
+                                />
+                            </div>
+                            <div className="mt-8 text-center max-w-lg">
+                                <h3 className="text-lg font-bold mb-2">{user.name}</h3>
+                                <p className="text-gray-600 mb-4">{user.whatsapp}</p>
+                                <p className="text-sm text-gray-500 bg-gray-100 p-4 rounded-lg">
+                                    Ce code QR contient vos informations d'identification ainsi que l'historique complet de vos commandes et leurs statuts.
+                                    Présentez-le au point de retrait ou au livreur pour vérification rapide.
+                                </p>
+                            </div>
+                        </>
+                    )}
                 </div>
               </div>
   

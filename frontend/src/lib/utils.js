@@ -12,7 +12,9 @@ export const formatPhoneForWhatsApp = (phone) => {
 };
 
 export const generateProductWhatsAppMessage = (product, language) => {
-  return `Bonjour! Je suis intéressé(e) par votre produit "${product.name[language]}" sur Nengoo. Pourriez-vous me donner plus d'informations? Merci!`;
+  const productName = typeof product.name === 'object' ? product.name[language] : product.name;
+  const productUrl = `${window.location.origin}/product/${product.id}`;
+  return `Bonjour! Je suis intéressé(e) par votre produit "${productName}" sur Nengoo: ${productUrl}. Pourriez-vous me donner plus d'informations? Merci!`;
 };
 
 export const createSlug = (text) => {
