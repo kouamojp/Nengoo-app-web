@@ -33,6 +33,7 @@ import {
   PrivacyPolicy,
   PrivacyPolicyEditor
 } from './components';
+import BuyerVerification from './components/admin/BuyerVerification';
 import BottomNav from './components/layout/BottomNav';
 
 function App() {
@@ -197,6 +198,7 @@ function App() {
           <Route path="/admin/dashboard" element={<AdminDashboard {...appProps} />} />
           <Route path="/admin/management" element={<AdminManagement {...appProps} />} />
           <Route path="/admin/privacy-policy" element={<PrivacyPolicyEditor {...appProps} />} />
+          <Route path="/verify-buyer/:buyerId" element={<BuyerVerification {...appProps} />} />
           {/* Catch-all route for unmatched paths */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

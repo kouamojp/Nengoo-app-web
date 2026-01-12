@@ -728,26 +728,17 @@ const UserProfile = (props) => {
                         <>
                             <div className="p-4 border-4 border-black rounded-xl bg-white shadow-lg">
                                 <QRCodeSVG
-                                    value={JSON.stringify({
-                                        user: {
-                                            id: user.id,
-                                            name: user.name,
-                                            whatsapp: user.whatsapp,
-                                            email: user.email,
-                                            type: user.type
-                                        },
-                                        orders: userOrders.map(o => ({
-                                            id: o.id,
-                                            date: o.orderedDate,
-                                            status: o.status,
-                                            total: o.totalAmount,
-                                            products: o.products.map(p => ({
-                                                name: p.name,
-                                                quantity: p.quantity,
-                                                price: p.price
-                                            }))
-                                        }))
-                                    })}
+                                    value={`PROFIL NENGOO\n` +
+                                           `Nom: ${user.name}\n` +
+                                           `ID: ${user.id}\n` +
+                                           `WhatsApp: ${user.whatsapp}\n\n` +
+                                           `DERNIERES COMMANDES:\n` +
+                                           userOrders.slice(0, 5).map(o => 
+                                             `#${o.id} - ${o.status}\n` +
+                                             `Date: ${new Date(o.orderedDate).toLocaleDateString()}\n` +
+                                             `Total: ${o.totalAmount} FCFA\n` +
+                                             `Produits: ${o.products.map(p => `${p.quantity}x ${p.name}`).join(', ')}`
+                                           ).join('\n---\n')}
                                     size={256}
                                     level={"M"}
                                     includeMargin={true}
@@ -757,8 +748,7 @@ const UserProfile = (props) => {
                                 <h3 className="text-lg font-bold mb-2">{user.name}</h3>
                                 <p className="text-gray-600 mb-4">{user.whatsapp}</p>
                                 <p className="text-sm text-gray-500 bg-gray-100 p-4 rounded-lg">
-                                    Ce code QR contient vos informations d'identification ainsi que l'historique complet de vos commandes et leurs statuts.
-                                    Présentez-le au point de retrait ou au livreur pour vérification rapide.
+                                    Scannez ce code pour voir les informations du profil et les dernières commandes en format texte simple.
                                 </p>
                             </div>
                         </>
