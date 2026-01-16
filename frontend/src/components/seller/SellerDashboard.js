@@ -14,7 +14,7 @@ import SellerProfile from './SellerProfile';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const SellerDashboard = (props) => {
-  const { language, user } = props;
+  const { language, user, setUser } = props;
   const [activeSection, setActiveSection] = useState('dashboard');
   const [stats, setStats] = useState([
     { title: "Ventes Totales", value: "0", icon: "💰", color: "from-green-400 to-green-600", change: "+0%" },
@@ -82,7 +82,7 @@ const SellerDashboard = (props) => {
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1">
-            <SellerSidebar onNavigate={handleNavigate} currentPage={activeSection} language={language} user={user} />
+            <SellerSidebar onNavigate={handleNavigate} currentPage={activeSection} language={language} user={user} setUser={setUser} />
           </div>
           
           <div id="seller-content-area" className="lg:col-span-3 space-y-8">

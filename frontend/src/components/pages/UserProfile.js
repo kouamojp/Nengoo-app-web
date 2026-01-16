@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import NotificationList from '../ui/NotificationList';
+import { translations } from '../../lib/translations';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -233,7 +234,7 @@ const BuyerMessages = ({ user, language }) => {
 };
 
 const UserProfile = (props) => {
-    const { language, user, cartItems } = props;
+    const { language, user, cartItems, setUser } = props;
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('profile');
     const [editMode, setEditMode] = useState(false);
@@ -249,6 +250,7 @@ const UserProfile = (props) => {
     const [userOrders, setUserOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [loadingOrders, setLoadingOrders] = useState(true);
+    const t = translations[language];
     
     // Real data state
     const [savedAddresses, setSavedAddresses] = useState([]);
@@ -499,6 +501,19 @@ const UserProfile = (props) => {
                     <span className="text-xl">📱</span>
                     <span className="font-medium">Mon QR Code</span>
                   </button>
+
+                  <button
+                      onClick={() => {
+                          setUser(null);
+                          localStorage.removeItem('nengoo-user');
+                          navigate('/'); // Redirect to home page
+                      }}
+                      className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors"
+                  >
+                    <span className="text-xl">🔌</span>
+                    <span className="font-medium">{t.logout}</span>
+                  </button>
+
                 </nav>
               </div>
             </div>

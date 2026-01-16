@@ -1,7 +1,9 @@
 
 import React from 'react';
+import { translations } from '../../lib/translations';
+import { Link, useNavigate } from 'react-router-dom';
 
-const SellerSidebar = ({ onNavigate, currentPage, language, user }) => {
+const SellerSidebar = ({ onNavigate, currentPage, language, user, setUser }) => {
   const menuItems = [
     { key: 'dashboard', icon: '📊', label: 'Tableau de Bord' },
     { key: 'products', icon: '📦', label: 'Produits' },
@@ -10,6 +12,8 @@ const SellerSidebar = ({ onNavigate, currentPage, language, user }) => {
     { key: 'messages', icon: '💬', label: 'Messages' },
     { key: 'profile', icon: '⚙️', label: 'Profil & Livraison' }
   ];
+  const t = translations[language];
+  const navigate = useNavigate();
 
   const sellerName = user?.businessName || 'Vendeur';
   const logoUrl = user?.logoUrl;
@@ -66,6 +70,19 @@ const SellerSidebar = ({ onNavigate, currentPage, language, user }) => {
           <span className="text-xl">🏠</span>
           <span>Retour au Site</span>
         </a>
+      </div>
+      <div className="border-t border-gray-200 my-2">
+          <button
+          onClick={() => {
+                setUser(null);
+                localStorage.removeItem('nengoo-user');
+                navigate('/'); // Redirect to home page
+              }}
+              className=" flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
+        >
+          <span className="text-xl">🔌</span>
+          <span>{t.logout}</span>
+          </button>
       </div>
     </div>
   );

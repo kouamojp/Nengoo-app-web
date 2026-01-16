@@ -11,6 +11,7 @@ import CategoryManagement from './CategoryManagement';
 import ShippingSettingsManagement from './ShippingSettingsManagement';
 import HomepageManagement from './HomepageManagement'; // Importer le nouveau composant
 import WhatsAppAnalytics from './WhatsAppAnalytics';
+import { translations } from '../../lib/translations';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -18,6 +19,7 @@ const AdminDashboard = (props) => {
     const { language, user, setUser } = props;
     const navigate = useNavigate();
     const [activeSection, setActiveSection] = useState('dashboard');
+    const t = translations[language];
     
     // State that remains in the dashboard
     const [buyers, setBuyers] = useState(adminMockData.buyers); // Mock data for buyers
@@ -171,6 +173,17 @@ const AdminDashboard = (props) => {
                                 <Link to="/" className="w-fullbg-white text-purple-600 hover:bg-gray-100 px-4 py-2 rounded-lg font-semibold transition-colors text-sm">
                                     ← Retour au site
                                 </Link>
+                                </div>
+                            <div className="border-t border-gray-200 my-2">
+                                <button
+                                    onClick={() => {
+                                        setUser(null);
+                                        localStorage.removeItem('nengoo-user');
+                                        navigate('/'); // Redirect to home page
+                                    }}
+                                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 text-gray-700 transition-colors"
+                                    >  <span className="text-xl">🔌</span><span className="font-medium text-sm">{t.logout}</span>
+                                </button>
                             </div>
                         </nav>
                     </div>
