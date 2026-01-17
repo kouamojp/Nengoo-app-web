@@ -16,6 +16,7 @@ from enum import Enum
 import bcrypt
 import boto3
 from botocore.exceptions import ClientError
+import html
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1134,32 +1135,38 @@ async def get_product_og_tags(product_id: str):
 
     target_url = f"{frontend_url}/product/{product['slug'] or product['id']}"
 
+    # Escape content to prevent HTML breakage
+    product_name = html.escape(product['name'])
+    product_description = html.escape(product['description'][:200] + "...") if product.get('description') else ""
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="fr">
     <head>
         <meta charset="UTF-8">
-        <title>{product['name']} | Nengoo</title>
+        <title>{product_name} | Nengoo</title>
         
         <!-- Open Graph / Facebook -->
         <meta property="og:type" content="product" />
         <meta property="og:url" content="{target_url}" />
-        <meta property="og:title" content="{product['name']}" />
-        <meta property="og:description" content="{product['description'][:200]}..." />
+        <meta property="og:title" content="{product_name}" />
+        <meta property="og:description" content="{product_description}" />
         <meta property="og:image" content="{image_url}" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
         <meta property="og:site_name" content="Nengoo" />
         
         <!-- Twitter -->
         <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:url" content="{target_url}" />
-        <meta property="twitter:title" content="{product['name']}" />
-        <meta property="twitter:description" content="{product['description'][:200]}..." />
+        <meta property="twitter:title" content="{product_name}" />
+        <meta property="twitter:description" content="{product_description}" />
         <meta property="twitter:image" content="{image_url}" />
         
         <meta http-equiv="refresh" content="0;url={target_url}" />
     </head>
     <body>
-        <p>Redirection vers <a href="{target_url}">{product['name']}</a>...</p>
+        <p>Redirection vers <a href="{target_url}">{product_name}</a>...</p>
         <script>window.location.href = "{target_url}";</script>
     </body>
     </html>
