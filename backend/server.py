@@ -1113,6 +1113,61 @@ async def get_max_product_price():
     logger.info("💰 [Backend] No products found, returning max price 0.0")
     return MaxPriceResponse(maxPrice=0.0)
 
+@api_router.get("/og/product/{product_id}", response_class=HTMLResponse)
+async def get_product_og_tags(product_id: str):
+    # Try looking up by ID first
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        # If not found by ID, try looking up by slug
+        product = await db.products.find_one({"slug": product_id})
+        
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Construct absolute image URL
+    image_url = product.get("images", [])[0] if product.get("images") else "https://nengoo.com/images/logo-nengoo.png" # Fallback image
+    if not image_url.startswith("http"):
+         # Assuming S3 or similar, but if relative, pre-pend backend/frontend URL
+         # For now, let's assume if it's not http, it might be a placeholder or we need a base
+         # Adjust this base URL as per your actual production image hosting
+         image_url = f"https://nengoo.com{image_url}" if image_url.startswith("/") else image_url
+    
+    # Frontend URL for redirection
+    frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
+    target_url = f"{frontend_url}/product/{product['slug'] or product['id']}"
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+        <meta charset="UTF-8">
+        <title>{product['name']} | Nengoo</title>
+        
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="product" />
+        <meta property="og:url" content="{target_url}" />
+        <meta property="og:title" content="{product['name']}" />
+        <meta property="og:description" content="{product['description'][:200]}..." />
+        <meta property="og:image" content="{image_url}" />
+        <meta property="og:site_name" content="Nengoo" />
+        
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content="{target_url}" />
+        <meta property="twitter:title" content="{product['name']}" />
+        <meta property="twitter:description" content="{product['description'][:200]}..." />
+        <meta property="twitter:image" content="{image_url}" />
+        
+        <meta http-equiv="refresh" content="0;url={target_url}" />
+    </head>
+    <body>
+        <p>Redirection vers <a href="{target_url}">{product['name']}</a>...</p>
+        <script>window.location.href = "{target_url}";</script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
+
 @api_router.get("/products/{product_identifier}", response_model=Product)
 async def get_product(product_identifier: str):
     # Try looking up by ID first
