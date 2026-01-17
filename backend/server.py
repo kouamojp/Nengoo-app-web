@@ -1173,6 +1173,32 @@ async def get_product_og_tags(product_id: str):
     """
     return HTMLResponse(content=html_content, status_code=200)
 
+@api_router.get("/og/debug/{product_id}")
+async def debug_product_og_tags(product_id: str):
+    # Try looking up by ID first
+    product = await db.products.find_one({"id": product_id})
+    if not product:
+        product = await db.products.find_one({"slug": product_id})
+        
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
+    
+    image_url = product.get("images", [])[0] if product.get("images") else f"{frontend_url}/images/logo-nengoo.png"
+    if not image_url.startswith("http"):
+         image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
+
+    target_url = f"{frontend_url}/product/{product['slug'] or product['id']}"
+
+    return {
+        "product_name": product['name'],
+        "frontend_url_env": frontend_url,
+        "raw_image_path": product.get("images", [])[0] if product.get("images") else "None",
+        "constructed_image_url": image_url,
+        "target_url": target_url
+    }
+
 @api_router.get("/products/{product_identifier}", response_model=Product)
 async def get_product(product_identifier: str):
     # Try looking up by ID first
