@@ -1124,16 +1124,14 @@ async def get_product_og_tags(product_id: str):
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Construct absolute image URL
-    image_url = product.get("images", [])[0] if product.get("images") else "https://nengoo.com/images/logo-nengoo.png" # Fallback image
-    if not image_url.startswith("http"):
-         # Assuming S3 or similar, but if relative, pre-pend backend/frontend URL
-         # For now, let's assume if it's not http, it might be a placeholder or we need a base
-         # Adjust this base URL as per your actual production image hosting
-         image_url = f"https://nengoo.com{image_url}" if image_url.startswith("/") else image_url
-    
     # Frontend URL for redirection
     frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
+    
+    # Construct absolute image URL
+    image_url = product.get("images", [])[0] if product.get("images") else f"{frontend_url}/images/logo-nengoo.png" # Fallback image
+    if not image_url.startswith("http"):
+         image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
+
     target_url = f"{frontend_url}/product/{product['slug'] or product['id']}"
 
     html_content = f"""
