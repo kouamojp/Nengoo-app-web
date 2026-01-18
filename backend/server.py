@@ -1135,9 +1135,16 @@ async def get_product_og_tags(product_id: str):
 
     target_url = f"{frontend_url}/product/{product['slug'] or product['id']}"
 
+    # Handle localized name and description
+    name_obj = product.get('name')
+    product_name_str = name_obj.get('fr') if isinstance(name_obj, dict) else name_obj
+
+    desc_obj = product.get('description')
+    product_description_str = desc_obj.get('fr') if isinstance(desc_obj, dict) else desc_obj
+
     # Escape content to prevent HTML breakage
-    product_name = html.escape(product['name'])
-    product_description = html.escape(product['description'][:200] + "...") if product.get('description') else ""
+    product_name = html.escape(product_name_str or '')
+    product_description = html.escape((product_description_str or '')[:200] + "...") if product_description_str else ""
 
     html_content = f"""
     <!DOCTYPE html>
