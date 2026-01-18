@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
-import { HelmetProvider } from 'react-helmet-async';
 import './App.css';
 import ScrollToTop from './components/ui/ScrollToTop';
 import Toast from './components/ui/Toast';
@@ -156,7 +155,7 @@ function App() {
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <HelmetProvider>
+    
       <div className="App">
         <Router>
           <ScrollToTop />
@@ -208,7 +207,7 @@ function App() {
         </Router>
         {toast.show && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
       </div>
-    </HelmetProvider>
+   
   );
 }
 
