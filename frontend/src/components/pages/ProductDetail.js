@@ -473,7 +473,7 @@ const ProductDetail = (props) => {
                   {/* Share Buttons */}
                   <div className="flex space-x-2 mt-4">
                     <a
-                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(product.name[language])}%20${encodeURIComponent(`${API_BASE_URL}/og/product/${product.id}`)}`}
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${API_BASE_URL}/og/product/${product.id}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
@@ -482,7 +482,7 @@ const ProductDetail = (props) => {
                       <span>Facebook</span>
                     </a>
                     <a
-                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${API_BASE_URL}/og/product/${product.id}`)}`}
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(product.name[language])}%20${encodeURIComponent(`${API_BASE_URL}/og/product/${product.id}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
