@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import './App.css';
 import ScrollToTop from './components/ui/ScrollToTop';
 import Toast from './components/ui/Toast';
@@ -155,57 +156,59 @@ function App() {
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="App">
-      <Router>
-        <ScrollToTop />
-        <Routes>
-          <Route path="/" element={<Homepage {...appProps} />} />
-          <Route path="/catalog" element={<ProductCatalog {...appProps} />} />
-          <Route path="/catalog/:category" element={<ProductCatalog {...appProps} />} />
-          <Route path="/product/:idOrSlug" element={<ProductDetail {...appProps} />} />
-          <Route path="/cart" element={<ShoppingCart {...appProps} />} />
-          <Route path="/checkout" element={<Checkout {...appProps} />} />
-          <Route path="/profile" element={<UserProfile {...appProps} />} />
-          <Route path="/notifications" element={<NotificationsPage {...appProps} />} />
-          <Route path="/about" element={<About {...appProps} />} />
-          <Route path="/search" element={<SearchResults {...appProps} />} />
-          <Route path="/pickup-points" element={<PickupPointsMap {...appProps} />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy {...appProps} />} />
+    <HelmetProvider>
+      <div className="App">
+        <Router>
+          <ScrollToTop />
+          <Routes>
+            <Route path="/" element={<Homepage {...appProps} />} />
+            <Route path="/catalog" element={<ProductCatalog {...appProps} />} />
+            <Route path="/catalog/:category" element={<ProductCatalog {...appProps} />} />
+            <Route path="/product/:idOrSlug" element={<ProductDetail {...appProps} />} />
+            <Route path="/cart" element={<ShoppingCart {...appProps} />} />
+            <Route path="/checkout" element={<Checkout {...appProps} />} />
+            <Route path="/profile" element={<UserProfile {...appProps} />} />
+            <Route path="/notifications" element={<NotificationsPage {...appProps} />} />
+            <Route path="/about" element={<About {...appProps} />} />
+            <Route path="/search" element={<SearchResults {...appProps} />} />
+            <Route path="/pickup-points" element={<PickupPointsMap {...appProps} />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy {...appProps} />} />
 
-          {/* Authentication Routes */}
-          <Route path="/login" element={<Login {...appProps} />} />
-          <Route path="/signup/buyer" element={<BuyerSignup {...appProps} />} />
-          <Route path="/signup/seller" element={<SellerSignup {...appProps} />} />
-          <Route path="/login/buyer" element={<BuyerSignup {...appProps} isLoginDefault={true} />} />
-          <Route path="/login/seller" element={<SellerSignup {...appProps} isLoginDefault={true} />} />
-          <Route path="/forgot-password" element={<ForgotPassword {...appProps} />} />
-          <Route path="/reset-password" element={<ResetPassword {...appProps} />} />
-          <Route path="/pending-approval" element={<PendingApproval {...appProps} />} />
-          
-          {/* Public Seller Shop Route */}
-          <Route path="/seller/:id" element={<SellerShop {...appProps} />} />
+            {/* Authentication Routes */}
+            <Route path="/login" element={<Login {...appProps} />} />
+            <Route path="/signup/buyer" element={<BuyerSignup {...appProps} />} />
+            <Route path="/signup/seller" element={<SellerSignup {...appProps} />} />
+            <Route path="/login/buyer" element={<BuyerSignup {...appProps} isLoginDefault={true} />} />
+            <Route path="/login/seller" element={<SellerSignup {...appProps} isLoginDefault={true} />} />
+            <Route path="/forgot-password" element={<ForgotPassword {...appProps} />} />
+            <Route path="/reset-password" element={<ResetPassword {...appProps} />} />
+            <Route path="/pending-approval" element={<PendingApproval {...appProps} />} />
+            
+            {/* Public Seller Shop Route */}
+            <Route path="/seller/:id" element={<SellerShop {...appProps} />} />
 
-          {/* Seller Routes */}
-          <Route path="/seller" element={<SellerDashboard {...appProps} />} />
-          <Route path="/seller/products" element={<SellerProducts {...appProps} />} />
-          <Route path="/seller/orders" element={<SellerOrders {...appProps} />} />
-          <Route path="/seller/analytics" element={<SellerAnalytics {...appProps} />} />
-          <Route path="/seller/profile" element={<SellerProfile {...appProps} />} />
-          <Route path="/seller/messages" element={<SellerMessages {...appProps} />} />
-          
-          {/* Admin Routes */}
-          <Route path="/admin/login" element={<AdminLogin {...appProps} />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard {...appProps} />} />
-          <Route path="/admin/management" element={<AdminManagement {...appProps} />} />
-          <Route path="/admin/privacy-policy" element={<PrivacyPolicyEditor {...appProps} />} />
-          <Route path="/verify-buyer/:buyerId" element={<BuyerVerification {...appProps} />} />
-          {/* Catch-all route for unmatched paths */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        <BottomNav cartItemCount={cartItemCount} user={user} />
-      </Router>
-      {toast.show && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
-    </div>
+            {/* Seller Routes */}
+            <Route path="/seller" element={<SellerDashboard {...appProps} />} />
+            <Route path="/seller/products" element={<SellerProducts {...appProps} />} />
+            <Route path="/seller/orders" element={<SellerOrders {...appProps} />} />
+            <Route path="/seller/analytics" element={<SellerAnalytics {...appProps} />} />
+            <Route path="/seller/profile" element={<SellerProfile {...appProps} />} />
+            <Route path="/seller/messages" element={<SellerMessages {...appProps} />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin/login" element={<AdminLogin {...appProps} />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard {...appProps} />} />
+            <Route path="/admin/management" element={<AdminManagement {...appProps} />} />
+            <Route path="/admin/privacy-policy" element={<PrivacyPolicyEditor {...appProps} />} />
+            <Route path="/verify-buyer/:buyerId" element={<BuyerVerification {...appProps} />} />
+            {/* Catch-all route for unmatched paths */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+          <BottomNav cartItemCount={cartItemCount} user={user} />
+        </Router>
+        {toast.show && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+      </div>
+    </HelmetProvider>
   );
 }
 
