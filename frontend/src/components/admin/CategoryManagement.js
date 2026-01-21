@@ -147,7 +147,7 @@ const CategoryManagement = (props) => {
     
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 max-sm:flex-col max-sm:space-y-4">
                 <h2 className="text-xl md:text-3xl font-bold">Gestion des Catégories ({categories.length})</h2>
                 <div className="flex items-center space-x-2">
                     <button 
