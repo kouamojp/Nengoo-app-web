@@ -52,6 +52,7 @@ origins = [
     "https://nengoo.com",
     "https://nengoo-app-web.vercel.app",
     "https://nengoo-app-web.onrender.com",
+    "https://nengoo-app-web.onrender.com/api/admins",
     "http://localhost:3000",
     "http://localhost:8080",
     "http://localhost:8000",
