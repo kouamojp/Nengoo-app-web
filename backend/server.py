@@ -2409,8 +2409,19 @@ async def create_admin(admin_data: AdminCreate):
 @api_router.get("/admins", response_model=List[Admin], dependencies=[Depends(super_admin_required)])
 async def list_admins():
     admins_cursor = db.admins.find()
-    admins = await admins_cursor.to_list(1000)
-    return [Admin(**admin) for admin in admins]
+    admins_from_db = await admins_cursor.to_list(1000)
+    valid_admins = []
+    for admin_data in admins_from_db:
+        try:
+            # Ensure 'type' field exists before validation, defaulting to 'admin'
+            if 'type' not in admin_data:
+                admin_data['type'] = 'admin'
+            valid_admins.append(Admin(**admin_data))
+        except Exception as e:
+            logging.error(f"Skipping invalid admin data due to validation error: {admin_data}")
+            logging.error(f"Error details: {e}")
+            continue
+    return valid_admins
 
 @api_router.put("/admins/{admin_id}", response_model=Admin, dependencies=[Depends(super_admin_required)])
 async def update_admin(admin_id: str, admin_data: AdminUpdate):
