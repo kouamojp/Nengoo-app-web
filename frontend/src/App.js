@@ -28,8 +28,9 @@ import {
   AdminLogin,
   AdminDashboard,
   AdminManagement,
-  PickupPointsMap,
+  SellerProductList,
   NotificationsPage,
+  PickupPointsMap ,
   PrivacyPolicy,
   PrivacyPolicyEditor
 } from './components';
@@ -200,6 +201,7 @@ function App() {
             <Route path="/admin/management" element={<AdminManagement {...appProps} />} />
             <Route path="/admin/privacy-policy" element={<PrivacyPolicyEditor {...appProps} />} />
             <Route path="/verify-buyer/:buyerId" element={<BuyerVerification {...appProps} />} />
+            <Route path="/admin/seller-products/:sellerId" element={<SellerProductList {...appProps} />} />
             {/* Catch-all route for unmatched paths */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

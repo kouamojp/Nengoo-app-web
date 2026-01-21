@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -388,6 +389,7 @@ const SellerManagement = (props) => {
                                     <td className="px-6 py-4 text-sm font-medium">
                                         <button onClick={() => handleEditClick(seller)} className="text-blue-600 hover:text-blue-800">Modifier</button>
                                         <button onClick={() => handleDeleteSeller(seller.id)} className="text-red-600 hover:text-red-800 ml-4">Supprimer</button>
+                                        <Link to={`/admin/seller-products/${seller.id}`} target='_blank' className="text-green-600 hover:text-green-800 ml-4">Voir les produits</Link>
                                     </td>
                                 </tr>
                             ))}

@@ -1,7 +1,7 @@
-
 export { default as AdminDashboard } from './admin/AdminDashboard';
 export { default as AdminLogin } from './admin/AdminLogin';
 export { default as AdminManagement } from './admin/AdminManagement';
+export { default as SellerProductList } from './admin/SellerProductList';
 export { default as PrivacyPolicyEditor } from './admin/PrivacyPolicyEditor';
 export { default as BuyerSignup } from './auth/BuyerSignup';
 export { default as Login } from './auth/Login';

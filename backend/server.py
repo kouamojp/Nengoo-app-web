@@ -1786,6 +1786,12 @@ async def get_seller_analytics(seller_id: str):
         top_products=top_products
     )
 
+@api_router.get("/sellers/{seller_id}/products", response_model=List[Product], dependencies=[Depends(admin_or_higher_required)])
+async def get_seller_products(seller_id: str):
+    products_cursor = db.products.find({"sellerId": seller_id}).sort("createdAt", -1)
+    products = await products_cursor.to_list(1000)
+    return [Product(**p) for p in products]
+
 # --- Order Management ---
 @api_router.get("/orders", response_model=List[Order])
 async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] = None, role: str = Depends(get_current_admin_role)):
