@@ -84,7 +84,7 @@ const SellerProductList = ({ user }) => {
                 Object.entries(groupedProducts).map(([date, productsOnDate]) => (
                     <div key={date} className="mb-6">
                         <h3 className="text-lg font-semibold border-b pb-2 mb-3">{date} - ({productsOnDate.length})</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             {productsOnDate.map(product => (
                                 <div key={product.id} className="border rounded-lg p-4">
                                     {product.images && product.images.length > 0 && (

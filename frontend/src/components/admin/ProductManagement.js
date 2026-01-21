@@ -363,7 +363,7 @@ const ProductManagement = (props) => {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 max-sm:flex-wrap max-sm:gap-4">
                 <h2 className="text-xl md:text-3xl font-bold">Gestion des produits ({filteredProducts.length})</h2>
                 <div className="flex items-center space-x-2">
                     <button
