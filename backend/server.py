@@ -52,22 +52,16 @@ origins = [
     "https://nengoo.com",
     "https://nengoo-app-web.vercel.app",
     "https://nengoo-app-web.onrender.com",
-    "https://nengoo-app-web.onrender.com/api/admins",
     "http://localhost:3000",
     "http://localhost:8080",
     "http://localhost:8000",
 ]
 
-# En développement, autoriser toutes les origines localhost
-# Pour production, utilisez la liste origins ci-dessus
-if os.getenv("ENVIRONMENT", "development") == "development":
-    allow_origins_list = ["*"]  # Autorise toutes les origines en dev
-else:
-    allow_origins_list = origins
-
+# Using an explicit list of origins is more secure than a wildcard,
+# especially when allow_credentials=True.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins_list,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
