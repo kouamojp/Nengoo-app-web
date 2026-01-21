@@ -261,7 +261,7 @@ const SellerManagement = (props) => {
         <div>
             <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des vendeurs ({filteredSellers.length})</h2>
 
-            <div className="mb-4 flex justify-between items-center">
+            <div className="mb-4 flex justify-between items-center max-sm:flex-wrap max-sm:gap-4">
                 <input
                     type="text"
                     placeholder="Rechercher des vendeurs..."
