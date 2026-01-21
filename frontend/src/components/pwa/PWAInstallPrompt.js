@@ -34,7 +34,7 @@ const PWAInstallPrompt = () => {
   if (!showInstall) return null;
 
   return (
-    <div className="fixed bottom-12 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-gradient-to-r from-purple-600 to-red-600 text-white p-4 rounded-lg shadow-xl z-50 animate-bounce">
+    <div className="fixed bottom-16 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-gradient-to-r from-purple-600 to-red-600 text-white p-4 rounded-lg shadow-xl z-50 animate-bounce">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <span className="text-2xl">📱</span>
