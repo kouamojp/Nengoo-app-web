@@ -283,10 +283,13 @@ const ProductDetail = (props) => {
   const getAbsoluteImageUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+    // Use nengoo.com as the base URL for Open Graph images
+    const baseUrl = 'https://nengoo.com';
+    return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const ogImageUrl = getAbsoluteImageUrl(images[0]);
+  const productUrl = `https://nengoo.com/product/${product.slug || product.id}`;
 
   return (
     <>
@@ -301,12 +304,15 @@ const ProductDetail = (props) => {
         <meta property="og:description" content={product.description[language]} />
         <meta property="og:image" content={ogImageUrl} />
         <meta property="og:image:secure_url" content={ogImageUrl} />
-        <meta property="og:url" content={window.location.href} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:url" content={productUrl} />
         <meta property="og:price:amount" content={product.promoPrice || product.price} />
         <meta property="og:price:currency" content="XAF" />
         
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content={productUrl} />
         <meta name="twitter:title" content={product.name[language]} />
         <meta name="twitter:description" content={product.description[language]} />
         <meta name="twitter:image" content={ogImageUrl} />
@@ -473,7 +479,7 @@ const ProductDetail = (props) => {
                   {/* Share Buttons */}
                   <div className="flex space-x-2 mt-4">
                     <a
-                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${API_BASE_URL}/og/product/${product.id}`)}`}
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://nengoo.com/product/${product.slug || product.id}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
@@ -482,7 +488,7 @@ const ProductDetail = (props) => {
                       <span>Facebook</span>
                     </a>
                     <a
-                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(product.name[language])}%20${encodeURIComponent(`${API_BASE_URL}/og/product/${product.id}`)}`}
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(product.name[language])}%20${encodeURIComponent(`https://nengoo.com/product/${product.slug || product.id}`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
