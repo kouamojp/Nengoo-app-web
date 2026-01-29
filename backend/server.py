@@ -1124,9 +1124,16 @@ async def get_product_og_tags(product_id: str):
     frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
     
     # Construct absolute image URL
-    image_url = product.get("images", [])[0] if product.get("images") else f"{frontend_url}/images/logo-nengoo.png" # Fallback image
-    if not image_url.startswith("http"):
-         image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
+    images = product.get("images", [])
+    # Check if images list exists, is not empty, and first element is valid
+    if images and len(images) > 0 and images[0]:
+        image_url = images[0]
+        # Convert relative URLs to absolute
+        if not image_url.startswith("http"):
+            image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
+    else:
+        # Fallback to logo if no valid image
+        image_url = f"{frontend_url}/images/logo-nengoo.png"
 
     target_url = f"{frontend_url}/product/{product['slug'] or product['id']}"
 
@@ -1186,17 +1193,24 @@ async def debug_product_og_tags(product_id: str):
         raise HTTPException(status_code=404, detail="Product not found")
 
     frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
-    
-    image_url = product.get("images", [])[0] if product.get("images") else f"{frontend_url}/images/logo-nengoo.png"
-    if not image_url.startswith("http"):
-         image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
+
+    images = product.get("images", [])
+    # Check if images list exists, is not empty, and first element is valid
+    if images and len(images) > 0 and images[0]:
+        image_url = images[0]
+        # Convert relative URLs to absolute
+        if not image_url.startswith("http"):
+            image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
+    else:
+        # Fallback to logo if no valid image
+        image_url = f"{frontend_url}/images/logo-nengoo.png"
 
     target_url = f"{frontend_url}/product/{product['slug'] or product['id']}"
 
     return {
         "product_name": product['name'],
         "frontend_url_env": frontend_url,
-        "raw_image_path": product.get("images", [])[0] if product.get("images") else "None",
+        "raw_image_path": images[0] if (images and len(images) > 0) else "None",
         "constructed_image_url": image_url,
         "target_url": target_url
     }
