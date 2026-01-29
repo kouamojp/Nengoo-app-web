@@ -1131,6 +1131,9 @@ async def get_product_og_tags(product_id: str):
         # Convert relative URLs to absolute
         if not image_url.startswith("http"):
             image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
+        # Force HTTPS for WhatsApp compatibility (WhatsApp may block HTTP images)
+        elif image_url.startswith("http://"):
+            image_url = image_url.replace("http://", "https://", 1)
     else:
         # Fallback to logo if no valid image
         image_url = f"{frontend_url}/images/logo-nengoo.png"
@@ -1148,38 +1151,57 @@ async def get_product_og_tags(product_id: str):
     product_name = html.escape(product_name_str or '')
     product_description = html.escape((product_description_str or '')[:200] + "...") if product_description_str else ""
 
-    html_content = f"""
-    <!DOCTYPE html>
-    <html lang="fr">
-    <head>
-        <meta charset="UTF-8">
-        <title>{product_name} | Nengoo</title>
-        
-        <!-- Open Graph / Facebook -->
-        <meta property="og:type" content="product" />
-        <meta property="og:url" content="{target_url}" />
-        <meta property="og:title" content="{product_name}" />
-        <meta property="og:description" content="{product_description}" />
-        <meta property="og:image" content="{image_url}" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:site_name" content="Nengoo" />
-        
-        <!-- Twitter -->
-        <meta property="twitter:card" content="summary_large_image" />
-        <meta property="twitter:url" content="{target_url}" />
-        <meta property="twitter:title" content="{product_name}" />
-        <meta property="twitter:description" content="{product_description}" />
-        <meta property="twitter:image" content="{image_url}" />
-        
-        <meta http-equiv="refresh" content="0;url={target_url}" />
-    </head>
-    <body>
-        <p>Redirection vers <a href="{target_url}">{product_name}</a>...</p>
-        <script>window.location.href = "{target_url}";</script>
-    </body>
-    </html>
-    """
+    # Determine image type for og:image:type
+    image_type = "image/jpeg"  # Default
+    if image_url.lower().endswith('.png'):
+        image_type = "image/png"
+    elif image_url.lower().endswith('.webp'):
+        image_type = "image/webp"
+    elif image_url.lower().endswith('.gif'):
+        image_type = "image/gif"
+
+    # Create image alt text
+    image_alt = f"{product_name} - Nengoo"
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{product_name} | Nengoo</title>
+
+    <!-- Open Graph / Facebook / WhatsApp -->
+    <meta property="og:type" content="product" />
+    <meta property="og:url" content="{target_url}" />
+    <meta property="og:title" content="{product_name}" />
+    <meta property="og:description" content="{product_description}" />
+    <meta property="og:image" content="{image_url}" />
+    <meta property="og:image:secure_url" content="{image_url}" />
+    <meta property="og:image:type" content="{image_type}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="{image_alt}" />
+    <meta property="og:site_name" content="Nengoo - Marketplace Cameroun" />
+    <meta property="og:locale" content="fr_FR" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="{target_url}" />
+    <meta name="twitter:title" content="{product_name}" />
+    <meta name="twitter:description" content="{product_description}" />
+    <meta name="twitter:image" content="{image_url}" />
+    <meta name="twitter:image:alt" content="{image_alt}" />
+
+    <meta http-equiv="refresh" content="0;url={target_url}" />
+</head>
+<body>
+    <h1>{product_name}</h1>
+    <p>{product_description}</p>
+    <img src="{image_url}" alt="{image_alt}" style="max-width:100%;height:auto;" />
+    <p>Redirection vers <a href="{target_url}">Voir le produit sur Nengoo</a>...</p>
+    <script>window.location.href = "{target_url}";</script>
+</body>
+</html>"""
     return HTMLResponse(content=html_content, status_code=200)
 
 @api_router.get("/og/debug/{product_id}")
@@ -1201,18 +1223,33 @@ async def debug_product_og_tags(product_id: str):
         # Convert relative URLs to absolute
         if not image_url.startswith("http"):
             image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
+        # Force HTTPS for WhatsApp compatibility (WhatsApp may block HTTP images)
+        elif image_url.startswith("http://"):
+            image_url = image_url.replace("http://", "https://", 1)
     else:
         # Fallback to logo if no valid image
         image_url = f"{frontend_url}/images/logo-nengoo.png"
 
     target_url = f"{frontend_url}/product/{product['slug'] or product['id']}"
 
+    # Determine image type
+    image_type = "image/jpeg"
+    if image_url.lower().endswith('.png'):
+        image_type = "image/png"
+    elif image_url.lower().endswith('.webp'):
+        image_type = "image/webp"
+    elif image_url.lower().endswith('.gif'):
+        image_type = "image/gif"
+
     return {
         "product_name": product['name'],
         "frontend_url_env": frontend_url,
         "raw_image_path": images[0] if (images and len(images) > 0) else "None",
         "constructed_image_url": image_url,
-        "target_url": target_url
+        "image_uses_https": image_url.startswith("https://"),
+        "image_type": image_type,
+        "target_url": target_url,
+        "og_tags_info": "Enhanced with og:image:secure_url, og:image:type, og:image:alt for WhatsApp compatibility"
     }
 
 @api_router.get("/products/{product_identifier}", response_model=Product)
