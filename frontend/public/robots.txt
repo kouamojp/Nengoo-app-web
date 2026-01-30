@@ -1,0 +1,30 @@
+# Nengoo Marketplace - Robots.txt
+User-agent: *
+Allow: /
+Allow: /catalog
+Allow: /product/
+Allow: /seller/
+Allow: /about
+Allow: /privacy-policy
+Allow: /pickup-points
+
+# Disallow admin and checkout pages
+Disallow: /admin/
+Disallow: /checkout
+Disallow: /cart
+Disallow: /profile
+Disallow: /notifications
+Disallow: /login
+Disallow: /signup/
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /pending-approval
+
+# Disallow API endpoints
+Disallow: /api/
+
+# Sitemap location
+Sitemap: https://www.nengoo.com/sitemap.xml
+
+# Crawl delay for polite crawling
+Crawl-delay: 1

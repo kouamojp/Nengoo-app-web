@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr
 from dotenv import load_dotenv
@@ -1108,6 +1108,133 @@ async def get_max_product_price():
     
     logger.info("💰 [Backend] No products found, returning max price 0.0")
     return MaxPriceResponse(maxPrice=0.0)
+
+@app.get("/sitemap.xml", response_class=Response)
+async def generate_sitemap():
+    """Generate dynamic XML sitemap for all products, categories, and sellers"""
+
+    try:
+        # Fetch all approved products
+        products_cursor = db.products.find({"status": "approved"})
+        products = await products_cursor.to_list(None)
+
+        # Fetch all approved sellers
+        sellers_cursor = db.sellers.find({"status": "approved"})
+        sellers = await sellers_cursor.to_list(None)
+
+        # Fetch all categories
+        categories_cursor = db.categories.find()
+        categories = await categories_cursor.to_list(None)
+
+        frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
+        current_date = datetime.utcnow().strftime("%Y-%m-%d")
+
+        # Build sitemap XML
+        xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+        xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+
+        # Homepage
+        xml_content += f'''  <url>
+    <loc>{frontend_url}/</loc>
+    <lastmod>{current_date}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+'''
+
+        # Catalog page
+        xml_content += f'''  <url>
+    <loc>{frontend_url}/catalog</loc>
+    <lastmod>{current_date}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+'''
+
+        # About page
+        xml_content += f'''  <url>
+    <loc>{frontend_url}/about</loc>
+    <lastmod>{current_date}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+'''
+
+        # Privacy Policy page
+        xml_content += f'''  <url>
+    <loc>{frontend_url}/privacy-policy</loc>
+    <lastmod>{current_date}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+'''
+
+        # Pickup points page
+        xml_content += f'''  <url>
+    <loc>{frontend_url}/pickup-points</loc>
+    <lastmod>{current_date}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+'''
+
+        # Category pages
+        for category in categories:
+            category_name = category.get('name', '')
+            if category_name:
+                # URL encode the category name
+                from urllib.parse import quote
+                encoded_name = quote(category_name)
+                xml_content += f'''  <url>
+    <loc>{frontend_url}/catalog/{encoded_name}</loc>
+    <lastmod>{current_date}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+'''
+
+        # Product pages
+        for product in products:
+            slug = product.get('slug') or product.get('id')
+            if not slug:
+                continue
+
+            # Get last modified date
+            updated = product.get('updatedAt', product.get('createdAt'))
+            if isinstance(updated, datetime):
+                lastmod = updated.strftime("%Y-%m-%d")
+            else:
+                lastmod = current_date
+
+            xml_content += f'''  <url>
+    <loc>{frontend_url}/product/{slug}</loc>
+    <lastmod>{lastmod}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+'''
+
+        # Seller shop pages
+        for seller in sellers:
+            seller_id = seller.get('id')
+            if seller_id:
+                xml_content += f'''  <url>
+    <loc>{frontend_url}/seller/{seller_id}</loc>
+    <lastmod>{current_date}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+'''
+
+        xml_content += '</urlset>'
+
+        logging.info(f"✅ [SEO] Sitemap generated: {len(products)} products, {len(sellers)} sellers, {len(categories)} categories")
+
+        return Response(content=xml_content, media_type="application/xml")
+
+    except Exception as e:
+        logging.error(f"❌ [SEO] Error generating sitemap: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error generating sitemap")
 
 @api_router.get("/og/product/{product_id}", response_class=HTMLResponse)
 async def get_product_og_tags(product_id: str):
