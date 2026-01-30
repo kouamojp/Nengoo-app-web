@@ -7,6 +7,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import re
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
@@ -55,17 +56,37 @@ origins = [
     "http://localhost:3000",
     "http://localhost:8080",
     "http://localhost:8000",
+    "http://localhost:8001",  # Backend lui-même (pour tests)
+    # Ports Flutter Web communs
+    "http://localhost:5000",
+    "http://localhost:5001",
+    "http://localhost:5500",
+    "http://localhost:8888",
+    "http://localhost:9000",
 ]
 
 # Using an explicit list of origins is more secure than a wildcard,
 # especially when allow_credentials=True.
+# Pour le développement, on peut aussi utiliser allow_origin_regex
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"http://localhost:\d+",  # Permet tous les ports localhost en dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- Utility Functions ---
+
+def normalize_whatsapp(whatsapp: str) -> str:
+    """
+    Normalise le format du numéro WhatsApp en supprimant tous les espaces.
+    Exemple: '+237 690703689' -> '+237690703689'
+    """
+    if not whatsapp:
+        return ""
+    return whatsapp.replace(" ", "").replace("-", "").strip()
 
 # --- Security (Mock Authorization) ---
 
@@ -458,6 +479,26 @@ class CategoryUpdate(BaseModel):
 class CategoryWithCount(Category):
     productCount: int
 
+class Ad(BaseModel):
+    id: str = Field(default_factory=lambda: f"ad_{str(uuid.uuid4())[:8]}")
+    title: str
+    description: Optional[str] = None
+    imageUrl: Optional[str] = None
+    linkUrl: Optional[str] = None
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
+    isActive: bool = True
+    createdAt: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+class AdCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    imageUrl: Optional[str] = None
+    linkUrl: Optional[str] = None
+    startDate: Optional[str] = None
+    endDate: Optional[str] = None
+    isActive: bool = True
+
 class PresignedUrlRequest(BaseModel):
     fileName: str
     fileType: str
@@ -510,6 +551,21 @@ class PrivacyPolicy(BaseModel):
 class PrivacyPolicyUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
+
+class AboutPageSettings(BaseModel):
+    id: str = Field(default="about_page_settings")
+    mission_image_url: str
+    mission_title: str = "Notre Mission"
+    mission_text_1: str
+    mission_text_2: str
+    last_updated: datetime = Field(default_factory=datetime.utcnow)
+    updated_by: Optional[str] = None  # Admin ID who last updated
+
+class AboutPageSettingsUpdate(BaseModel):
+    mission_image_url: Optional[str] = None
+    mission_title: Optional[str] = None
+    mission_text_1: Optional[str] = None
+    mission_text_2: Optional[str] = None
 
 class Message(BaseModel):
     id: str = Field(default_factory=lambda: f"msg_{str(uuid.uuid4())[:8]}")
@@ -1017,9 +1073,18 @@ async def register_buyer(buyer_data: BuyerCreate):
 @api_router.post("/buyers/login", response_model=Buyer)
 async def buyer_login(login_data: BuyerLoginRequest):
     """Login for buyer accounts"""
-    logging.info(f"[BUYER LOGIN] Attempting login with WhatsApp: {login_data.whatsapp}")
+    # Normaliser le numéro WhatsApp (supprimer les espaces)
+    normalized_whatsapp = normalize_whatsapp(login_data.whatsapp)
 
-    buyer = await db.users.find_one({"whatsapp": login_data.whatsapp, "type": "buyer"})
+    logging.info(f"[BUYER LOGIN] Attempting login with WhatsApp: {login_data.whatsapp} -> normalized: {normalized_whatsapp}")
+
+    # Chercher l'acheteur avec le numéro normalisé ou le numéro original
+    buyer = await db.users.find_one({
+        "$or": [
+            {"whatsapp": normalized_whatsapp, "type": "buyer"},
+            {"whatsapp": login_data.whatsapp, "type": "buyer"}
+        ]
+    })
 
     if not buyer:
         logging.warning(f"[BUYER LOGIN] Buyer not found with WhatsApp: {login_data.whatsapp}")
@@ -1844,9 +1909,18 @@ class SellerLoginRequest(BaseModel):
 
 @api_router.post("/sellers/login", response_model=Seller)
 async def seller_login(login_data: SellerLoginRequest):
-    logging.info(f"[SELLER LOGIN] Attempting login with WhatsApp: {login_data.whatsapp}")
+    # Normaliser le numéro WhatsApp (supprimer les espaces)
+    normalized_whatsapp = normalize_whatsapp(login_data.whatsapp)
 
-    seller = await db.sellers.find_one({"whatsapp": login_data.whatsapp})
+    logging.info(f"[SELLER LOGIN] Attempting login with WhatsApp: {login_data.whatsapp} -> normalized: {normalized_whatsapp}")
+
+    # Chercher le vendeur avec le numéro normalisé ou le numéro original
+    seller = await db.sellers.find_one({
+        "$or": [
+            {"whatsapp": normalized_whatsapp},
+            {"whatsapp": login_data.whatsapp}
+        ]
+    })
 
     if not seller:
         logging.warning(f"[SELLER LOGIN] Seller not found with WhatsApp: {login_data.whatsapp}")
@@ -2494,6 +2568,35 @@ async def delete_category(category_id: str):
         raise HTTPException(status_code=404, detail="Category not found")
     return
 
+# --- Ads Management ---
+@api_router.get("/ads/active", response_model=List[Ad])
+async def get_active_ads():
+    """
+    Récupère les annonces actives.
+    Retourne une liste vide s'il n'y a pas d'annonces (pas de 404).
+    """
+    # Chercher les ads actives
+    ads_cursor = db.ads.find({"isActive": True})
+    ads = await ads_cursor.to_list(100)
+
+    # Retourner la liste (vide ou avec des éléments)
+    return [Ad(**ad) for ad in ads]
+
+@api_router.post("/ads", response_model=Ad, dependencies=[Depends(admin_or_higher_required)])
+async def create_ad(ad_data: AdCreate):
+    """Créer une nouvelle annonce (admin uniquement)"""
+    ad = Ad(**ad_data.dict())
+    await db.ads.insert_one(ad.dict())
+    return ad
+
+@api_router.delete("/ads/{ad_id}", dependencies=[Depends(admin_or_higher_required)])
+async def delete_ad(ad_id: str):
+    """Supprimer une annonce (admin uniquement)"""
+    result = await db.ads.delete_one({"id": ad_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Ad not found")
+    return {"message": "Ad deleted successfully"}
+
 # --- File Upload Management (AWS S3) ---
 @api_router.post("/generate-presigned-url", response_model=PresignedUrlResponse, dependencies=[Depends(seller_id_or_support_required)])
 async def generate_presigned_url(request: PresignedUrlRequest):
@@ -2774,6 +2877,56 @@ async def update_privacy_policy(
 
     return PrivacyPolicy(**updated_policy)
 
+@api_router.get("/about-page-settings", response_model=AboutPageSettings)
+async def get_about_page_settings():
+    """
+    Get the about page settings (public endpoint).
+    """
+    settings = await db.about_page_settings.find_one({"id": "about_page_settings"})
+
+    if not settings:
+        # Create default settings if not exists
+        default_settings = AboutPageSettings(
+            id="about_page_settings",
+            mission_image_url="https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg",
+            mission_title="Notre Mission",
+            mission_text_1="Nengoo a été créé avec pour mission de connecter les consommateurs camerounais aux meilleurs produits locaux et internationaux, tout en soutenant l'économie locale et l'artisanat traditionnel.",
+            mission_text_2="Nous croyons fermement au potentiel du commerce électronique pour transformer l'économie camerounaise et offrir de nouvelles opportunités aux entrepreneurs locaux.",
+            last_updated=datetime.utcnow()
+        )
+        await db.about_page_settings.insert_one(default_settings.dict())
+        return default_settings
+
+    return AboutPageSettings(**settings)
+
+@api_router.put("/about-page-settings", response_model=AboutPageSettings, dependencies=[Depends(super_admin_required)])
+async def update_about_page_settings(
+    settings_update: AboutPageSettingsUpdate,
+    x_admin_id: Optional[str] = Header(None, alias="X-Admin-Id")
+):
+    """
+    Update the about page settings (super admin only).
+    """
+    update_data = settings_update.dict(exclude_unset=True)
+
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided.")
+
+    update_data["last_updated"] = datetime.utcnow()
+    update_data["updated_by"] = x_admin_id
+
+    result = await db.about_page_settings.update_one(
+        {"id": "about_page_settings"},
+        {"$set": update_data},
+        upsert=True
+    )
+
+    updated_settings = await db.about_page_settings.find_one({"id": "about_page_settings"})
+
+    if not updated_settings:
+        raise HTTPException(status_code=404, detail="Failed to update about page settings.")
+
+    return AboutPageSettings(**updated_settings)
 
 
 # --- Router Inclusion ---
