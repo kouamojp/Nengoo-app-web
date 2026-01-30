@@ -21,7 +21,7 @@ export const About = (props) => {
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
-            <div>
+            <div className="md:text-left">
               <h2 className="text-3xl font-bold mb-6">Notre Mission</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
                 Nengoo a été créé avec pour mission de connecter les consommateurs camerounais 
@@ -37,7 +37,7 @@ export const About = (props) => {
               <img
                 src="https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg"
                 alt="About Nengoo"
-                className="rounded-lg shadow-lg"
+                className="rounded-lg shadow-lg h-96 w-full object-cover object-top"
               />
             </div>
           </div>
