@@ -380,7 +380,7 @@ const ProductDetail = (props) => {
                 </div>
 
                 {/* Price */}
-                <div className="mb-6 flex items-baseline">
+                <div className="mb-6 flex items-baseline max-sm:flex-col max-sm:items-center max-sm:space-y-2">
                   {product.promoPrice && product.promoPrice > 0 ? (
                     <>
                       <span className="text-5xl font-bold text-red-600 mr-4">
@@ -418,7 +418,7 @@ const ProductDetail = (props) => {
                 {/* Quantity Selector */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium mb-2">{t.quantity}</label>
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 max-sm:justify-center">
                     <button
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
                       className="bg-gray-200 hover:bg-gray-300 w-10 h-10 rounded-lg flex items-center justify-center"
