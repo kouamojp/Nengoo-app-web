@@ -1191,7 +1191,7 @@ async def generate_sitemap():
         categories_cursor = db.categories.find()
         categories = await categories_cursor.to_list(None)
 
-        frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
+        frontend_url = os.getenv("FRONTEND_URL", "https://nengoo-app-web.onrender.com")
         current_date = datetime.utcnow().strftime("%Y-%m-%d")
 
         # Build sitemap XML

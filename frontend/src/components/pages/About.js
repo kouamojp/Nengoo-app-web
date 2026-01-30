@@ -1,12 +1,40 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
 export const About = (props) => {
   const { language } = props;
-  
+  const [aboutSettings, setAboutSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAboutSettings = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/about-page-settings`);
+        if (response.ok) {
+          const data = await response.json();
+          setAboutSettings(data);
+        }
+      } catch (error) {
+        console.error('Error fetching about page settings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAboutSettings();
+  }, []);
+
+  // Default values if API fails
+  const missionImage = aboutSettings?.mission_image_url || "https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg";
+  const missionTitle = aboutSettings?.mission_title || "Notre Mission";
+  const missionText1 = aboutSettings?.mission_text_1 || "Nengoo a été créé avec pour mission de connecter les consommateurs camerounais aux meilleurs produits locaux et internationaux, tout en soutenant l'économie locale et l'artisanat traditionnel.";
+  const missionText2 = aboutSettings?.mission_text_2 || "Nous croyons fermement au potentiel du commerce électronique pour transformer l'économie camerounaise et offrir de nouvelles opportunités aux entrepreneurs locaux.";
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header {...props} />
@@ -22,23 +50,30 @@ export const About = (props) => {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
             <div className="md:text-left">
-              <h2 className="text-3xl font-bold mb-6">Notre Mission</h2>
+              <h2 className="text-3xl font-bold mb-6">{missionTitle}</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                Nengoo a été créé avec pour mission de connecter les consommateurs camerounais 
-                aux meilleurs produits locaux et internationaux, tout en soutenant l'économie locale 
-                et l'artisanat traditionnel.
+                {missionText1}
               </p>
               <p className="text-gray-700 leading-relaxed">
-                Nous croyons fermement au potentiel du commerce électronique pour transformer 
-                l'économie camerounaise et offrir de nouvelles opportunités aux entrepreneurs locaux.
+                {missionText2}
               </p>
             </div>
             <div>
-              <img
-                src="https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg"
-                alt="About Nengoo"
-                className="rounded-lg shadow-lg h-96 w-full object-cover object-top"
-              />
+              {loading ? (
+                <div className="rounded-lg shadow-lg h-96 w-full bg-gray-200 animate-pulse flex items-center justify-center">
+                  <span className="text-gray-500">Chargement...</span>
+                </div>
+              ) : (
+                <img
+                  src={missionImage}
+                  alt={missionTitle}
+                  className="rounded-lg shadow-lg h-96 w-full object-cover object-top"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg";
+                  }}
+                />
+              )}
             </div>
           </div>
           

@@ -10,6 +10,7 @@ import OrderManagement from './OrderManagement';
 import CategoryManagement from './CategoryManagement';
 import ShippingSettingsManagement from './ShippingSettingsManagement';
 import HomepageManagement from './HomepageManagement'; // Importer le nouveau composant
+import AboutPageManagement from './AboutPageManagement';
 import WhatsAppAnalytics from './WhatsAppAnalytics';
 import { translations } from '../../lib/translations';
 
@@ -160,6 +161,9 @@ const AdminDashboard = (props) => {
                                     <button onClick={() => handleNavigate('shipping')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'shipping' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
                                         <span className="text-xl">🚚</span><span className="font-medium text-sm">Frais de livraison</span>
                                     </button>
+                                    <button onClick={() => handleNavigate('about')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeSection === 'about' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'}`}>
+                                        <span className="text-xl">ℹ️</span><span className="font-medium text-sm">Gestion Page À propos</span>
+                                    </button>
                                     <Link to="/admin/privacy-policy" className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors hover:bg-gray-100">
                                         <span className="text-xl">🔒</span><span className="font-medium text-sm">Politique de confidentialité</span>
                                     </Link>
@@ -221,6 +225,9 @@ const AdminDashboard = (props) => {
                     </div>
                     <div id="homepage-section" className={`${activeSection === 'homepage' ? '' : 'hidden'}`}>
                         <HomepageManagement {...props} />
+                    </div>
+                    <div id="about-section" className={`${activeSection === 'about' ? '' : 'hidden'}`}>
+                        <AboutPageManagement {...props} />
                     </div>
                 </div>
             </div>

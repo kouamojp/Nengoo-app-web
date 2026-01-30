@@ -35,13 +35,14 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
   };
 
   useEffect(() => {
-    if (user) {
+    // Only fetch notifications for buyers and sellers, not admins
+    if (user && (user.type === 'buyer' || user.type === 'seller')) {
       const fetchUnreadCount = async () => {
         const count = await getUnreadNotificationsCount(user.id, user.type);
         setUnreadCount(count);
       };
       fetchUnreadCount();
-      
+
       // Poll every minute
       const interval = setInterval(fetchUnreadCount, 60000);
       return () => clearInterval(interval);
@@ -199,9 +200,9 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
           <div className="hidden md:flex items-end space-x-4">
             {/* <InstallButton /> */}
             
-            {user && (
+            {user && (user.type === 'buyer' || user.type === 'seller') && (
               <div className="relative notifications-container">
-                <button 
+                <button
                   onClick={() => setShowNotifications(!showNotifications)}
                   className="relative hover:text-yellow-300 transition-colors flex flex-col items-center"
                 >
@@ -214,9 +215,9 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                   <div className="text-sm">Notifs</div>
                 </button>
                 {showNotifications && (
-                  <NotificationList 
-                    userId={user.id} 
-                    userType={user.type} 
+                  <NotificationList
+                    userId={user.id}
+                    userType={user.type}
                     onClose={() => setShowNotifications(false)}
                   />
                 )}
