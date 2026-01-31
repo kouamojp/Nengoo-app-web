@@ -90,6 +90,26 @@ def normalize_whatsapp(whatsapp: str) -> str:
 
 # --- Security (Mock Authorization) ---
 
+async def get_user_id_from_request(
+    authorization: Optional[str] = Header(None),
+    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
+    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")
+) -> Optional[str]:
+    """Extract user ID from Authorization Bearer token or X-Buyer-Id/X-Seller-Id headers"""
+    # First check custom headers (legacy support)
+    if x_buyer_id:
+        return x_buyer_id
+    if x_seller_id:
+        return x_seller_id
+
+    # Extract from Bearer token
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.replace("Bearer ", "").strip()
+        # Token is the user ID itself (e.g., "buyer_73b41c54")
+        return token
+
+    return None
+
 async def get_current_admin_role(x_admin_role: str = Header(None)) -> Optional[str]:
     return x_admin_role
 
@@ -1659,11 +1679,9 @@ async def can_user_review_product(
 async def create_product_interaction(
     product_id: str,
     interaction_data: ProductInteractionCreate,
-    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
-    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")
+    user_id: Optional[str] = Depends(get_user_id_from_request)
 ):
     """Create or update a product interaction (view, favourite, rating)"""
-    user_id = x_buyer_id or x_seller_id
     if not user_id:
         raise HTTPException(status_code=401, detail="User ID required")
 
@@ -1729,11 +1747,9 @@ async def create_product_interaction(
 @api_router.get("/interactions/product/{product_id}")
 async def get_product_interactions(
     product_id: str,
-    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
-    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")
+    user_id: Optional[str] = Depends(get_user_id_from_request)
 ):
     """Get aggregated interaction stats for a product"""
-    user_id = x_buyer_id or x_seller_id
 
     # Get total views, favorites, and ratings
     pipeline = [
@@ -1795,14 +1811,12 @@ async def get_product_interactions(
 
 @api_router.get("/interactions/user")
 async def get_user_interactions(
-    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
-    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id"),
+    user_id: Optional[str] = Depends(get_user_id_from_request),
     page: int = 0,
     size: int = 8,
     sort: str = "timestamp,desc"
 ):
     """Get all interactions for a user (favourites, ratings, etc.)"""
-    user_id = x_buyer_id or x_seller_id
     if not user_id:
         raise HTTPException(status_code=401, detail="User ID required")
 
