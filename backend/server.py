@@ -1191,7 +1191,7 @@ async def generate_sitemap():
         categories_cursor = db.categories.find()
         categories = await categories_cursor.to_list(None)
 
-        frontend_url = os.getenv("FRONTEND_URL", "https://nengoo-app-web.onrender.com")
+        frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
         current_date = datetime.utcnow().strftime("%Y-%m-%d")
 
         # Build sitemap XML
@@ -1823,9 +1823,13 @@ async def get_user_interactions(
     for interaction in interactions:
         product = await db.products.find_one({"id": interaction["productId"]})
         if product:
+            # Remove MongoDB _id field before serialization
+            product_dict = dict(product)
+            product_dict.pop("_id", None)
+
             enriched_interactions.append({
                 "id": interaction["id"],
-                "product": product,
+                "product": product_dict,
                 "isFavourite": interaction.get("isFavourite", False),
                 "rating": interaction.get("rating", 0),
                 "interaction": interaction.get("interaction", "view"),
