@@ -109,8 +109,6 @@ android-sdk/ -e
 
 frontend/build/
 
-nengoo-front
-
 .claude/settings.local.json
 
 GEMINI_LOG.md
