@@ -1025,7 +1025,7 @@ class ShippingSettings(BaseModel):
     price: float = Field(..., description="Prix de la livraison standard")
 
 class HomepageSettings(BaseModel):
-    heroImageUrl: str = Field(..., description="URL de l'image de la section hero de la page d'accueil")
+    heroImages: List[str] = Field(default=[], description="Liste des URLs des images du carrousel hero de la page d'accueil")
 
 # --- API Endpoints for Settings ---
 @api_router.get("/settings/shipping", response_model=ShippingSettings)
@@ -1049,8 +1049,12 @@ async def get_homepage_settings():
     homepage_settings = await db.settings.find_one({"_id": "homepage_settings"})
     if homepage_settings:
         return HomepageSettings(**homepage_settings)
-    # Remplacer par une URL par défaut ou une image de secours appropriée
-    return HomepageSettings(heroImageUrl="https://via.placeholder.com/1920x1080.png?text=Nengoo")
+    # Images par défaut pour le carrousel hero
+    return HomepageSettings(heroImages=[
+        "https://images.unsplash.com/photo-1550041499-4c5857d2b508",
+        "https://images.unsplash.com/photo-1441986300917-64674bd600d8",
+        "https://images.unsplash.com/photo-1483985988355-763728e1935b"
+    ])
 
 @api_router.put("/settings/homepage", response_model=HomepageSettings, dependencies=[Depends(super_admin_required)])
 async def update_homepage_settings(settings: HomepageSettings):

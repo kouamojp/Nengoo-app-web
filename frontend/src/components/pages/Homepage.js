@@ -7,6 +7,13 @@ import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
 import PWAInstallPrompt from '../pwa/PWAInstallPrompt';
 import InstallAppButton from '../pwa/InstallAppButton';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Pagination, Autoplay, EffectFade } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/pagination';
+import 'swiper/css/effect-fade';
+import './HeroSwiper.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -20,7 +27,7 @@ const Homepage = (props) => {
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [newsletterFeedback, setNewsletterFeedback] = useState({ message: '', isError: false });
-  const [heroImageUrl, setHeroImageUrl] = useState('');
+  const [heroImages, setHeroImages] = useState([]);
 
   // Mapping des icônes et couleurs pour les catégories
   const categoryIcons = {
@@ -46,11 +53,15 @@ const Homepage = (props) => {
           throw new Error('Could not fetch homepage settings');
         }
         const data = await response.json();
-        setHeroImageUrl(data.heroImageUrl);
+        setHeroImages(data.heroImages || []);
       } catch (error) {
-        console.error("Erreur lors de la récupération de l'image hero:", error);
-        // Fallback to a default image if the fetch fails
-        setHeroImageUrl("https://images.unsplash.com/photo-1550041499-4c5857d2b508");
+        console.error("Erreur lors de la récupération des images hero:", error);
+        // Fallback to default images if the fetch fails
+        setHeroImages([
+          "https://images.unsplash.com/photo-1550041499-4c5857d2b508",
+          "https://images.unsplash.com/photo-1441986300917-64674bd600d8",
+          "https://images.unsplash.com/photo-1483985988355-763728e1935b"
+        ]);
       }
     };
 
@@ -178,11 +189,40 @@ const Homepage = (props) => {
               </div>
             </div>
             <div className="relative order-first lg:order-last">
-              <img
-                src={heroImageUrl || "https://images.unsplash.com/photo-1550041499-4c5857d2b508"}
-                alt="Hero"
-                className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full max-h-96 object-cover"
-              />
+              {heroImages.length > 0 ? (
+                <Swiper
+                  modules={[Navigation, Pagination, Autoplay, EffectFade]}
+                  spaceBetween={0}
+                  slidesPerView={1}
+                  navigation
+                  pagination={{ clickable: true }}
+                  autoplay={{
+                    delay: 5000,
+                    disableOnInteraction: false,
+                  }}
+                  effect="fade"
+                  fadeEffect={{ crossFade: true }}
+                  loop={heroImages.length > 1}
+                  className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full"
+                  style={{ maxHeight: '384px' }}
+                >
+                  {heroImages.map((imageUrl, index) => (
+                    <SwiperSlide key={index}>
+                      <img
+                        src={imageUrl}
+                        alt={`Hero ${index + 1}`}
+                        className="w-full h-96 object-cover rounded-lg"
+                      />
+                    </SwiperSlide>
+                  ))}
+                </Swiper>
+              ) : (
+                <img
+                  src="https://images.unsplash.com/photo-1550041499-4c5857d2b508"
+                  alt="Hero"
+                  className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full max-h-96 object-cover"
+                />
+              )}
               {/* <div className="absolute -bottom-4 -left-4 bg-yellow-400 text-black p-3 sm:p-4 rounded-lg font-bold text-center">
                 {t.flashSale} 🔥<br />
                 <span className="text-sm">-30% OFF</span>

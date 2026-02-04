@@ -12,14 +12,35 @@ module.exports = {
       '@': path.resolve(__dirname, 'src'),
     },
     configure: (webpackConfig) => {
-      
+
+      // Fix for ES modules in node_modules (is-plain-obj, unified, etc.)
+      const oneOfRule = webpackConfig.module.rules.find(rule => rule.oneOf);
+      if (oneOfRule) {
+        const babelLoaderRule = oneOfRule.oneOf.find(
+          rule => rule.loader && rule.loader.includes('babel-loader')
+        );
+
+        if (babelLoaderRule) {
+          // Include specific ES modules that need transpilation
+          babelLoaderRule.include = [
+            babelLoaderRule.include,
+            /node_modules\/is-plain-obj/,
+            /node_modules\/unified/,
+            /node_modules\/bail/,
+            /node_modules\/trough/,
+            /node_modules\/vfile/,
+            /node_modules\/unist-util-stringify-position/,
+          ].filter(Boolean);
+        }
+      }
+
       // Disable hot reload completely if environment variable is set
       if (config.disableHotReload) {
         // Remove hot reload related plugins
         webpackConfig.plugins = webpackConfig.plugins.filter(plugin => {
           return !(plugin.constructor.name === 'HotModuleReplacementPlugin');
         });
-        
+
         // Disable watch mode
         webpackConfig.watch = false;
         webpackConfig.watchOptions = {
@@ -39,7 +60,7 @@ module.exports = {
           ],
         };
       }
-      
+
       return webpackConfig;
     },
   },
