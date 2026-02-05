@@ -1342,8 +1342,9 @@ async def get_product_og_tags(product_id: str):
     # Construct absolute image URL
     images = product.get("images", [])
     # Check if images list exists, is not empty, and first element is valid
-    if images and len(images) > 0 and images[0]:
-        image_url = images[0]
+    # Also check that the image URL is not just whitespace
+    if images and len(images) > 0 and images[0] and isinstance(images[0], str) and images[0].strip():
+        image_url = images[0].strip()
         # Convert relative URLs to absolute
         if not image_url.startswith("http"):
             image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
@@ -1434,8 +1435,9 @@ async def debug_product_og_tags(product_id: str):
 
     images = product.get("images", [])
     # Check if images list exists, is not empty, and first element is valid
-    if images and len(images) > 0 and images[0]:
-        image_url = images[0]
+    # Also check that the image URL is not just whitespace
+    if images and len(images) > 0 and images[0] and isinstance(images[0], str) and images[0].strip():
+        image_url = images[0].strip()
         # Convert relative URLs to absolute
         if not image_url.startswith("http"):
             image_url = f"{frontend_url}{image_url}" if image_url.startswith("/") else f"{frontend_url}/{image_url}"
