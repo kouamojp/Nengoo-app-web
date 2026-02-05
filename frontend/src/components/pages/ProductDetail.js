@@ -289,7 +289,7 @@ const ProductDetail = (props) => {
   };
 
   const ogImageUrl = getAbsoluteImageUrl(images[0]);
-  const productUrl = `https://nengoo.com/product/${product.slug || product.id}`;
+  const productUrl = `https://nengoo-app-web.onrender.com/api/og/product/${product.slug || product.id}`;
 
   return (
     <>
