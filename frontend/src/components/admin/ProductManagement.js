@@ -13,6 +13,7 @@ const ProductManagement = (props) => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null); // State for editing
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedSellerId, setSelectedSellerId] = useState(''); // Filtre par vendeur
     const [selectedProducts, setSelectedProducts] = useState([]);
 
     // State for new product form
@@ -353,12 +354,17 @@ const ProductManagement = (props) => {
 
     const filteredProducts = products.filter(product => {
         const query = searchQuery.toLowerCase();
-        return (
+        const matchesSearch = (
             product.name.toLowerCase().includes(query) ||
             product.description.toLowerCase().includes(query) ||
             product.category.toLowerCase().includes(query) ||
             product.sellerName.toLowerCase().includes(query)
         );
+
+        // Filtrer par vendeur si un vendeur est sélectionné
+        const matchesSeller = selectedSellerId === '' || product.sellerId === selectedSellerId;
+
+        return matchesSearch && matchesSeller;
     });
 
     return (
@@ -379,14 +385,41 @@ const ProductManagement = (props) => {
                 </div>
             </div>
 
-            <div className="mb-4">
-                <input
-                    type="text"
-                    placeholder="Rechercher des produits..."
-                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                />
+            <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <input
+                        type="text"
+                        placeholder="Rechercher des produits..."
+                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                </div>
+                <div>
+                    <select
+                        value={selectedSellerId}
+                        onChange={(e) => setSelectedSellerId(e.target.value)}
+                        className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 bg-white"
+                    >
+                        <option value="">👤 Tous les vendeurs ({products.length} produits)</option>
+                        {sellers.map((seller) => {
+                            const sellerProductCount = products.filter(p => p.sellerId === seller.id).length;
+                            return (
+                                <option key={seller.id} value={seller.id}>
+                                    {seller.businessName} - {seller.city} ({sellerProductCount} produit{sellerProductCount > 1 ? 's' : ''})
+                                </option>
+                            );
+                        })}
+                    </select>
+                    {selectedSellerId && (
+                        <button
+                            onClick={() => setSelectedSellerId('')}
+                            className="mt-2 text-sm text-purple-600 hover:text-purple-800 font-medium"
+                        >
+                            ✕ Réinitialiser le filtre
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Edit Product Modal */}
