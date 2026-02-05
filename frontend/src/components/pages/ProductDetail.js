@@ -345,7 +345,7 @@ const ProductDetail = (props) => {
                         className="w-full h-96 md:h-[30rem] object-cover rounded-lg"
                         onError={(e) => {
                             e.target.onerror = null;
-                            e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
+                            e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo-web.png';
                         }}
                     />
                 </div>
