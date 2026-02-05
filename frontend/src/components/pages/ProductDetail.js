@@ -362,7 +362,7 @@ const ProductDetail = (props) => {
                         onClick={() => setSelectedImage(index)}
                         onError={(e) => {
                           e.target.onerror = null;
-                          e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
+                          e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo-web.png';
                         }}
                       />
                     ))}
