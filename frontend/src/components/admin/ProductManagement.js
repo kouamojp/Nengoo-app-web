@@ -702,6 +702,7 @@ const ProductManagement = (props) => {
                                         checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
                                     />
                                 </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Image</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produit</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendeur</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix</th>
@@ -720,6 +721,19 @@ const ProductManagement = (props) => {
                                             checked={selectedProducts.includes(product.id)}
                                             onChange={(e) => handleSelectOne(e, product.id)}
                                         />
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {product.images && product.images.length > 0 ? (
+                                            <img
+                                                src={product.images[0]}
+                                                alt={product.name}
+                                                className="w-16 h-16 object-cover rounded-lg shadow-sm"
+                                            />
+                                        ) : (
+                                            <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                                                <span className="text-gray-400 text-xs">Pas d'image</span>
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 font-medium">{product.name}</td>
                                     <td className="px-6 py-4 text-sm">{product.sellerName}</td>
