@@ -6,6 +6,7 @@ import { translations } from '../../lib/translations';
 import { mockUsers, cameroonCities } from '../../lib/mockData';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+import SocialLoginButtons from './SocialLoginButtons';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -271,6 +272,17 @@ const SellerSignup = (props) => {
                 {isLogin ? t.login : "Soumettre ma candidature"}
               </button>
             </form>
+
+            {/* Social Login Buttons - Only show in login mode */}
+            {isLogin && (
+              <div className="mt-6">
+                <SocialLoginButtons
+                  userType="seller"
+                  setUser={setUser}
+                  mode="login"
+                />
+              </div>
+            )}
 
             <div className="text-center mt-6">
               <button

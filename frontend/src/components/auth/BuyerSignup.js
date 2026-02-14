@@ -6,6 +6,7 @@ import { translations } from '../../lib/translations';
 import { mockUsers } from '../../lib/mockData';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+import SocialLoginButtons from './SocialLoginButtons';
 
 const BuyerSignup = (props) => {
   const { language, setUser, isLoginDefault = false } = props;
@@ -199,6 +200,15 @@ const BuyerSignup = (props) => {
                 {isLogin ? t.login : t.createAccount}
               </button>
             </form>
+
+            {/* Social Login Buttons */}
+            <div className="mt-6">
+              <SocialLoginButtons
+                userType="buyer"
+                setUser={setUser}
+                mode={isLogin ? 'login' : 'signup'}
+              />
+            </div>
 
             <div className="text-center mt-6">
               <button

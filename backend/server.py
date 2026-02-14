@@ -22,6 +22,12 @@ import html
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Import Firebase Admin configuration
+from firebase_admin_config import initialize_firebase_admin
+
+# Initialize Firebase Admin SDK
+initialize_firebase_admin()
+
 # --- Email Configuration ---
 # Add these variables to your .env file
 conf = ConnectionConfig(
@@ -296,7 +302,7 @@ class ProductUpdate(BaseModel):
 class Seller(BaseModel):
     id: str = Field(default_factory=lambda: f"seller_{str(uuid.uuid4())[:8]}")
     whatsapp: str
-    password: Optional[str] = None  # Hashed. Made optional to support legacy data and public listing.
+    password: Optional[str] = None  # Hashed. Made optional to support OAuth users
     name: str
     businessName: str
     email: str
@@ -313,6 +319,10 @@ class Seller(BaseModel):
     socialMedia: Optional[dict] = None
     reset_token: Optional[str] = None
     reset_token_expiry: Optional[datetime] = None
+    # OAuth fields
+    oauth_provider: Optional[str] = None  # 'google.com', 'facebook.com', 'apple.com'
+    oauth_uid: Optional[str] = None  # Firebase UID
+    last_login: Optional[datetime] = None
 
 class SellerCreate(BaseModel):
     whatsapp: str
@@ -532,7 +542,7 @@ class Buyer(BaseModel):
     whatsapp: str
     name: str
     email: str
-    password: Optional[str] = None # Hashed password
+    password: Optional[str] = None # Hashed password (optional for OAuth users)
     type: str = "buyer"
     joinDate: datetime
     status: str
@@ -540,6 +550,10 @@ class Buyer(BaseModel):
     totalSpent: float = 0.0
     reset_token: Optional[str] = None
     reset_token_expiry: Optional[datetime] = None
+    # OAuth fields
+    oauth_provider: Optional[str] = None  # 'google.com', 'facebook.com', 'apple.com'
+    oauth_uid: Optional[str] = None  # Firebase UID
+    last_login: Optional[datetime] = None
 
 class BuyerUpdate(BaseModel):
     name: Optional[str] = None
@@ -1931,6 +1945,9 @@ class SellerLoginRequest(BaseModel):
     whatsapp: str
     password: str
 
+class SellerOAuthLoginRequest(BaseModel):
+    idToken: str
+
 @api_router.post("/sellers/login", response_model=Seller)
 async def seller_login(login_data: SellerLoginRequest):
     # Normaliser le numéro WhatsApp (supprimer les espaces)
@@ -1960,6 +1977,97 @@ async def seller_login(login_data: SellerLoginRequest):
 
     logging.info(f"[SELLER LOGIN] Login successful for {login_data.whatsapp}")
     return Seller(**seller)
+
+@api_router.post("/sellers/oauth-login", response_model=Seller)
+async def seller_oauth_login(oauth_data: SellerOAuthLoginRequest):
+    """
+    OAuth login endpoint for sellers
+    Only allows login for already approved sellers (no auto-registration)
+    """
+    from firebase_admin_config import verify_firebase_token, is_firebase_initialized
+
+    # Check if Firebase is initialized
+    if not is_firebase_initialized():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OAuth authentication is not available. Please contact support."
+        )
+
+    try:
+        # Verify Firebase token
+        decoded_token = verify_firebase_token(oauth_data.idToken)
+
+        # Extract user information from token
+        firebase_uid = decoded_token.get('uid')
+        email = decoded_token.get('email')
+        provider_id = decoded_token.get('firebase', {}).get('sign_in_provider', 'unknown')
+
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email address is required for OAuth login."
+            )
+
+        # Check if seller exists by OAuth UID
+        seller = await db.sellers.find_one({"oauth_uid": firebase_uid})
+
+        if seller:
+            # Check if approved
+            if seller.get("status") != "approved":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Votre compte vendeur est en attente d'approbation"
+                )
+
+            # Update last login
+            await db.sellers.update_one(
+                {"_id": seller["_id"]},
+                {"$set": {"last_login": datetime.utcnow()}}
+            )
+            seller['last_login'] = datetime.utcnow()
+            return Seller(**seller)
+
+        # Check if seller exists by email
+        seller = await db.sellers.find_one({"email": email})
+
+        if seller:
+            # Check if approved
+            if seller.get("status") != "approved":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Votre compte vendeur existe mais n'est pas encore approuvé. Veuillez attendre l'approbation de l'administrateur."
+                )
+
+            # Link OAuth to existing approved account
+            await db.sellers.update_one(
+                {"_id": seller["_id"]},
+                {
+                    "$set": {
+                        "oauth_provider": provider_id,
+                        "oauth_uid": firebase_uid,
+                        "last_login": datetime.utcnow()
+                    }
+                }
+            )
+            seller['oauth_provider'] = provider_id
+            seller['oauth_uid'] = firebase_uid
+            seller['last_login'] = datetime.utcnow()
+            return Seller(**seller)
+
+        # No seller found - sellers cannot auto-register via OAuth
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Aucun compte vendeur approuvé trouvé avec cette adresse e-mail. Veuillez d'abord vous inscrire en tant que vendeur via le formulaire d'inscription et attendre l'approbation."
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"[SELLER OAUTH LOGIN] Error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"OAuth authentication failed: {str(e)}"
+        )
 
 @api_router.put("/sellers/{seller_id}/approve", response_model=Seller, dependencies=[Depends(moderator_or_higher_required)])
 async def approve_seller(seller_id: str):

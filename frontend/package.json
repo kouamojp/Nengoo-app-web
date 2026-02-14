@@ -6,8 +6,12 @@
   "author": "Nengoo Team",
   "homepage": "https://nengoo.com",
   "dependencies": {
+    "@capacitor-firebase/authentication": "^6.1.0",
+    "@capacitor/browser": "^6.0.0",
+    "@capacitor/preferences": "^6.0.0",
     "axios": "^1.8.4",
     "cra-template": "1.2.0",
+    "firebase": "^11.1.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
