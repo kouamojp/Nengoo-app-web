@@ -274,7 +274,7 @@ const SellerSignup = (props) => {
             </form>
 
             {/* Social Login Buttons - Only show in login mode */}
-            {isLogin && (
+           {/*  {isLogin && (
               <div className="mt-6">
                 <SocialLoginButtons
                   userType="seller"
@@ -282,7 +282,7 @@ const SellerSignup = (props) => {
                   mode="login"
                 />
               </div>
-            )}
+            )} */}
 
             <div className="text-center mt-6">
               <button

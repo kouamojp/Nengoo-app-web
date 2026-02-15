@@ -202,13 +202,13 @@ const BuyerSignup = (props) => {
             </form>
 
             {/* Social Login Buttons */}
-            <div className="mt-6">
+           {/*  <div className="mt-6">
               <SocialLoginButtons
                 userType="buyer"
                 setUser={setUser}
                 mode={isLogin ? 'login' : 'signup'}
               />
-            </div>
+            </div> */}
 
             <div className="text-center mt-6">
               <button
