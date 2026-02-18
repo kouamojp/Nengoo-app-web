@@ -94,6 +94,17 @@ def normalize_whatsapp(whatsapp: str) -> str:
         return ""
     return whatsapp.replace(" ", "").replace("-", "").strip()
 
+def migrate_seller_data(seller_data: dict) -> dict:
+    """
+    Migrates legacy seller data to match current schema.
+    Adds default values for missing required fields.
+    """
+    if "region" not in seller_data:
+        seller_data["region"] = seller_data.get("city", "Non spécifié")
+    if "address" not in seller_data:
+        seller_data["address"] = "Non spécifié"
+    return seller_data
+
 # --- Security (Mock Authorization) ---
 
 async def get_user_id_from_request(
@@ -366,6 +377,7 @@ class OrderProduct(BaseModel):
     quantity: int
     price: float
     image: Optional[str] = None
+    images: Optional[List[str]] = None
 
 class Order(BaseModel):
     id: str
@@ -1926,6 +1938,8 @@ async def list_sellers():
     valid_sellers = []
     for s in sellers:
         try:
+            # Migrate legacy seller data
+            s = migrate_seller_data(s)
             # The Seller model now includes password as optional, so this should be safe.
             # We add this try-except block for added robustness against corrupted data.
             valid_sellers.append(Seller(**s))
@@ -1939,6 +1953,10 @@ async def get_seller(seller_id: str):
     seller = await db.sellers.find_one({"id": seller_id})
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+
+    # Migrate legacy seller data
+    seller = migrate_seller_data(seller)
+
     return Seller(**seller)
 
 class SellerLoginRequest(BaseModel):
@@ -1974,6 +1992,9 @@ async def seller_login(login_data: SellerLoginRequest):
     if seller["status"] != "approved":
         logging.warning(f"[SELLER LOGIN] Seller {login_data.whatsapp} not approved: {seller['status']}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Votre compte vendeur est en attente d'approbation")
+
+    # Migrate legacy seller data
+    seller = migrate_seller_data(seller)
 
     logging.info(f"[SELLER LOGIN] Login successful for {login_data.whatsapp}")
     return Seller(**seller)
@@ -2025,6 +2046,8 @@ async def seller_oauth_login(oauth_data: SellerOAuthLoginRequest):
                 {"$set": {"last_login": datetime.utcnow()}}
             )
             seller['last_login'] = datetime.utcnow()
+            # Migrate legacy seller data
+            seller = migrate_seller_data(seller)
             return Seller(**seller)
 
         # Check if seller exists by email
@@ -2052,6 +2075,8 @@ async def seller_oauth_login(oauth_data: SellerOAuthLoginRequest):
             seller['oauth_provider'] = provider_id
             seller['oauth_uid'] = firebase_uid
             seller['last_login'] = datetime.utcnow()
+            # Migrate legacy seller data
+            seller = migrate_seller_data(seller)
             return Seller(**seller)
 
         # No seller found - sellers cannot auto-register via OAuth
@@ -2075,6 +2100,8 @@ async def approve_seller(seller_id: str):
     updated_seller = await db.sellers.find_one({"id": seller_id})
     if not updated_seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    # Migrate legacy seller data
+    updated_seller = migrate_seller_data(updated_seller)
     return Seller(**updated_seller)
 
 @api_router.put("/sellers/{seller_id}", response_model=Seller)
@@ -2104,6 +2131,8 @@ async def update_seller(
     updated_seller = await db.sellers.find_one({"id": seller_id})
     if not updated_seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    # Migrate legacy seller data
+    updated_seller = migrate_seller_data(updated_seller)
     return Seller(**updated_seller)
 
 @api_router.delete("/sellers", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(admin_or_higher_required)])
@@ -2203,9 +2232,41 @@ async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] =
             pickup_point = await db.pickupPoints.find_one({"id": order_data["pickupPointId"]})
             if pickup_point:
                 order_data["pickupPointName"] = pickup_point.get("name")
-        
+
+        # Handle legacy shippingAddress format (convert dict to string)
+        if isinstance(order_data.get("shippingAddress"), dict):
+            addr = order_data["shippingAddress"]
+            order_data["shippingAddress"] = addr.get("address", "")
+            if not order_data.get("shippingCity"):
+                order_data["shippingCity"] = addr.get("city")
+            if not order_data.get("shippingRegion"):
+                order_data["shippingRegion"] = addr.get("region")
+            if not order_data.get("shippingPhone"):
+                order_data["shippingPhone"] = addr.get("phone")
+
+        # Ensure required fields exist with defaults
+        if "products" not in order_data:
+            order_data["products"] = []
+        if "totalAmount" not in order_data:
+            order_data["totalAmount"] = 0.0
+        if "pickupStatus" not in order_data:
+            order_data["pickupStatus"] = "pending"
+
+        # Ensure products have both image and images fields
+        for product in order_data.get("products", []):
+            # If has images but no image, set image to first element
+            if "images" in product and "image" not in product:
+                product["image"] = product["images"][0] if product["images"] else None
+            # If has image but no images, create images array
+            elif "image" in product and "images" not in product:
+                product["images"] = [product["image"]] if product["image"] else []
+            # If has neither, set both to None/empty
+            elif "image" not in product and "images" not in product:
+                product["image"] = None
+                product["images"] = []
+
         enriched_orders.append(Order(**order_data))
-    
+
     return enriched_orders
 
 @api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(order_owner_or_support_required)])
@@ -2392,7 +2453,8 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             name=product_info["name"],
             quantity=item.quantity,
             price=product_info.get("promoPrice") if product_info.get("promoPrice") and product_info.get("promoPrice") > 0 else product_info["price"],
-            image=product_info["images"][0] if product_info.get("images") and len(product_info["images"]) > 0 else None
+            image=product_info["images"][0] if product_info.get("images") and len(product_info["images"]) > 0 else None,
+            images=product_info.get("images", [])
         ))
 
     created_orders = []

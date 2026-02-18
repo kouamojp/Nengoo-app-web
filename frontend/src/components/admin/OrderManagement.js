@@ -189,6 +189,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commande</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acheteur</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendeur</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Images</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -215,6 +216,32 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                         <td className="px-6 py-4 font-medium">{order.id}</td>
                                         <td className="px-6 py-4 text-sm">{order.buyerName}</td>
                                         <td className="px-6 py-4 text-sm">{order.sellerName}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-wrap gap-1">
+                                                {order.products && order.products.slice(0, 3).map((product, index) => (
+                                                    product.images && product.images[0] ? (
+                                                        <img
+                                                            key={index}
+                                                            src={product.images[0]}
+                                                            alt={product.name}
+                                                            className="w-10 h-10 object-cover rounded border border-gray-200"
+                                                            title={product.name}
+                                                        />
+                                                    ) : (
+                                                        <div key={index} className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                        </div>
+                                                    )
+                                                ))}
+                                                {order.products && order.products.length > 3 && (
+                                                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-xs font-medium text-gray-600">
+                                                        +{order.products.length - 3}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4 text-sm font-medium">{formatPrice(order.totalAmount)}</td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2 py-1 text-xs rounded-full ${order.status === 'delivered' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
@@ -248,7 +275,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                     </tr>
                                     {expandedOrderId === order.id && (
                                         <tr className="bg-gray-50">
-                                            <td colSpan="8" className="px-12 py-4">
+                                            <td colSpan="9" className="px-12 py-4">
                                                 <div>
                                                     <h4 className="font-bold text-md mb-2">Détails de la Commande</h4>
                                                     <p className="text-sm text-gray-600 mb-2">Vendu par : <span className="font-medium">{order.sellerName}</span></p>
@@ -270,10 +297,25 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                                     <h4 className="font-bold text-md mt-4 mb-2">Produits commandés</h4>
                                                     <ul className="divide-y divide-gray-200">
                                                         {order.products.map(product => (
-                                                            <li key={product.productId} className="py-2 flex justify-between items-center">
-                                                                <div>
-                                                                    <p className="font-medium">{product.name}</p>
-                                                                    <p className="text-sm text-gray-500">Quantité: {product.quantity}</p>
+                                                            <li key={product.productId} className="py-3 flex justify-between items-center">
+                                                                <div className="flex items-center gap-3">
+                                                                    {product.images && product.images[0] ? (
+                                                                        <img
+                                                                            src={product.images[0]}
+                                                                            alt={product.name}
+                                                                            className="w-16 h-16 object-cover rounded border border-gray-200"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                                            </svg>
+                                                                        </div>
+                                                                    )}
+                                                                    <div>
+                                                                        <p className="font-medium">{product.name}</p>
+                                                                        <p className="text-sm text-gray-500">Quantité: {product.quantity}</p>
+                                                                    </div>
                                                                 </div>
                                                                 <p className="font-medium">{formatPrice(product.price * product.quantity)}</p>
                                                             </li>
