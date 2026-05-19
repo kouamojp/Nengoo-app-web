@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.nengoo.twa",
+      "sha256_cert_fingerprints": [
+        "76:F6:C5:B2:BF:FB:B0:68:21:6D:DD:88:18:BB:95:03:01:07:55:12:2B:E4:74:F4:D9:41:3D:3A:79:CA:19:68"
+      ]
+    }
+  }
+]
