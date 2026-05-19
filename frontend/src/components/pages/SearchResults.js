@@ -63,7 +63,7 @@ const SearchResults = (props) => {
           <h1 className="text-3xl font-bold mb-2">Résultats de recherche</h1>
           {query && (
             <p className="text-gray-600">
-              {loading ? 'Recherche en cours...' : (<>{searchResults.length} résultat(s) pour "<strong>${query}</strong>"</>)}
+              {loading ? 'Recherche en cours...' : (<>{searchResults.length} résultat(s) pour "<strong>{query}</strong>"</>)}
             </p>
           )}
         </div>
