@@ -51,6 +51,7 @@ const ProductCard = ({ product, language, addToCart }) => {
           src={product.image}
           alt={product.name[language]}
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+          loading="lazy"
           onClick={handleProductClick}
           onError={(e) => {
             e.target.onerror = null; // Prevent infinite loop if fallback also fails

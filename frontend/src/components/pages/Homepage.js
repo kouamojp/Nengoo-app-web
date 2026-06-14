@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
@@ -165,7 +166,45 @@ const Homepage = (props) => {
     }
   };
 
+  const organizationJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Nengoo',
+    url: 'https://www.nengoo.com',
+    logo: 'https://www.nengoo.com/icons/logo-512x512.png',
+    description: 'Nengoo est la marketplace camerounaise de confiance pour acheter et vendre des produits locaux et internationaux au Cameroun.',
+    sameAs: [],
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer service',
+      availableLanguage: ['French'],
+    },
+  };
+
+  const searchActionJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Nengoo',
+    url: 'https://www.nengoo.com',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: 'https://www.nengoo.com/search?q={search_term_string}',
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
   return (
+    <>
+      <Helmet>
+        <title>Nengoo — Marketplace Cameroun | Achetez & Vendez en ligne</title>
+        <meta name="description" content="Nengoo, la marketplace camerounaise de confiance. Achetez et vendez des produits locaux et internationaux au Cameroun. Livraison rapide, paiement sécurisé." />
+        <link rel="canonical" href="https://www.nengoo.com/" />
+        <script type="application/ld+json">{JSON.stringify(organizationJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(searchActionJsonLd)}</script>
+      </Helmet>
     <div className="min-h-screen bg-gray-50">
       <Header {...props} />
       
@@ -442,6 +481,7 @@ const Homepage = (props) => {
 
       <Footer language={language} />
     </div>
+    </>
   );
 };
 

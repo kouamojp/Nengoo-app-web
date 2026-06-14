@@ -7,4 +7,4 @@ source $HOME/.cargo/env
 pip install --upgrade pip
 
 # Installer les dépendances
-pip install -r backend/requirements.txt
+pip install -r requirements.txt

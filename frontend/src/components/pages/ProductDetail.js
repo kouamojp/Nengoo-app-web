@@ -290,13 +290,62 @@ const ProductDetail = (props) => {
 
   const ogImageUrl = getAbsoluteImageUrl(images[0]);
   const productUrl = `https://nengoo-app-web.onrender.com/api/og/product/${product.slug || product.id}`;
+  const canonicalUrl = `https://www.nengoo.com/product/${product.slug || product.id}`;
+
+  const jsonLd = {
+    '@context': 'https://schema.org/',
+    '@type': 'Product',
+    name: product.name[language],
+    description: product.description[language],
+    image: images,
+    url: canonicalUrl,
+    ...(seller && {
+      brand: {
+        '@type': 'Brand',
+        name: seller.businessName || seller.name,
+      },
+    }),
+    offers: {
+      '@type': 'Offer',
+      url: canonicalUrl,
+      priceCurrency: 'XAF',
+      price: product.promoPrice || product.price,
+      availability: product.inStock
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock',
+      seller: seller
+        ? { '@type': 'Organization', name: seller.businessName || seller.name }
+        : undefined,
+    },
+    ...(product.reviewsCount > 0 && {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: product.rating,
+        reviewCount: product.reviewsCount,
+        bestRating: 5,
+        worstRating: 1,
+      },
+    }),
+  };
+
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Accueil', item: 'https://www.nengoo.com/' },
+      { '@type': 'ListItem', position: 2, name: 'Catalogue', item: 'https://www.nengoo.com/catalog' },
+      { '@type': 'ListItem', position: 3, name: t[product.category] || product.category, item: `https://www.nengoo.com/catalog/${encodeURIComponent(product.category)}` },
+      { '@type': 'ListItem', position: 4, name: product.name[language], item: canonicalUrl },
+    ],
+  };
 
   return (
     <>
       <Helmet>
-        <title>{product.name[language]}</title>
-        <meta name="description" content={product.description[language]} />
-        
+        <title>{product.name[language]} — Nengoo</title>
+        <meta name="description" content={product.description[language]?.slice(0, 160)} />
+        <link rel="canonical" href={canonicalUrl} />
+
         {/* Open Graph / Facebook / WhatsApp */}
         <meta property="og:type" content="product" />
         <meta property="og:site_name" content="Nengoo" />
@@ -309,13 +358,17 @@ const ProductDetail = (props) => {
         <meta property="og:url" content={productUrl} />
         <meta property="og:price:amount" content={product.promoPrice || product.price} />
         <meta property="og:price:currency" content="XAF" />
-        
+
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:url" content={productUrl} />
         <meta name="twitter:title" content={product.name[language]} />
         <meta name="twitter:description" content={product.description[language]} />
         <meta name="twitter:image" content={ogImageUrl} />
+
+        {/* JSON-LD Structured Data */}
+        <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
       </Helmet>
       <div className="min-h-screen bg-gray-50">
         <Header {...props} />
@@ -355,10 +408,11 @@ const ProductDetail = (props) => {
                       <img
                         key={index}
                         src={img}
-                        alt={`${product.name[language]} ${index + 1}`}
+                        alt={`${product.name[language]} - photo ${index + 1}`}
                         className={`w-20 h-20 object-cover rounded cursor-pointer border-2 ${
                           selectedImage === index ? 'border-purple-500' : 'border-gray-200'
                         }`}
+                        loading="lazy"
                         onClick={() => setSelectedImage(index)}
                         onError={(e) => {
                           e.target.onerror = null;

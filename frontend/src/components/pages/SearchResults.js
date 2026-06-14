@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useLocation, Link } from 'react-router-dom';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
@@ -55,6 +56,18 @@ const SearchResults = (props) => {
   }, [query, language]);
 
   return (
+    <>
+      <Helmet>
+        <title>{query ? `"${query}" — Recherche Nengoo` : 'Recherche — Nengoo'}</title>
+        <meta
+          name="description"
+          content={query
+            ? `${searchResults.length} résultat(s) pour "${query}" sur Nengoo, la marketplace camerounaise.`
+            : 'Recherchez des produits locaux et internationaux sur Nengoo, votre marketplace au Cameroun.'
+          }
+        />
+        <meta name="robots" content="noindex, follow" />
+      </Helmet>
     <div className="min-h-screen bg-gray-50">
       <Header {...props} />
       
@@ -101,6 +114,7 @@ const SearchResults = (props) => {
       
       <Footer language={language} />
     </div>
+    </>
   );
 };
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
@@ -149,7 +150,25 @@ const ProductCatalog = (props) => {
     ...categories
   ];
 
+  const pageTitle = selectedCategory && selectedCategory !== 'all'
+    ? `${selectedCategory} — Catalogue Nengoo`
+    : 'Catalogue — Nengoo Marketplace Cameroun';
+
+  const pageDescription = selectedCategory && selectedCategory !== 'all'
+    ? `Découvrez tous les produits de la catégorie ${selectedCategory} sur Nengoo, la marketplace camerounaise de confiance.`
+    : 'Parcourez des milliers de produits locaux et internationaux sur Nengoo, votre marketplace camerounaise. Livraison au Cameroun.';
+
   return (
+    <>
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDescription} />
+        <link rel="canonical" href={
+          selectedCategory && selectedCategory !== 'all'
+            ? `https://www.nengoo.com/catalog/${encodeURIComponent(selectedCategory)}`
+            : 'https://www.nengoo.com/catalog'
+        } />
+      </Helmet>
     <div className="min-h-screen bg-gray-50">
       <Header {...props} />
       
@@ -286,6 +305,7 @@ const ProductCatalog = (props) => {
       
       <Footer language={language} />
     </div>
+    </>
   );
 };
 
