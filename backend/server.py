@@ -59,6 +59,10 @@ origins = [
     "https://nengoo.com",
     "https://nengoo-app-web.vercel.app",
     "https://nengoo-app-web.onrender.com",
+    # Capacitor mobile app origins
+    "capacitor://localhost",
+    "https://localhost",
+    "http://localhost",
     "http://localhost:3000",
     "http://localhost:8080",
     "http://localhost:8000",
@@ -77,7 +81,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"http://localhost:\d+",  # Permet tous les ports localhost en dev
+    allow_origin_regex=r"(http://localhost:\d+|capacitor://.*)",  # localhost dev + Capacitor mobile
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
