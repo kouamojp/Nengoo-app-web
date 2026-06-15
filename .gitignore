@@ -78,7 +78,12 @@ agenthub/agents/youtube/db
 .cache/
 
 # Mobile development
-android-sdk/ -e 
+android-sdk/
+
+# Android signing — ne jamais commiter
+frontend/android/nengoo-release.keystore
+frontend/android/keystore.properties
+-e 
 # Environment files
 *.env
 *.env.*

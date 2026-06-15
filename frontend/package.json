@@ -26,9 +26,9 @@
   },
   "scripts": {
     "start": "craco start",
-    "build": "craco build && npm run build:mobile",
-    "build:mobile": "npx cap copy && npx cap open ios && npx cap open android",
+    "build": "craco build",
     "build:pwa": "craco build",
+    "build:android": "npm run build:pwa && npx cap copy android",
     "test": "craco test",
     "eject": "react-scripts eject",
     "cap:init": "npx cap init",

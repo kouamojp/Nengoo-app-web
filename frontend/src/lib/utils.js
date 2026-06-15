@@ -11,9 +11,12 @@ export const formatPhoneForWhatsApp = (phone) => {
   return phone.replace(/\D/g, '');
 };
 
+const SITE_URL = process.env.REACT_APP_SITE_URL || 'https://www.nengoo.com';
+
 export const generateProductWhatsAppMessage = (product, language) => {
   const productName = typeof product.name === 'object' ? product.name[language] : product.name;
-  const productUrl = `${window.location.origin}/product/${product.id}`;
+  const slug = product.slug || product.id;
+  const productUrl = `${SITE_URL}/product/${slug}`;
   return `Bonjour! Je suis intéressé(e) par votre produit "${productName}" sur Nengoo: ${productUrl}. Pourriez-vous me donner plus d'informations? Merci!`;
 };
 

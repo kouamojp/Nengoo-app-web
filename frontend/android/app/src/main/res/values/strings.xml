@@ -4,4 +4,7 @@
     <string name="title_activity_main">Nengoo</string>
     <string name="package_name">com.nengoo.cameroon</string>
     <string name="custom_url_scheme">com.nengoo.cameroon</string>
+    <string name="facebook_app_id">0</string>
+    <string name="fb_login_protocol_scheme">fb0</string>
+    <string name="facebook_client_token">0</string>
 </resources>
