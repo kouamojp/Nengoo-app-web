@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    {
+      "source": "/product/:idOrSlug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|whatsapp|telegrambot|twitterbot|slackbot|linkedinbot|pinterestbot|discordbot|vkshare|w3c_validator|baiduspider|googlebot|bingbot|yandexbot|duckduckbot|applebot|ia_archiver|crawler|spider|bot|preview|scraper|curl|wget|python-requests|okhttp).*"
+        }
+      ],
+      "destination": "https://nengoo-app-web.onrender.com/api/og/product/:idOrSlug"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

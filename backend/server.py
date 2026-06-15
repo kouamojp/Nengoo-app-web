@@ -3131,6 +3131,90 @@ async def update_about_page_settings(
 from routers.buyers import router as buyers_router
 api_router.include_router(buyers_router)
 
+
+# --- OG / Social Preview SSR ---
+
+def _escape_html(text: str) -> str:
+    return (str(text)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+@api_router.get("/og/product/{id_or_slug}", response_class=HTMLResponse)
+async def product_og_preview(id_or_slug: str):
+    """Renvoie une page HTML avec les Open Graph meta tags pour les crawlers sociaux."""
+    product = await db.products.find_one(
+        {"$or": [{"id": id_or_slug}, {"slug": id_or_slug}]}
+    )
+
+    site_url = "https://www.nengoo.com"
+    default_image = f"{site_url}/icons/logo-512x512.png"
+
+    if not product:
+        html = f"""<!DOCTYPE html>
+<html lang="fr"><head>
+  <meta charset="utf-8">
+  <title>Nengoo - Marketplace Cameroun</title>
+  <meta property="og:title" content="Nengoo - Marketplace Cameroun">
+  <meta property="og:description" content="Votre marketplace camerounaise de confiance">
+  <meta property="og:image" content="{default_image}">
+  <meta property="og:url" content="{site_url}">
+  <meta http-equiv="refresh" content="0;url={site_url}/product/{id_or_slug}">
+</head><body><script>window.location.href="{site_url}/product/{id_or_slug}";</script></body></html>"""
+        return HTMLResponse(content=html)
+
+    name = _escape_html(product.get("name", "Produit Nengoo"))
+    raw_desc = product.get("description", "Découvrez ce produit sur Nengoo")
+    description = _escape_html(raw_desc[:160])
+    images = product.get("images", [])
+    image = images[0] if images else default_image
+    price = product.get("promoPrice") or product.get("price") or 0
+    currency = product.get("currency", "XAF")
+    slug = product.get("slug") or product.get("id")
+    url = f"{site_url}/product/{slug}"
+    seller_name = _escape_html(product.get("sellerName", "Nengoo"))
+
+    html = f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>{name} — Nengoo</title>
+  <meta name="description" content="{description}">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="product">
+  <meta property="og:url" content="{url}">
+  <meta property="og:title" content="{name} — Nengoo">
+  <meta property="og:description" content="{description}">
+  <meta property="og:image" content="{image}">
+  <meta property="og:image:width" content="800">
+  <meta property="og:image:height" content="800">
+  <meta property="og:site_name" content="Nengoo">
+  <meta property="og:locale" content="fr_CM">
+  <meta property="product:price:amount" content="{price}">
+  <meta property="product:price:currency" content="{currency}">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{name} — Nengoo">
+  <meta name="twitter:description" content="{description}">
+  <meta name="twitter:image" content="{image}">
+
+  <!-- WhatsApp / Telegram lisent og: -->
+  <meta property="og:price:amount" content="{price}">
+  <meta property="og:price:currency" content="{currency}">
+
+  <meta http-equiv="refresh" content="0;url={url}">
+</head>
+<body>
+  <p>Redirection vers <a href="{url}">{name} sur Nengoo</a> ({price} {currency}) — vendu par {seller_name}.</p>
+  <script>window.location.href = "{url}";</script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
 # --- App Initialization ---
 app.include_router(api_router)
 
