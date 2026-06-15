@@ -83,6 +83,7 @@ android-sdk/
 # Android signing — ne jamais commiter
 frontend/android/nengoo-release.keystore
 frontend/android/keystore.properties
+frontend/android/app/google-services.json
 -e 
 # Environment files
 *.env
