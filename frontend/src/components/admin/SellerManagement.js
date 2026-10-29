@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { notify, confirmAction, statusLabel } from './adminFeedback';
+import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field, formatXAF } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -11,6 +13,7 @@ const SellerManagement = (props) => {
     const [categories, setCategories] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSellers, setSelectedSellers] = useState([]);
+    const [statusFilter, setStatusFilter] = useState('all');
 
     // State for create modal
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -63,10 +66,10 @@ const SellerManagement = (props) => {
                 description: '',
                 categories: []
             });
-            alert('✅ Vendeur créé avec succès!');
+            notify('Vendeur créé avec succès.', 'success');
         } catch (error) {
             console.error('Error creating seller:', error);
-            alert(`Erreur: ${error.message}`);
+            notify(error.message, 'error');
         }
     };
 
@@ -92,7 +95,7 @@ const SellerManagement = (props) => {
     };
 
     const handleBulkDelete = async () => {
-        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedSellers.length} vendeurs? Cette action est irréversible.`)) {
+        if (await confirmAction({ title: `Supprimer ${selectedSellers.length} vendeur(s) ?`, message: 'Leurs boutiques disparaîtront du site. Cette action est définitive.' })) {
             try {
                 const response = await fetch(`${API_BASE_URL}/sellers`, {
                     method: 'DELETE',
@@ -108,10 +111,10 @@ const SellerManagement = (props) => {
                 }
                 await fetchSellers();
                 setSelectedSellers([]);
-                alert('🗑️ Vendeurs supprimés avec succès!');
+                notify('Vendeurs supprimés avec succès.', 'success');
             } catch (error) {
                 console.error('Error deleting sellers:', error);
-                alert(`Erreur: ${error.message}`);
+                notify(error.message, 'error');
             }
         }
     };
@@ -167,11 +170,11 @@ const SellerManagement = (props) => {
             }
             
             setSellers(sellers.map(s => s.id === seller.id ? { ...s, status: newStatus } : s));
-            alert(`✅ Statut du vendeur mis à jour à "${newStatus}".`);
+            notify(`Statut du vendeur : ${statusLabel(newStatus)}.`, 'success');
 
         } catch (error) {
             console.error("Error updating seller status:", error);
-            alert(`Erreur: ${error.message}`);
+            notify(error.message, 'error');
             fetchSellers();
         }
     };
@@ -208,15 +211,15 @@ const SellerManagement = (props) => {
             }
             await fetchSellers();
             setShowEditModal(false);
-            alert('✅ Vendeur mis à jour avec succès!');
+            notify('Vendeur mis à jour avec succès.', 'success');
         } catch (error) {
             console.error('Error updating seller:', error);
-            alert(`Erreur: ${error.message}`);
+            notify(error.message, 'error');
         }
     };
 
     const handleDeleteSeller = async (sellerId) => {
-        if (window.confirm('Êtes-vous sûr de vouloir supprimer ce vendeur? Cette action est irréversible.')) {
+        if (await confirmAction({ title: 'Supprimer ce vendeur ?', message: 'Sa boutique disparaîtra du site. Cette action est définitive.' })) {
             try {
                 const response = await fetch(`${API_BASE_URL}/sellers/${sellerId}`, {
                     method: 'DELETE',
@@ -227,175 +230,208 @@ const SellerManagement = (props) => {
                     throw new Error(err.detail || 'Failed to delete seller');
                 }
                 await fetchSellers();
-                alert('🗑️ Vendeur supprimé avec succès!');
+                notify('Vendeur supprimé avec succès.', 'success');
             } catch (error) {
                 console.error('Error deleting seller:', error);
-                alert(`Erreur: ${error.message}`);
+                notify(error.message, 'error');
             }
         }
     };
 
     if (!user || !['super_admin', 'admin'].includes(user.role)) {
         return (
-            <div className="p-6 bg-yellow-50 border-l-4 border-yellow-400">
-                <p className="font-bold">Permission Denied</p>
-                <p>You do not have the required permissions to view this section.</p>
-            </div>
+            <p className="adm-card p-5 text-gray-700">
+                La gestion des vendeurs est réservée aux administrateurs et au super administrateur.
+            </p>
         );
     }
 
+    const pendingCount = sellers.filter(s => s.status === 'pending').length;
 
     const filteredSellers = sellers.filter(seller => {
         const query = searchQuery.toLowerCase();
-        return (
-            seller.businessName.toLowerCase().includes(query) ||
-            seller.name.toLowerCase().includes(query) ||
-            seller.email.toLowerCase().includes(query) ||
-            seller.whatsapp.toLowerCase().includes(query) ||
-            seller.city.toLowerCase().includes(query) ||
-            seller.region.toLowerCase().includes(query)
+        const matchesStatus = statusFilter === 'all' || seller.status === statusFilter;
+        return matchesStatus && (
+            (seller.businessName || '').toLowerCase().includes(query) ||
+            (seller.name || '').toLowerCase().includes(query) ||
+            (seller.email || '').toLowerCase().includes(query) ||
+            (seller.whatsapp || '').toLowerCase().includes(query) ||
+            (seller.city || '').toLowerCase().includes(query) ||
+            (seller.region || '').toLowerCase().includes(query)
         );
     });
 
+    const sellerFields = (data, onChange, isEdit) => (
+        <>
+            <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Nom de la boutique" required>
+                    <input type="text" name="businessName" value={data.businessName} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="Nom du propriétaire" required>
+                    <input type="text" name="name" value={data.name} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="WhatsApp" required hint="Avec l'indicatif, ex. : 2376XXXXXXXX">
+                    <input type="tel" name="whatsapp" value={data.whatsapp} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="Email" required>
+                    <input type="email" name="email" value={data.email} onChange={onChange} className="adm-input" required />
+                </Field>
+            </div>
+            {isEdit ? (
+                <Field label="Nouveau mot de passe" hint="Laissez vide pour garder le mot de passe actuel.">
+                    <input type="password" name="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="adm-input" autoComplete="new-password" />
+                </Field>
+            ) : (
+                <Field label="Mot de passe" required>
+                    <input type="password" name="password" value={data.password} onChange={onChange} className="adm-input" autoComplete="new-password" required />
+                </Field>
+            )}
+            <Field label="Adresse" required>
+                <input type="text" name="address" value={data.address} onChange={onChange} className="adm-input" required />
+            </Field>
+            <div className="grid sm:grid-cols-3 gap-4">
+                <Field label="Ville" required>
+                    <input type="text" name="city" value={data.city} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="Région" required>
+                    <input type="text" name="region" value={data.region} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="Livraison (FCFA)" required>
+                    <input type="number" name="deliveryPrice" value={data.deliveryPrice} onChange={onChange} min="0" className="adm-input" required />
+                </Field>
+            </div>
+            <Field label="Description de la boutique" required>
+                <textarea name="description" value={data.description} onChange={onChange} className="adm-input" rows="3" required />
+            </Field>
+        </>
+    );
+
+    const COLUMNS = 6;
+
     return (
         <div>
-            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des vendeurs ({filteredSellers.length})</h2>
+            <SectionHeader
+                title="Vendeurs"
+                count={filteredSellers.length}
+                actions={
+                    <button onClick={() => setShowCreateModal(true)} className="adm-btn adm-btn-primary">
+                        Ajouter un vendeur
+                    </button>
+                }
+            />
 
-            <div className="mb-4 flex justify-between items-center max-sm:flex-wrap max-sm:gap-4">
-                <input
-                    type="text"
-                    placeholder="Rechercher des vendeurs..."
-                    className="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setShowCreateModal(true)}
-                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-                    >
-                        + Ajouter un vendeur
-                    </button>
-                    <button
-                        onClick={handleBulkDelete}
-                        disabled={selectedSellers.length === 0}
-                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
-                    >
-                        Supprimer la sélection
-                    </button>
+            <Toolbar>
+                <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Rechercher par boutique, nom, contact ou ville" />
+                <div className="flex gap-1 p-1 rounded-full bg-gray-100 max-w-full overflow-x-auto hide-scrollbar" role="group" aria-label="Filtrer par statut">
+                    {[
+                        { value: 'all', label: 'Tous' },
+                        { value: 'pending', label: `À valider${pendingCount ? ` (${pendingCount})` : ''}` },
+                        { value: 'approved', label: 'Approuvés' },
+                        { value: 'suspended', label: 'Suspendus' },
+                    ].map(opt => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setStatusFilter(opt.value)}
+                            aria-pressed={statusFilter === opt.value}
+                            className={`!min-h-0 h-8 px-3 rounded-full text-sm font-semibold whitespace-nowrap transition-colors ${
+                                statusFilter === opt.value ? 'bg-white text-purple-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
                 </div>
-            </div>
+            </Toolbar>
+
+            <SelectionBar count={selectedSellers.length} onDelete={handleBulkDelete} onClear={() => setSelectedSellers([])} />
 
             {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">➕ Ajouter un vendeur</h2>
-                            <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+                <Modal title="Ajouter un vendeur" onClose={() => setShowCreateModal(false)}>
+                    <form onSubmit={handleCreateSeller} className="space-y-4">
+                        {sellerFields(newSeller, handleCreateInputChange, false)}
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button type="button" onClick={() => setShowCreateModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
+                            <button type="submit" className="adm-btn adm-btn-primary">Créer le vendeur</button>
                         </div>
-                        <form onSubmit={handleCreateSeller} className="space-y-4">
-                            <input type="text" name="businessName" value={newSeller.businessName} onChange={handleCreateInputChange} placeholder="Nom de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="name" value={newSeller.name} onChange={handleCreateInputChange} placeholder="Nom du propriétaire" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="tel" name="whatsapp" value={newSeller.whatsapp} onChange={handleCreateInputChange} placeholder="WhatsApp (ex: 2376xxxxxxxx)" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="email" name="email" value={newSeller.email} onChange={handleCreateInputChange} placeholder="Email" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="password" name="password" value={newSeller.password} onChange={handleCreateInputChange} placeholder="Mot de passe" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="address" value={newSeller.address} onChange={handleCreateInputChange} placeholder="Adresse" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="city" value={newSeller.city} onChange={handleCreateInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="region" value={newSeller.region} onChange={handleCreateInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="number" name="deliveryPrice" value={newSeller.deliveryPrice} onChange={handleCreateInputChange} placeholder="Prix de livraison" className="w-full px-4 py-3 border rounded-lg" required />
-                            <textarea name="description" value={newSeller.description} onChange={handleCreateInputChange} placeholder="Description de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
-                            <button type="submit" className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold">Créer le vendeur</button>
-                        </form>
-                    </div>
-                </div>
+                    </form>
+                </Modal>
             )}
 
             {showEditModal && currentSeller && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">✏️ Modifier le vendeur</h2>
-                            <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+                <Modal title={`Modifier ${currentSeller.businessName}`} onClose={() => setShowEditModal(false)}>
+                    <form onSubmit={handleUpdateSeller} className="space-y-4">
+                        {sellerFields(currentSeller, handleEditInputChange, true)}
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button type="button" onClick={() => setShowEditModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
+                            <button type="submit" className="adm-btn adm-btn-primary">Enregistrer</button>
                         </div>
-                        <form onSubmit={handleUpdateSeller} className="space-y-4">
-                            <input type="text" name="businessName" value={currentSeller.businessName} onChange={handleEditInputChange} placeholder="Nom de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="name" value={currentSeller.name} onChange={handleEditInputChange} placeholder="Nom du propriétaire" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="tel" name="whatsapp" value={currentSeller.whatsapp} onChange={handleEditInputChange} placeholder="WhatsApp" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="email" name="email" value={currentSeller.email} onChange={handleEditInputChange} placeholder="Email" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="password" name="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe (laisser vide pour ne pas changer)" className="w-full px-4 py-3 border rounded-lg" />
-                            <input type="text" name="address" value={currentSeller.address} onChange={handleEditInputChange} placeholder="Adresse" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="city" value={currentSeller.city} onChange={handleEditInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="region" value={currentSeller.region} onChange={handleEditInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="number" name="deliveryPrice" value={currentSeller.deliveryPrice} onChange={handleEditInputChange} placeholder="Prix de livraison" className="w-full px-4 py-3 border rounded-lg" required />
-                            <textarea name="description" value={currentSeller.description} onChange={handleEditInputChange} placeholder="Description de la boutique" className="w-full px-4 py-3 border rounded-lg" required />
-                            {/* Note: Category editing can be complex. For now, we are not including it in the edit form. */}
-                            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold">Mettre à jour</button>
-                        </form>
-                    </div>
-                </div>
+                    </form>
+                </Modal>
             )}
-            
-            <div className="bg-white rounded-lg shadow-md overflow-auto">
-                {loading ? <p className="p-6">Chargement...</p> : (
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b">
-                            <tr>
-                                <th className="px-6 py-3 text-left">
-                                    <input 
+
+            <div className="adm-card overflow-x-auto">
+                <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th className="adm-th w-10">
+                                <input
+                                    type="checkbox"
+                                    aria-label="Tout sélectionner"
+                                    onChange={handleSelectAll}
+                                    checked={selectedSellers.length === filteredSellers.length && filteredSellers.length > 0}
+                                />
+                            </th>
+                            <th className="adm-th">Boutique</th>
+                            <th className="adm-th">Contact</th>
+                            <th className="adm-th text-right">Livraison</th>
+                            <th className="adm-th">Statut</th>
+                            <th className="adm-th"><span className="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {loading ? (
+                            <LoadingRows colSpan={COLUMNS} />
+                        ) : filteredSellers.length === 0 ? (
+                            <EmptyRow colSpan={COLUMNS}>
+                                {sellers.length === 0 ? 'Aucun vendeur inscrit pour le moment.' : 'Aucun vendeur ne correspond à ces critères.'}
+                            </EmptyRow>
+                        ) : filteredSellers.map((seller) => (
+                            <tr key={seller.id} className={selectedSellers.includes(seller.id) ? 'bg-purple-50' : 'hover:bg-gray-50'}>
+                                <td className="adm-td">
+                                    <input
                                         type="checkbox"
-                                        onChange={handleSelectAll}
-                                        checked={selectedSellers.length === filteredSellers.length && filteredSellers.length > 0}
+                                        aria-label={`Sélectionner ${seller.businessName}`}
+                                        checked={selectedSellers.includes(seller.id)}
+                                        onChange={(e) => handleSelectOne(e, seller.id)}
                                     />
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Boutique</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ville</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prix Livr.</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </td>
+                                <td className="adm-td">
+                                    <p className="font-semibold">{seller.businessName}</p>
+                                    <p className="text-xs text-gray-500">{[seller.name, seller.city].filter(Boolean).join(', ')}</p>
+                                </td>
+                                <td className="adm-td">
+                                    <p className="whitespace-nowrap">{seller.whatsapp}</p>
+                                    <p className="text-xs text-gray-500 break-all">{seller.email}</p>
+                                </td>
+                                <td className="adm-td text-right price whitespace-nowrap">{formatXAF(seller.deliveryPrice)}</td>
+                                <td className="adm-td">
+                                    <StatusSelect
+                                        value={seller.status}
+                                        onChange={(value) => handleStatusChange(seller, value)}
+                                        options={['pending', 'approved', 'suspended']}
+                                        label={`Statut de ${seller.businessName}`}
+                                    />
+                                </td>
+                                <td className="adm-td whitespace-nowrap text-right">
+                                    <Link to={`/admin/seller-products/${seller.id}`} className="adm-link">Produits</Link>
+                                    <button onClick={() => handleEditClick(seller)} className="adm-link !min-h-0 ml-4">Modifier</button>
+                                    <button onClick={() => handleDeleteSeller(seller.id)} className="adm-link-danger !min-h-0 ml-4">Supprimer</button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {filteredSellers.map((seller) => (
-                                <tr key={seller.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedSellers.includes(seller.id)}
-                                            onChange={(e) => handleSelectOne(e, seller.id)}
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4 font-medium">{seller.businessName}</td>
-                                    <td className="px-6 py-4 text-sm">{seller.whatsapp} <br/> {seller.email}</td>
-                                    <td className="px-6 py-4 text-sm">{seller.city}</td>
-                                    <td className="px-6 py-4 text-sm font-medium">
-                                        {new Intl.NumberFormat('fr-CM', { style: 'currency', currency: 'XAF' }).format(seller.deliveryPrice || 0)}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <select
-                                            value={seller.status}
-                                            onChange={(e) => handleStatusChange(seller, e.target.value)}
-                                            className={`p-2 rounded text-sm border-transparent focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                                                seller.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                                seller.status === 'suspended' ? 'bg-red-100 text-red-800' :
-                                                'bg-yellow-100 text-yellow-800'
-                                            }`}
-                                        >
-                                            <option value="approved">Approuvé</option>
-                                            <option value="suspended">Suspendu</option>
-                                            <option value="pending">En attente</option>
-                                        </select>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm font-medium">
-                                        <button onClick={() => handleEditClick(seller)} className="text-blue-600 hover:text-blue-800">Modifier</button>
-                                        <button onClick={() => handleDeleteSeller(seller.id)} className="text-red-600 hover:text-red-800 ml-4">Supprimer</button>
-                                        <Link to={`/admin/seller-products/${seller.id}`} target='_blank' className="text-green-600 hover:text-green-800 ml-4">Voir les produits</Link>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );

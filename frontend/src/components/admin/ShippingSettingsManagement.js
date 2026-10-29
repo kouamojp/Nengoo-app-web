@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { notify } from './adminFeedback';
+import { SectionHeader, Field } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -44,10 +46,10 @@ const ShippingSettingsManagement = ({ user }) => {
                 throw new Error(errData.detail || 'Failed to update shipping price');
             }
             
-            alert('Shipping price updated successfully!');
+            notify('Frais de livraison enregistrés.', 'success');
         } catch (err) {
             setError(err.message);
-            alert(`Error: ${err.message}`);
+            notify(err.message, 'error');
         } finally {
             setLoading(false);
         }
@@ -55,39 +57,37 @@ const ShippingSettingsManagement = ({ user }) => {
     
     if (user.role !== 'super_admin') {
         return (
-            <div className="p-6 bg-yellow-50 border-l-4 border-yellow-400">
-                <p className="font-bold">Permission Denied</p>
-                <p>You do not have permission to view this section.</p>
-            </div>
+            <p className="adm-card p-5 text-gray-700">
+                Seul le super administrateur peut modifier les frais de livraison.
+            </p>
         );
     }
 
     return (
         <div>
-            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des Frais de Livraison</h2>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-                <div className="mb-4">
-                    <label htmlFor="shippingPrice" className="block text-sm font-medium text-gray-700">
-                        Prix de la livraison standard (XAF)
-                    </label>
+            <SectionHeader
+                title="Frais de livraison"
+                description="Prix appliqué à la livraison à domicile quand le vendeur n'a pas fixé le sien."
+            />
+            <form
+                className="adm-card p-5 sm:p-6 max-w-md space-y-4"
+                onSubmit={(e) => { e.preventDefault(); handleSave(); }}
+            >
+                <Field label="Livraison standard (FCFA)">
                     <input
                         type="number"
                         id="shippingPrice"
+                        min="0"
                         value={price}
                         onChange={(e) => setPrice(e.target.value)}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                        placeholder="Entrez le prix"
+                        className="adm-input"
                     />
-                </div>
-                {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-                <button
-                    onClick={handleSave}
-                    disabled={loading}
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded disabled:bg-gray-400"
-                >
-                    {loading ? 'Enregistrement...' : 'Enregistrer'}
+                </Field>
+                {error && <p className="text-sm text-red-700" role="alert">{error}</p>}
+                <button type="submit" disabled={loading} className="adm-btn adm-btn-primary">
+                    {loading ? 'Enregistrement…' : 'Enregistrer'}
                 </button>
-            </div>
+            </form>
         </div>
     );
 };

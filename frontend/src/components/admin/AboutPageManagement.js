@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { SectionHeader, Field } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const AboutPageManagement = ({ user }) => {
   const [settings, setSettings] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
@@ -65,236 +67,170 @@ const AboutPageManagement = ({ user }) => {
       if (response.ok) {
         const data = await response.json();
         setSettings(data);
-        setMessage({ text: '✅ Paramètres mis à jour avec succès !', type: 'success' });
+        setMessage({ text: 'Page À propos enregistrée.', type: 'success' });
       } else {
         const error = await response.json();
-        setMessage({ text: `❌ Erreur: ${error.detail}`, type: 'error' });
+        setMessage({ text: error.detail || "L'enregistrement a échoué.", type: 'error' });
       }
     } catch (error) {
       console.error('Error updating about page settings:', error);
-      setMessage({ text: '❌ Erreur lors de la mise à jour', type: 'error' });
+      setMessage({ text: "L'enregistrement a échoué. Vérifiez votre connexion, puis réessayez.", type: 'error' });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleGeneratePresignedUrl = async () => {
+  // Envoie l'image choisie sur S3 puis place son adresse publique dans le formulaire
+  const handleUploadImage = async (file) => {
+    if (!file) return;
+    setUploadingImage(true);
+    setMessage({ text: '', type: '' });
     try {
-      const fileName = prompt('Nom du fichier (ex: about-mission.jpg):');
-      if (!fileName) return;
-
-      const response = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
+      const presignedResponse = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Admin-Id': user.id
+          'X-Admin-Role': user?.role || 'admin',
         },
-        body: JSON.stringify({
-          fileName: fileName,
-          fileType: 'image/jpeg'
-        })
+        body: JSON.stringify({ fileName: file.name, fileType: file.type }),
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        setFormData(prev => ({
-          ...prev,
-          mission_image_url: data.publicUrl
-        }));
-        setMessage({
-          text: `✅ URL générée ! Upload URL: ${data.uploadUrl.substring(0, 50)}...`,
-          type: 'success'
-        });
-      } else {
-        const error = await response.json();
-        setMessage({ text: `❌ Erreur: ${error.detail}`, type: 'error' });
+      if (!presignedResponse.ok) {
+        const err = await presignedResponse.json();
+        throw new Error(err.detail || "Impossible de préparer l'envoi de l'image.");
       }
+      const { uploadUrl, publicUrl } = await presignedResponse.json();
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+      if (!uploadResponse.ok) throw new Error("L'envoi de l'image a échoué.");
+      setFormData(prev => ({ ...prev, mission_image_url: publicUrl }));
+      setMessage({ text: 'Image envoyée. Enregistrez pour la publier sur la page.', type: 'success' });
     } catch (error) {
-      console.error('Error generating presigned URL:', error);
-      setMessage({ text: '❌ Erreur lors de la génération de l\'URL', type: 'error' });
+      console.error('Error uploading about image:', error);
+      setMessage({ text: error.message, type: 'error' });
+    } finally {
+      setUploadingImage(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement...</p>
-        </div>
+      <div className="space-y-4" aria-busy="true">
+        <div className="h-10 w-1/3 rounded loading-shimmer" />
+        <div className="h-96 rounded-xl loading-shimmer" />
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-2">Gestion Page "À propos"</h2>
-        <p className="text-gray-600">
-          Configurez le contenu de la section "Notre Mission" de la page À propos
-        </p>
-      </div>
+    <div>
+      <SectionHeader
+        title="Page À propos"
+        description="Le bloc « mission » affiché en haut de la page À propos."
+        actions={
+          <a href="/about" target="_blank" rel="noopener noreferrer" className="adm-btn adm-btn-secondary">
+            Voir la page
+          </a>
+        }
+      />
 
       {message.text && (
-        <div className={`mb-6 p-4 rounded-lg ${
-          message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-        }`}>
+        <p
+          role={message.type === 'error' ? 'alert' : 'status'}
+          className={`mb-5 p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}
+        >
           {message.text}
-        </div>
+        </p>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Image URL */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            URL de l'image de mission
-          </label>
-          <div className="flex gap-2">
+      <form onSubmit={handleSubmit} className="grid xl:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+        <div className="adm-card p-5 sm:p-6 space-y-5">
+          <Field label="Titre" required>
+            <input
+              type="text"
+              name="mission_title"
+              value={formData.mission_title}
+              onChange={handleChange}
+              className="adm-input"
+              required
+            />
+          </Field>
+          <Field label="Premier paragraphe" required hint={`${formData.mission_text_1.length} caractères`}>
+            <textarea
+              name="mission_text_1"
+              value={formData.mission_text_1}
+              onChange={handleChange}
+              rows={5}
+              className="adm-input"
+              required
+            />
+          </Field>
+          <Field label="Second paragraphe" required hint={`${formData.mission_text_2.length} caractères`}>
+            <textarea
+              name="mission_text_2"
+              value={formData.mission_text_2}
+              onChange={handleChange}
+              rows={5}
+              className="adm-input"
+              required
+            />
+          </Field>
+
+          {settings && (
+            <p className="text-sm text-gray-500">
+              Dernière mise à jour le {new Date(settings.last_updated).toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              {settings.updated_by && <>, par {settings.updated_by}</>}.
+            </p>
+          )}
+
+          <div className="flex flex-wrap justify-end gap-2 pt-2 border-t border-gray-200">
+            <button type="button" onClick={fetchSettings} className="adm-btn adm-btn-secondary mt-4" disabled={saving}>
+              Annuler les modifications
+            </button>
+            <button type="submit" disabled={saving || uploadingImage} className="adm-btn adm-btn-primary mt-4">
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+
+        <aside className="adm-card p-5 sm:p-6 space-y-4">
+          <h3 className="font-bold">Image</h3>
+          <div className="aspect-[4/5] rounded-xl overflow-hidden bg-gray-100">
+            {formData.mission_image_url && (
+              <img
+                src={formData.mission_image_url}
+                alt="Aperçu de l'image de la mission"
+                className="w-full h-full object-cover object-top"
+                onError={(e) => { e.target.style.visibility = 'hidden'; }}
+                onLoad={(e) => { e.target.style.visibility = 'visible'; }}
+              />
+            )}
+          </div>
+          <Field label="Envoyer une image" hint="JPG, PNG ou WebP, format portrait de préférence.">
+            <input
+              type="file"
+              accept="image/*"
+              disabled={uploadingImage}
+              onChange={(e) => handleUploadImage(e.target.files[0])}
+              className="block w-full text-sm text-gray-600 file:mr-3 file:h-10 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-purple-800 hover:file:bg-purple-200 disabled:opacity-50"
+            />
+          </Field>
+          {uploadingImage && <p className="text-sm text-gray-600" role="status">Envoi de l'image…</p>}
+          <Field label="Ou adresse (URL) de l'image" required>
             <input
               type="url"
               name="mission_image_url"
               value={formData.mission_image_url}
               onChange={handleChange}
               placeholder="https://exemple.com/image.jpg"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="adm-input"
               required
             />
-            <button
-              type="button"
-              onClick={handleGeneratePresignedUrl}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors whitespace-nowrap"
-              title="Générer une URL d'upload S3"
-            >
-              📤 S3 URL
-            </button>
-          </div>
-          <p className="mt-1 text-sm text-gray-500">
-            URL complète de l'image (doit être accessible publiquement)
-          </p>
-        </div>
-
-        {/* Image Preview */}
-        {formData.mission_image_url && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Aperçu de l'image
-            </label>
-            <img
-              src={formData.mission_image_url}
-              alt="Aperçu"
-              className="w-full max-w-md h-64 object-cover rounded-lg shadow-md"
-              onError={(e) => {
-                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%23ddd" width="400" height="300"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif"%3EImage non disponible%3C/text%3E%3C/svg%3E';
-              }}
-            />
-          </div>
-        )}
-
-        {/* Mission Title */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Titre de la mission
-          </label>
-          <input
-            type="text"
-            name="mission_title"
-            value={formData.mission_title}
-            onChange={handleChange}
-            placeholder="Notre Mission"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            required
-          />
-        </div>
-
-        {/* Mission Text 1 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Texte de mission - Paragraphe 1
-          </label>
-          <textarea
-            name="mission_text_1"
-            value={formData.mission_text_1}
-            onChange={handleChange}
-            rows={4}
-            placeholder="Premier paragraphe de la mission..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            required
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            {formData.mission_text_1.length} caractères
-          </p>
-        </div>
-
-        {/* Mission Text 2 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Texte de mission - Paragraphe 2
-          </label>
-          <textarea
-            name="mission_text_2"
-            value={formData.mission_text_2}
-            onChange={handleChange}
-            rows={4}
-            placeholder="Deuxième paragraphe de la mission..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-            required
-          />
-          <p className="mt-1 text-sm text-gray-500">
-            {formData.mission_text_2.length} caractères
-          </p>
-        </div>
-
-        {/* Last Updated Info */}
-        {settings && (
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm text-gray-600">
-              <strong>Dernière mise à jour :</strong>{' '}
-              {new Date(settings.last_updated).toLocaleString('fr-FR')}
-            </p>
-            {settings.updated_by && (
-              <p className="text-sm text-gray-600 mt-1">
-                <strong>Par :</strong> {settings.updated_by}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Submit Button */}
-        <div className="flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={fetchSettings}
-            className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            disabled={saving}
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className={`px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold transition-colors ${
-              saving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-700'
-            }`}
-          >
-            {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
-          </button>
-        </div>
+          </Field>
+        </aside>
       </form>
-
-      {/* Preview Link */}
-      <div className="mt-8 pt-6 border-t border-gray-200">
-        <a
-          href="/about"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium"
-        >
-          👁️ Prévisualiser la page À propos
-          <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-        </a>
-      </div>
     </div>
   );
 };

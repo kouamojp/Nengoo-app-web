@@ -1,17 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import AdminLayout from './AdminLayout';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SellerProductList = ({ user }) => {
+const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'XAF',
+    minimumFractionDigits: 0,
+}).format(price || 0);
+
+const getLocalizedValue = (field, lang = 'fr') => {
+    if (typeof field === 'object' && field !== null && field[lang]) {
+        return field[lang];
+    }
+    return field;
+};
+
+const SellerProductList = ({ user, setUser }) => {
     const { sellerId } = useParams();
     const [seller, setSeller] = useState(null);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const allowed = user && ['super_admin', 'admin'].includes(user.role);
 
     useEffect(() => {
         const fetchSellerProducts = async () => {
-            if (!user || !['super_admin', 'admin'].includes(user.role)) {
+            if (!allowed) {
                 setLoading(false);
                 return;
             }
@@ -41,67 +56,79 @@ const SellerProductList = ({ user }) => {
         };
 
         fetchSellerProducts();
-    }, [sellerId, user]);
+    }, [sellerId, user, allowed]);
 
-    if (loading) {
-        return <p>Chargement des produits du vendeur...</p>;
+    if (!allowed) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="adm-card max-w-md w-full p-8 text-left">
+                    <h1 className="adm-title">Accès réservé</h1>
+                    <p className="adm-subtitle mb-6">Cette page est réservée aux administrateurs.</p>
+                    <Link to="/admin/login" className="adm-btn adm-btn-primary">Se connecter</Link>
+                </div>
+            </div>
+        );
     }
 
-    if (!user || !['super_admin', 'admin'].includes(user.role)) {
-        return <p>Accès non autorisé.</p>;
-    }
-    
-    if (!seller) {
-        return <p>Vendeur non trouvé.</p>;
-    }
-
-    const groupedProducts = products.reduce((acc, product) => {
-        const date = new Date(product.createdAt).toLocaleDateString('fr-FR', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-        if (!acc[date]) {
-            acc[date] = [];
-        }
-        acc[date].push(product);
-        return acc;
-    }, {});
-
-
-    const getLocalizedValue = (field, lang = 'fr') => {
-        if (typeof field === 'object' && field !== null && field[lang]) {
-            return field[lang];
-        }
-        return field;
-    };
-
+    // Produits regroupés par jour d'ajout, du plus récent au plus ancien
+    const groupedProducts = [...products]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .reduce((acc, product) => {
+            const date = new Date(product.createdAt).toLocaleDateString('fr-FR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            (acc[date] = acc[date] || []).push(product);
+            return acc;
+        }, {});
 
     return (
-        <div className="container mx-auto px-4 py-6">
-            <h1 className="text-2xl font-bold mb-12">Produits de {seller.businessName}</h1>
-            {Object.keys(groupedProducts).length > 0 ? (
-                Object.entries(groupedProducts).map(([date, productsOnDate]) => (
-                    <div key={date} className="mb-6">
-                        <h3 className="text-lg font-semibold border-b pb-2 mb-3">{date} - ({productsOnDate.length})</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {productsOnDate.map(product => (
-                                <div key={product.id} className="border rounded-lg p-4">
-                                    {product.images && product.images.length > 0 && (
-                                        <img src={product.images[0]} alt={getLocalizedValue(product.name)} className="w-full h-48 object-cover mb-4 rounded-lg" />
-                                    )}
-                                    <p className="font-bold">{getLocalizedValue(product.name)}</p>
-                                    <p className="text-sm text-gray-600 mb-2">{getLocalizedValue(product.description)}</p>
-                                    <p className="font-semibold text-lg">{new Intl.NumberFormat('fr-CM', { style: 'currency', currency: 'XAF' }).format(product.price)}</p>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))
+        <AdminLayout
+            user={user}
+            setUser={setUser}
+            active="sellers"
+            title={seller ? `Produits de ${seller.businessName}` : 'Produits du vendeur'}
+            description={seller && !loading ? `${products.length} produit${products.length > 1 ? 's' : ''}, du plus récent au plus ancien.` : undefined}
+            actions={<Link to="/admin/dashboard?section=sellers" className="adm-btn adm-btn-secondary">Tous les vendeurs</Link>}
+        >
+            {loading ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4" aria-busy="true">
+                    {[...Array(8)].map((_, i) => <div key={i} className="h-64 rounded-xl loading-shimmer" />)}
+                </div>
+            ) : !seller ? (
+                <p className="adm-card p-5 text-gray-700">Ce vendeur est introuvable. Il a peut-être été supprimé.</p>
+            ) : products.length === 0 ? (
+                <p className="adm-card p-5 text-gray-700">Ce vendeur n'a encore ajouté aucun produit.</p>
             ) : (
-                <p>Ce vendeur n'a aucun produit.</p>
+                <div className="space-y-8">
+                    {Object.entries(groupedProducts).map(([date, productsOnDate]) => (
+                        <section key={date}>
+                            <h2 className="flex items-baseline gap-2 text-lg font-bold mb-3">
+                                {date}
+                                <span className="text-sm font-normal text-gray-500">{productsOnDate.length} produit{productsOnDate.length > 1 ? 's' : ''}</span>
+                            </h2>
+                            <ul className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {productsOnDate.map(product => (
+                                    <li key={product.id} className="adm-card overflow-hidden flex flex-col">
+                                        <div className="aspect-square bg-gray-100">
+                                            {product.images && product.images.length > 0 && (
+                                                <img src={product.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
+                                            )}
+                                        </div>
+                                        <div className="p-3 sm:p-4 flex flex-col flex-1">
+                                            <p className="font-bold leading-snug line-clamp-2">{getLocalizedValue(product.name)}</p>
+                                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">{getLocalizedValue(product.description)}</p>
+                                            <p className="price text-lg text-purple-800 mt-auto pt-2">{formatPrice(product.price)}</p>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </section>
+                    ))}
+                </div>
             )}
-        </div>
+        </AdminLayout>
     );
 };
 

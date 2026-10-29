@@ -2,6 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { adminRoles } from '../../lib/mockData'; // Keep for role display info
+import AdminLayout from './AdminLayout';
+import { SelectionBar, StatusBadge, EmptyRow, LoadingRows } from './AdminUI';
+import { notify, confirmAction, statusLabel } from './adminFeedback';
+
+const PERMISSION_LABELS = {
+  all: 'Toutes les permissions',
+  manage_users: 'Gérer les utilisateurs',
+  view_users: 'Voir les utilisateurs',
+  manage_sellers: 'Gérer les vendeurs',
+  manage_products: 'Gérer les produits',
+  manage_orders: 'Gérer les commandes',
+  view_orders: 'Voir les commandes',
+  view_analytics: 'Voir les statistiques',
+  manage_messages: 'Gérer les messages',
+};
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -40,10 +55,10 @@ const AdminManagement = (props) => {
 
     const handleBulkDelete = async () => {
         if (selectedAdmins.includes(user.id)) {
-            alert("Vous ne pouvez pas vous supprimer vous-même.");
+            notify("Vous ne pouvez pas vous supprimer vous-même.", 'error');
             return;
         }
-        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedAdmins.length} administrateurs? Cette action est irréversible.`)) {
+        if (await confirmAction({ title: `Supprimer ${selectedAdmins.length} administrateur(s) ?`, message: "Ils ne pourront plus se connecter à l'administration. Cette action est définitive." })) {
             try {
                 const response = await fetch(`${API_BASE_URL}/admins`, {
                     method: 'DELETE',
@@ -59,10 +74,10 @@ const AdminManagement = (props) => {
                 }
                 await fetchAdmins();
                 setSelectedAdmins([]);
-                alert('🗑️ Administrateurs supprimés avec succès!');
+                notify('Administrateurs supprimés avec succès.', 'success');
             } catch (error) {
                 console.error('Error deleting admins:', error);
-                alert(`Erreur: ${error.message}`);
+                notify(error.message, 'error');
             }
         }
     };
@@ -82,7 +97,7 @@ const AdminManagement = (props) => {
       setAdmins(data);
     } catch (error) {
       console.error("Error fetching admins:", error);
-      alert('Erreur lors de la récupération des administrateurs.');
+      notify("Impossible de charger la liste des administrateurs. Rechargez la page pour réessayer.", 'error');
     } finally {
       setLoading(false);
     }
@@ -97,14 +112,11 @@ const AdminManagement = (props) => {
 
   if (!user || user.type !== 'admin') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">🚫</div>
-          <h2 className="text-2xl font-bold mb-4">Accès Refusé</h2>
-          <p className="text-gray-600 mb-6">Réservé aux administrateurs.</p>
-          <Link to="/admin/login" className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold">
-            Se connecter
-          </Link>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="adm-card max-w-md w-full p-8 text-left">
+          <h1 className="adm-title">Accès réservé</h1>
+          <p className="adm-subtitle mb-6">Connectez-vous avec un compte administrateur pour accéder à cette page.</p>
+          <Link to="/admin/login" className="adm-btn adm-btn-primary">Se connecter</Link>
         </div>
       </div>
     );
@@ -132,7 +144,7 @@ const AdminManagement = (props) => {
 
   const handleAddAdmin = async () => {
     if (!formData.name || !formData.whatsapp || !formData.email || !formData.accessCode) {
-      alert('Veuillez remplir tous les champs');
+      notify('Veuillez remplir tous les champs', 'error');
       return;
     }
 
@@ -159,11 +171,11 @@ const AdminManagement = (props) => {
       await fetchAdmins(); // Refetch admins
       setFormData({ name: '', whatsapp: '', email: '', role: 'support', accessCode: '' });
       setShowAddForm(false);
-      alert(`✅ Administrateur "${formData.name}" ajouté avec succès!`);
+      notify(`Administrateur "${formData.name}" ajouté avec succès.`, 'success');
 
     } catch (error) {
       console.error("Error creating admin:", error);
-      alert(`Erreur: ${error.message}`);
+      notify(error.message, 'error');
     }
   };
   
@@ -199,11 +211,11 @@ const AdminManagement = (props) => {
           await fetchAdmins();
           setEditingAdmin(null);
           setFormData({ name: '', whatsapp: '', email: '', role: 'support', accessCode: '' });
-          alert('✅ Administrateur mis à jour avec succès!');
+          notify('Administrateur mis à jour avec succès.', 'success');
   
       } catch (error) {
           console.error("Error updating admin:", error);
-          alert(`Erreur: ${error.message}`);
+          notify(error.message, 'error');
       }
   };
 
@@ -211,12 +223,12 @@ const AdminManagement = (props) => {
     if (!passwordChangeAdmin) return;
 
     if (newPassword.length < 6) {
-        alert('Le nouveau mot de passe doit contenir au moins 6 caractères.');
+        notify('Le nouveau mot de passe doit contenir au moins 6 caractères.', 'error');
         return;
     }
 
     if (newPassword !== confirmPassword) {
-        alert('Les mots de passe ne correspondent pas.');
+        notify('Les mots de passe ne correspondent pas.', 'error');
         return;
     }
 
@@ -240,21 +252,21 @@ const AdminManagement = (props) => {
             }
         }
 
-        alert('✅ Mot de passe mis à jour avec succès!');
+        notify('Mot de passe mis à jour avec succès.', 'success');
         setPasswordChangeAdmin(null);
         setNewPassword('');
         setConfirmPassword('');
 
     } catch (error) {
         console.error("Error updating password:", error);
-        alert(`Erreur: ${error.message}`);
+        notify(error.message, 'error');
     }
   };
   
 
   const toggleAdminStatus = async (adminId, currentStatus) => {
     if (!isSuperAdmin) {
-      alert('⚠️ Seul le Super Administrateur peut changer le statut des admins');
+      notify('Seul le Super Administrateur peut changer le statut des admins', 'error');
       return;
     }
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
@@ -277,21 +289,21 @@ const AdminManagement = (props) => {
             }
         }
         await fetchAdmins();
-        alert(`Statut de l'administrateur mis à jour à "${newStatus}".`);
+        notify(`Statut de l'administrateur : ${statusLabel(newStatus)}.`, 'success');
     } catch (error) {
         console.error("Error updating status:", error);
-        alert(`Erreur: ${error.message}`);
+        notify(error.message, 'error');
     }
   };
 
   const deleteAdmin = async (adminId) => {
     if (!isSuperAdmin) {
-      alert('⚠️ Seul le Super Administrateur peut supprimer des admins');
+      notify('Seul le Super Administrateur peut supprimer des admins', 'error');
       return;
     }
 
     const admin = admins.find(a => a.id === adminId);
-    if (admin && confirm(`Êtes-vous sûr de vouloir supprimer "${admin.name}"?`)) {
+    if (admin && await confirmAction({ title: `Supprimer ${admin.name} ?`, message: "Cet administrateur ne pourra plus se connecter. Cette action est définitive." })) {
       try {
         const response = await fetch(`${API_BASE_URL}/admins/${adminId}`, {
             method: 'DELETE',
@@ -307,10 +319,10 @@ const AdminManagement = (props) => {
             }
         }
         await fetchAdmins();
-        alert('✅ Administrateur supprimé');
+        notify('Administrateur supprimé', 'success');
       } catch (error) {
           console.error("Error deleting admin:", error);
-          alert(`Erreur: ${error.message}`);
+          notify(error.message, 'error');
       }
     }
   };
@@ -324,138 +336,92 @@ const AdminManagement = (props) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-gradient-to-r from-purple-700 to-red-600 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Link to="/admin/dashboard" className="text-white hover:text-gray-200">
-                ← Retour Dashboard
-              </Link>
-              <div className="border-l border-white/30 pl-4">
-                <h1 className="text-2xl font-bold">👥 Gestion des Administrateurs</h1>
-                <p className="text-sm opacity-90">Rôles et permissions</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm">👤 {user.name}</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {getRoleStats().map((stat) => (
-            <div key={stat.role} className={`bg-white rounded-lg shadow-md p-6 border-l-4 border-${stat.color}-500`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">{stat.name}</p>
-                  <p className="text-3xl font-bold">{stat.count}</p>
+    <AdminLayout
+      user={user}
+      setUser={props.setUser}
+      active="admins"
+      title="Administrateurs"
+      description="Les membres de l'équipe et ce que chaque rôle peut faire."
+      actions={isSuperAdmin && !editingAdmin && (
+        <button onClick={() => setShowAddForm(!showAddForm)} className={`adm-btn ${showAddForm ? 'adm-btn-secondary' : 'adm-btn-primary'}`}>
+          {showAddForm ? 'Annuler' : 'Ajouter un administrateur'}
+        </button>
+      )}
+    >
+        {/* Rôles : effectif et permissions */}
+        <section aria-labelledby="roles-title" className="mb-8">
+          <h2 id="roles-title" className="text-xl font-extrabold mb-3">Rôles</h2>
+          <ul className="adm-card grid sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-200 overflow-hidden">
+            {getRoleStats().map((stat) => (
+              <li key={stat.role} className="p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="font-bold">{stat.name}</h3>
+                  <span className="price text-2xl text-purple-800" aria-label={`${stat.count} membre(s)`}>{stat.count}</span>
                 </div>
-                <div className="text-4xl">{stat.icon}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Roles & Permissions Info */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-bold mb-6">📋 Rôles et Permissions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {Object.entries(adminRoles).map(([key, role]) => (
-              <div key={key} className="border rounded-lg p-4">
-                <div className="flex items-center space-x-3 mb-3">
-                  <span className="text-3xl">{role.icon}</span>
-                  <div>
-                    <h3 className="font-bold">{role.name}</h3>
-                    <span className={`text-xs px-2 py-1 rounded-full bg-${role.color}-100 text-${role.color}-800`}>
-                      {key}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">Permissions:</p>
-                  {role.permissions.map((perm, idx) => (
-                    <div key={idx} className="text-xs text-gray-600 flex items-start justify-center">
-                      <span className="text-green-500 mr-1">✓</span>
-                      <span>{perm.replace(/_/g, ' ')}</span>
-                    </div>
+                <ul className="mt-3 space-y-1 text-sm text-gray-600">
+                  {stat.permissions.map((perm, idx) => (
+                    <li key={idx}>{PERMISSION_LABELS[perm] || perm.replace(/_/g, ' ')}</li>
                   ))}
-                </div>
-              </div>
+                </ul>
+              </li>
             ))}
-          </div>
-        </div>
-
-        {/* Add Admin Button */}
-        {isSuperAdmin && (
-          <div className="mb-6">
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="bg-gradient-to-r from-purple-600 to-red-600 hover:from-purple-700 hover:to-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-all shadow-lg"
-            >
-              {showAddForm ? '✕ Annuler' : '+ Ajouter un Administrateur'}
-            </button>
-          </div>
-        )}
+          </ul>
+        </section>
 
         {/* Add/Edit Admin Form */}
         {isSuperAdmin && (showAddForm || editingAdmin) && (
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h3 className="text-xl font-bold mb-6">
-              {editingAdmin ? '✏️ Modifier Administrateur' : '➕ Nouvel Administrateur'}
+          <div className="adm-card p-6 mb-8">
+            <h3 className="text-xl font-extrabold mb-6">
+              {editingAdmin ? "Modifier l'administrateur" : "Nouvel administrateur"}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet *</label>
+                <label className="adm-label">Nom complet *</label>
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
                   placeholder="Ex: Marie Kouam"
-                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="adm-input"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Numéro WhatsApp *</label>
+                <label className="adm-label">Numéro WhatsApp *</label>
                 <input
                   type="tel"
                   name="whatsapp"
                   value={formData.whatsapp}
                   onChange={handleInputChange}
                   placeholder="+237 XXX XXX XXX"
-                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="adm-input"
                   disabled={editingAdmin}
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                <label className="adm-label">Email *</label>
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="admin@nengoo.com"
-                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="adm-input"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Rôle *</label>
+                <label className="adm-label">Rôle *</label>
                 <select
                   name="role"
                   value={formData.role}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="adm-input"
                   disabled={!isSuperAdmin}
                 >
                   {Object.entries(adminRoles).map(([key, role]) => (
@@ -471,14 +437,14 @@ const AdminManagement = (props) => {
 
               {!editingAdmin && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Code d'accès *</label>
+                  <label className="adm-label">Code d'accès *</label>
                   <input
                     type="password"
                     name="accessCode"
                     value={formData.accessCode}
                     onChange={handleInputChange}
                     placeholder="Créer un code d'accès"
-                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">Code secret pour la connexion</p>
@@ -486,10 +452,10 @@ const AdminManagement = (props) => {
               )}
             </div>
 
-            <div className="flex space-x-4 mt-6">
+            <div className="flex flex-wrap gap-3 mt-6">
               <button
                 onClick={editingAdmin ? handleUpdateAdmin : handleAddAdmin}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                className="adm-btn adm-btn-primary"
               >
                 {editingAdmin ? 'Mettre à jour' : 'Créer Administrateur'}
               </button>
@@ -499,7 +465,7 @@ const AdminManagement = (props) => {
                   setEditingAdmin(null);
                   setFormData({ name: '', whatsapp: '', email: '', role: 'support', accessCode: '' });
                 }}
-                className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-lg font-semibold transition-colors"
+                className="adm-btn adm-btn-secondary"
               >
                 Annuler
               </button>
@@ -509,175 +475,140 @@ const AdminManagement = (props) => {
 
         {/* Admins List */}
         {isSuperAdmin && (
-          <div className="bg-white rounded-lg shadow-md overflow-auto">
-          <div className="p-6 border-b flex justify-between items-center">
-            <h3 className="text-xl font-bold">Liste des Administrateurs ({admins.length})</h3>
-            {isSuperAdmin && (
-              <button
-                onClick={handleBulkDelete}
-                disabled={selectedAdmins.length === 0}
-                className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
-              >
-                Supprimer la sélection
-              </button>
-            )}
-          </div>
-          <div className="overflow-x-auto">
-            {loading ? (
-                <p className="p-6">Chargement des administrateurs...</p>
-            ) : (
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left">
-                    <input
+          <section aria-labelledby="members-title">
+            <h2 id="members-title" className="text-xl font-extrabold mb-3">
+              Membres <span className="font-semibold text-gray-500 tabular-nums">{admins.length}</span>
+            </h2>
+            <SelectionBar count={selectedAdmins.length} onDelete={handleBulkDelete} onClear={() => setSelectedAdmins([])} />
+            <div className="adm-card overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="adm-th w-10">
+                      <input
                         type="checkbox"
+                        aria-label="Tout sélectionner"
                         onChange={handleSelectAll}
                         checked={selectedAdmins.length === admins.length && admins.length > 0}
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Administrateur</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rôle</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Création</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dernière Connexion</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {admins.map((admin) => {
-                  const roleInfo = adminRoles[admin.role];
-                  return (
-                    <tr key={admin.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4">
-                            <input
-                                type="checkbox"
-                                checked={selectedAdmins.includes(admin.id)}
-                                onChange={(e) => handleSelectOne(e, admin.id)}
-                                disabled={admin.id === user.id}
-                            />
+                      />
+                    </th>
+                    <th className="adm-th">Membre</th>
+                    <th className="adm-th">Contact</th>
+                    <th className="adm-th">Rôle</th>
+                    <th className="adm-th">Statut</th>
+                    <th className="adm-th">Dernière connexion</th>
+                    <th className="adm-th"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {loading ? (
+                    <LoadingRows colSpan={7} rows={3} />
+                  ) : admins.length === 0 ? (
+                    <EmptyRow colSpan={7}>Aucun administrateur.</EmptyRow>
+                  ) : admins.map((admin) => {
+                    const roleInfo = adminRoles[admin.role];
+                    const isSelf = admin.id === user.id;
+                    return (
+                      <tr key={admin.id} className={selectedAdmins.includes(admin.id) ? 'bg-purple-50' : 'hover:bg-gray-50'}>
+                        <td className="adm-td">
+                          <input
+                            type="checkbox"
+                            aria-label={`Sélectionner ${admin.name}`}
+                            checked={selectedAdmins.includes(admin.id)}
+                            onChange={(e) => handleSelectOne(e, admin.id)}
+                            disabled={isSelf}
+                          />
                         </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center space-x-3">
-                          <div className="text-2xl">{roleInfo?.icon}</div>
-                          <div>
-                            <p className="font-medium text-gray-900">{admin.name}</p>
-                            <p className="text-sm text-gray-500">{admin.id}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-gray-900">{admin.whatsapp}</p>
-                        <p className="text-sm text-gray-500">{admin.email}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 text-xs rounded-full font-medium bg-${roleInfo?.color}-100 text-${roleInfo?.color}-800`}>
-                          {roleInfo?.name}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 text-xs rounded-full font-medium ${ 
-                          admin.status === 'active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {admin.status === 'active' ? 'Actif' : 'Suspendu'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {new Date(admin.createdDate).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {admin.lastLogin ? new Date(admin.lastLogin).toLocaleString() : 'Jamais'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditAdmin(admin)}
-                            className="text-blue-600 hover:text-blue-800 font-semibold text-sm"
-                          >
-                            ✏️ Modifier
-                          </button>
-                          {isSuperAdmin && (
-                            <button
-                                onClick={() => {
-                                    setPasswordChangeAdmin(admin);
-                                    setNewPassword('');
-                                    setConfirmPassword('');
-                                }}
-                                className="text-gray-600 hover:text-gray-800 font-semibold text-sm"
-                            >
-                                🔑 Changer Mdp
-                            </button>
+                        <td className="adm-td">
+                          <p className="font-semibold">{admin.name}{isSelf && <span className="font-normal text-gray-500"> (vous)</span>}</p>
+                          {admin.createdDate && (
+                            <p className="text-xs text-gray-500">
+                              Depuis le {new Date(admin.createdDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
                           )}
-                          {isSuperAdmin && admin.role !== 'super_admin' && (
+                        </td>
+                        <td className="adm-td">
+                          <p className="whitespace-nowrap">{admin.whatsapp}</p>
+                          <p className="text-xs text-gray-500 break-all">{admin.email}</p>
+                        </td>
+                        <td className="adm-td whitespace-nowrap">{roleInfo?.name || admin.role}</td>
+                        <td className="adm-td"><StatusBadge status={admin.status === 'active' ? 'active' : 'suspended'} /></td>
+                        <td className="adm-td text-gray-600 whitespace-nowrap">
+                          {admin.lastLogin
+                            ? new Date(admin.lastLogin).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : 'Jamais'}
+                        </td>
+                        <td className="adm-td whitespace-nowrap text-right">
+                          <button onClick={() => handleEditAdmin(admin)} className="adm-link !min-h-0">Modifier</button>
+                          <button
+                            onClick={() => {
+                              setPasswordChangeAdmin(admin);
+                              setNewPassword('');
+                              setConfirmPassword('');
+                            }}
+                            className="adm-link !min-h-0 ml-4"
+                          >
+                            Code d'accès
+                          </button>
+                          {admin.role !== 'super_admin' && (
                             <>
-                              <button
-                                onClick={() => toggleAdminStatus(admin.id, admin.status)}
-                                className="text-orange-600 hover:text-orange-800 font-semibold text-sm"
-                              >
-                                {admin.status === 'active' ? '🚫 Suspendre' : '✅ Activer'}
+                              <button onClick={() => toggleAdminStatus(admin.id, admin.status)} className="adm-link !min-h-0 ml-4">
+                                {admin.status === 'active' ? 'Suspendre' : 'Réactiver'}
                               </button>
-                              <button
-                                onClick={() => deleteAdmin(admin.id)}
-                                className="text-red-600 hover:text-red-800 font-semibold text-sm"
-                              >
-                                🗑️ Supprimer
+                              <button onClick={() => deleteAdmin(admin.id)} className="adm-link-danger !min-h-0 ml-4">
+                                Supprimer
                               </button>
                             </>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            )}
-          </div>
-        </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
         )}
-        
+
         {/* Password Change Modal */}
         {isSuperAdmin && passwordChangeAdmin && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
-                    <h3 className="text-2xl font-bold mb-6">Changer le mot de passe pour <span className="text-purple-600">{passwordChangeAdmin.name}</span></h3>
+            <div className="adm-backdrop">
+                <div className="adm-modal max-w-md">
+                    <h3 className="adm-modal-title mb-6">Nouveau code d'accès pour {passwordChangeAdmin.name}</h3>
                     
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Nouveau mot de passe</label>
+                            <label className="adm-label">Nouveau mot de passe</label>
                             <input
                                 type="password"
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
-                                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="adm-input"
                                 placeholder="••••••••"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Confirmer le mot de passe</label>
+                            <label className="adm-label">Confirmer le mot de passe</label>
                             <input
                                 type="password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
-                                className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="adm-input"
                                 placeholder="••••••••"
                             />
                         </div>
                     </div>
 
-                    <div className="flex space-x-4 mt-8">
+                    <div className="flex flex-wrap sm:flex-nowrap gap-3 mt-8">
                         <button
                             onClick={handlePasswordChange}
-                            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold w-full"
+                            className="adm-btn adm-btn-primary w-full"
                         >
                             Mettre à jour le mot de passe
                         </button>
                         <button
                             onClick={() => setPasswordChangeAdmin(null)}
-                            className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-3 rounded-lg font-semibold w-full"
+                            className="adm-btn adm-btn-secondary w-full"
                         >
                             Annuler
                         </button>
@@ -689,23 +620,16 @@ const AdminManagement = (props) => {
         
 
         {/* Info Box */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6 text-left">
-          <div className="flex items-start space-x-3">
-            <span className="text-3xl">ℹ️</span>
-            <div>
-              <h4 className="font-semibold text-blue-900 mb-2">Informations Importantes</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Seul le <strong>Super Administrateur</strong> peut suspendre ou supprimer des admins</li>
-                <li>• Les codes d'accès ne sont affichés qu'une seule fois lors de la création</li>
-                <li>• Chaque rôle a des permissions spécifiques définies</li>
-                <li>• Les admins suspendus ne peuvent plus se connecter</li>
-                <li>• Le Super Admin ne peut pas être supprimé ou suspendu</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+        <section className="mt-8 bg-purple-50 rounded-xl p-5 sm:p-6" aria-labelledby="admins-rules">
+          <h2 id="admins-rules" className="font-bold text-purple-950 mb-2">À savoir</h2>
+          <ul className="text-sm text-purple-900 space-y-1.5 list-disc pl-5">
+            <li>Seul le super administrateur peut suspendre ou supprimer un administrateur.</li>
+            <li>Le code d'accès n'est affiché qu'une fois, à la création du compte.</li>
+            <li>Un administrateur suspendu ne peut plus se connecter.</li>
+            <li>Le super administrateur ne peut être ni suspendu ni supprimé.</li>
+          </ul>
+        </section>
+    </AdminLayout>
   );
 };
 

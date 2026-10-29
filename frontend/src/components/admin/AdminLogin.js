@@ -59,78 +59,68 @@ const AdminLogin = (props) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-red-600 flex items-center justify-center p-4">
+    <div className="on-dark min-h-screen bg-purple-950 flex items-center justify-center p-4 text-left">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <img 
-              src="/images/logo-nengoo.png" 
-              alt="Nengoo Logo" 
-              className="h-16 w-auto mx-auto mb-4"
-            />
-            <div className="text-6xl mb-4">🔐</div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Accès Administrateur</h1>
-            <p className="text-gray-600">Connectez-vous pour gérer Nengoo</p>
-          </div>
+        <img
+          src="/images/logo-nengoo-white.png"
+          alt="Nengoo"
+          className="h-12 w-auto mb-8"
+        />
+        <div className="bg-white rounded-2xl p-6 sm:p-8">
+          <h1 className="adm-title">Administration</h1>
+          <p className="adm-subtitle mb-6">Connectez-vous avec le numéro WhatsApp et le code d'accès de votre compte administrateur.</p>
 
           {error && (
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-              <p className="text-red-700 text-sm">{error}</p>
-            </div>
+            <p className="mb-5 p-3 rounded-lg bg-red-50 text-red-800 text-sm" role="alert">{error}</p>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Numéro WhatsApp Administrateur
+              <label className="adm-label" htmlFor="admin-whatsapp">
+                Numéro WhatsApp
               </label>
               <input
+                id="admin-whatsapp"
                 type="tel"
                 name="whatsapp"
                 value={formData.whatsapp}
                 onChange={handleInputChange}
-                placeholder="+237 XXX XXX XXX"
+                placeholder="+237 6XX XXX XXX"
+                autoComplete="username"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="adm-input"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="adm-label" htmlFor="admin-code">
                 Code d'accès
               </label>
               <input
+                id="admin-code"
                 type="password"
                 name="accessCode"
                 value={formData.accessCode}
                 onChange={handleInputChange}
-                placeholder="Entrez le code d'accès"
+                autoComplete="current-password"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="adm-input"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-600 to-red-600 text-white py-3 px-6 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50"
+              className="adm-btn adm-btn-primary w-full !min-h-[2.75rem]"
             >
-              {loading ? 'Connexion en cours...' : 'Se connecter'}
+              {loading ? 'Connexion…' : 'Se connecter'}
             </button>
           </form>
-
-          <div className="mt-6 text-center">
-            <Link to="/" className="text-gray-600 hover:text-gray-700 text-sm">
-              ← Retour à l'accueil
-            </Link>
-          </div>
-
-          <div className="mt-6 bg-gray-50 rounded-lg p-4">
-            <p className="text-xs text-gray-500 text-center">
-              🔒 Accès réservé aux administrateurs autorisés uniquement
-            </p>
-          </div>
         </div>
+
+        <Link to="/" className="inline-block mt-6 text-sm text-purple-200 hover:text-white hover:underline underline-offset-4">
+          Retour au site
+        </Link>
       </div>
     </div>
   );

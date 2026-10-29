@@ -1,5 +1,7 @@
 
 import React, { useState } from 'react';
+import { notify, confirmAction, statusLabel } from './adminFeedback';
+import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -8,6 +10,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
     const [expandedOrderId, setExpandedOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedOrders, setSelectedOrders] = useState([]);
+    const [statusFilter, setStatusFilter] = useState('all');
 
     const handleSelectAll = (e) => {
         if (e.target.checked) {
@@ -26,7 +29,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
     };
 
     const handleBulkDelete = async () => {
-        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedOrders.length} commandes? Cette action est irréversible.`)) {
+        if (await confirmAction({ title: `Supprimer ${selectedOrders.length} commande(s) ?`, message: 'Elles disparaîtront aussi pour les acheteurs et les vendeurs. Cette action est définitive.' })) {
             try {
                 const response = await fetch(`${API_BASE_URL}/orders`, {
                     method: 'DELETE',
@@ -44,10 +47,10 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                     onOrderUpdate();
                 }
                 setSelectedOrders([]);
-                alert('🗑️ Commandes supprimées avec succès!');
+                notify('Commandes supprimées avec succès.', 'success');
             } catch (error) {
                 console.error('Error deleting orders:', error);
-                alert(`Erreur: ${error.message}`);
+                notify(error.message, 'error');
             }
         }
     };
@@ -74,17 +77,17 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
             if (onOrderUpdate) {
                 onOrderUpdate();
             }
-            alert(`Statut de la commande ${orderId} mis à jour à "${newStatus}".`);
+            notify(`Statut de la commande ${orderId} : ${statusLabel(newStatus)}.`, 'success');
         } catch (error) {
             console.error("Error updating order status:", error);
-            alert(`Erreur: ${error.message}`);
+            notify(error.message, 'error');
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteOrder = async (orderId) => {
-        if (!window.confirm(`Êtes-vous sûr de vouloir supprimer la commande ${orderId} ? Cette action est irréversible.`)) {
+        if (!(await confirmAction({ title: `Supprimer la commande ${orderId} ?`, message: "Elle disparaîtra aussi pour l'acheteur et le vendeur. Cette action est définitive." }))) {
             return;
         }
 
@@ -101,7 +104,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                  if (onOrderUpdate) {
                     onOrderUpdate();
                 }
-                alert(`Commande ${orderId} supprimée avec succès.`);
+                notify(`Commande ${orderId} supprimée avec succès.`, 'success');
             } else if (!response.ok) {
                 const err = await response.json();
                 throw new Error(err.detail || 'Failed to delete order');
@@ -109,12 +112,12 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                  if (onOrderUpdate) {
                     onOrderUpdate();
                 }
-                alert(`Commande ${orderId} supprimée avec succès.`);
+                notify(`Commande ${orderId} supprimée avec succès.`, 'success');
             }
 
         } catch (error) {
             console.error("Error deleting order:", error);
-            alert(`Erreur: ${error.message}`);
+            notify(error.message, 'error');
         } finally {
             setLoading(false);
         }
@@ -128,196 +131,166 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
         }).format(price);
     };
 
-    const getStatusText = (status) => {
-        switch (status) {
-            case 'pending': return 'En attente';
-            case 'processing': return 'En cours';
-            case 'shipped': return 'Expédiée';
-            case 'delivered': return 'Livrée';
-            case 'cancelled': return 'Annulée';
-            default: return status;
-        }
-    };
+    const STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    const isSuperAdmin = user && user.role === 'super_admin';
 
     const filteredOrders = orders.filter(order => {
         const query = searchQuery.toLowerCase();
-        const productNames = order.products ? order.products.map(p => p.name.toLowerCase()).join(' ') : '';
-        return (
+        const productNames = order.products ? order.products.map(p => (p.name || '').toLowerCase()).join(' ') : '';
+        const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+        return matchesStatus && (
             order.id.toString().toLowerCase().includes(query) ||
-            order.buyerName.toLowerCase().includes(query) ||
-            order.sellerName.toLowerCase().includes(query) ||
+            (order.buyerName || '').toLowerCase().includes(query) ||
+            (order.sellerName || '').toLowerCase().includes(query) ||
             productNames.includes(query)
         );
     });
 
+    const orderDate = (order) => {
+        const date = order.createdAt || order.orderedDate;
+        return date ? new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    };
+
+    const ProductThumb = ({ product, size = 'w-10 h-10' }) => (
+        product.images && product.images[0]
+            ? <img src={product.images[0]} alt="" title={product.name} className={`${size} object-cover rounded-md bg-gray-100`} loading="lazy" />
+            : <div className={`${size} rounded-md bg-gray-100`} aria-hidden="true" />
+    );
+
+    const COLUMNS = isSuperAdmin ? 7 : 6;
+
     return (
         <div>
-            <h2 className="text-xl md:text-3xl font-bold mb-6">Gestion des commandes ({filteredOrders.length})</h2>
-            
-            <div className="mb-4 flex justify-between items-center max-sm:flex-wrap max-sm:gap-4">
-                <input
-                    type="text"
-                    placeholder="Rechercher des commandes..."
-                    className="w-full md:w-1/3 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {user && user.role === 'super_admin' && (
-                    <button
-                        onClick={handleBulkDelete}
-                        disabled={selectedOrders.length === 0}
-                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
-                    >
-                        Supprimer la sélection
-                    </button>
-                )}
-            </div>
+            <SectionHeader title="Commandes" count={filteredOrders.length} />
 
-            <div className="bg-white rounded-lg shadow-md overflow-auto">
-                {loading ? <p className="p-6">Chargement...</p> : (
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b">
-                            <tr>
-                                <th className="px-6 py-3 text-left">
-                                    <input 
+            <Toolbar>
+                <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Rechercher par n°, acheteur, vendeur ou produit" />
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filtrer par statut" className="adm-input w-auto">
+                    <option value="all">Tous les statuts</option>
+                    {STATUSES.map(s => (
+                        <option key={s} value={s}>{statusLabel(s)} ({orders.filter(o => o.status === s).length})</option>
+                    ))}
+                </select>
+            </Toolbar>
+
+            {isSuperAdmin && (
+                <SelectionBar count={selectedOrders.length} onDelete={handleBulkDelete} onClear={() => setSelectedOrders([])} />
+            )}
+
+            <div className="adm-card overflow-x-auto" aria-busy={loading}>
+                <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            {isSuperAdmin && (
+                                <th className="adm-th w-10">
+                                    <input
                                         type="checkbox"
+                                        aria-label="Tout sélectionner"
                                         onChange={handleSelectAll}
                                         checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
                                     />
                                 </th>
-                                <th className="px-2 py-3"></th> {/* For expand button */}
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commande</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acheteur</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendeur</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Images</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {filteredOrders.map((order) => (
+                            )}
+                            <th className="adm-th">Commande</th>
+                            <th className="adm-th">Acheteur</th>
+                            <th className="adm-th">Vendeur</th>
+                            <th className="adm-th text-right">Total</th>
+                            <th className="adm-th">Statut</th>
+                            <th className="adm-th"><span className="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {filteredOrders.length === 0 ? (
+                            <EmptyRow colSpan={COLUMNS}>
+                                {orders.length === 0 ? 'Aucune commande pour le moment.' : 'Aucune commande ne correspond à ces critères.'}
+                            </EmptyRow>
+                        ) : filteredOrders.map((order) => {
+                            const expanded = expandedOrderId === order.id;
+                            return (
                                 <React.Fragment key={order.id}>
-                                    <tr className="hover:bg-gray-50">
-                                        <td className="px-6 py-4">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedOrders.includes(order.id)}
-                                                onChange={(e) => handleSelectOne(e, order.id)}
-                                            />
-                                        </td>
-                                        <td className="px-2 py-4">
-                                            <button onClick={() => toggleProducts(order.id)} className="text-gray-500 hover:text-gray-700">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 transition-transform duration-200 ${expandedOrderId === order.id ? 'transform rotate-90' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                                </svg>
-                                            </button>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium">{order.id}</td>
-                                        <td className="px-6 py-4 text-sm">{order.buyerName}</td>
-                                        <td className="px-6 py-4 text-sm">{order.sellerName}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-wrap gap-1">
-                                                {order.products && order.products.slice(0, 3).map((product, index) => (
-                                                    product.images && product.images[0] ? (
-                                                        <img
-                                                            key={index}
-                                                            src={product.images[0]}
-                                                            alt={product.name}
-                                                            className="w-10 h-10 object-cover rounded border border-gray-200"
-                                                            title={product.name}
-                                                        />
-                                                    ) : (
-                                                        <div key={index} className="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                            </svg>
-                                                        </div>
-                                                    )
-                                                ))}
-                                                {order.products && order.products.length > 3 && (
-                                                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center text-xs font-medium text-gray-600">
-                                                        +{order.products.length - 3}
-                                                    </div>
-                                                )}
+                                    <tr className={selectedOrders.includes(order.id) ? 'bg-purple-50' : 'hover:bg-gray-50'}>
+                                        {isSuperAdmin && (
+                                            <td className="adm-td">
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`Sélectionner la commande ${order.id}`}
+                                                    checked={selectedOrders.includes(order.id)}
+                                                    onChange={(e) => handleSelectOne(e, order.id)}
+                                                />
+                                            </td>
+                                        )}
+                                        <td className="adm-td">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex -space-x-2 shrink-0">
+                                                    {(order.products || []).slice(0, 3).map((product, index) => (
+                                                        <div key={index} className="ring-2 ring-white rounded-md"><ProductThumb product={product} /></div>
+                                                    ))}
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold whitespace-nowrap">{order.id}</p>
+                                                    <p className="text-xs text-gray-500 whitespace-nowrap">
+                                                        {orderDate(order)}
+                                                        {order.products && order.products.length > 0 && `, ${order.products.length} article${order.products.length > 1 ? 's' : ''}`}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-sm font-medium">{formatPrice(order.totalAmount)}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 text-xs rounded-full ${order.status === 'delivered' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                                {getStatusText(order.status)}
-                                            </span>
+                                        <td className="adm-td">{order.buyerName}</td>
+                                        <td className="adm-td">{order.sellerName}</td>
+                                        <td className="adm-td text-right price whitespace-nowrap">{formatPrice(order.totalAmount)}</td>
+                                        <td className="adm-td">
+                                            <StatusSelect
+                                                value={order.status}
+                                                onChange={(value) => handleUpdateOrderStatus(order.id, value)}
+                                                options={STATUSES}
+                                                label={`Statut de la commande ${order.id}`}
+                                            />
                                         </td>
-                                        <td className="px-6 py-4 flex items-center space-x-2">
-                                            <select 
-                                                value={order.status} 
-                                                onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
-                                                className="border rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        <td className="adm-td whitespace-nowrap text-right">
+                                            <button
+                                                onClick={() => toggleProducts(order.id)}
+                                                aria-expanded={expanded}
+                                                className="adm-link !min-h-0"
                                             >
-                                                <option value="pending">En attente</option>
-                                                <option value="processing">En cours</option>
-                                                <option value="shipped">Expédiée</option>
-                                                <option value="delivered">Livrée</option>
-                                                <option value="cancelled">Annulée</option>
-                                            </select>
-                                            {user && user.role === 'super_admin' && (
-                                                <button
-                                                    onClick={() => handleDeleteOrder(order.id)}
-                                                    className="text-red-600 hover:text-red-900"
-                                                    title="Supprimer la commande"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
+                                                {expanded ? 'Masquer' : 'Détails'}
+                                            </button>
+                                            {isSuperAdmin && (
+                                                <button onClick={() => handleDeleteOrder(order.id)} className="adm-link-danger !min-h-0 ml-4">
+                                                    Supprimer
                                                 </button>
                                             )}
                                         </td>
                                     </tr>
-                                    {expandedOrderId === order.id && (
+                                    {expanded && (
                                         <tr className="bg-gray-50">
-                                            <td colSpan="9" className="px-12 py-4">
-                                                <div>
-                                                    <h4 className="font-bold text-md mb-2">Détails de la Commande</h4>
-                                                    <p className="text-sm text-gray-600 mb-2">Vendu par : <span className="font-medium">{order.sellerName}</span></p>
-
-                                                    <p className="text-sm text-gray-600 mb-2">Client : <span className="font-medium">{order.buyerName}</span></p>
-                                                    {order.buyerWhatsapp && (
-                                                        <p className="text-sm text-gray-600 mb-2">WhatsApp Client : <span className="font-medium">{order.buyerWhatsapp}</span></p>
-                                                    )}
-
-                                                    <p className="text-sm text-gray-600 mb-2">
-                                                        Moyen de livraison :
-                                                        {order.pickupPointName ? (
-                                                            <span className="font-medium"> Retrait à "{order.pickupPointName}"</span>
-                                                        ) : (
-                                                            <span className="font-medium"> Livraison à domicile</span>
-                                                        )}
-                                                    </p>
-                                                    
-                                                    <h4 className="font-bold text-md mt-4 mb-2">Produits commandés</h4>
-                                                    <ul className="divide-y divide-gray-200">
-                                                        {order.products.map(product => (
-                                                            <li key={product.productId} className="py-3 flex justify-between items-center">
-                                                                <div className="flex items-center gap-3">
-                                                                    {product.images && product.images[0] ? (
-                                                                        <img
-                                                                            src={product.images[0]}
-                                                                            alt={product.name}
-                                                                            className="w-16 h-16 object-cover rounded border border-gray-200"
-                                                                        />
-                                                                    ) : (
-                                                                        <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                                                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                                            </svg>
-                                                                        </div>
-                                                                    )}
-                                                                    <div>
-                                                                        <p className="font-medium">{product.name}</p>
-                                                                        <p className="text-sm text-gray-500">Quantité: {product.quantity}</p>
-                                                                    </div>
+                                            <td colSpan={COLUMNS} className="px-4 sm:px-6 py-5">
+                                                <div className="grid lg:grid-cols-[16rem_minmax(0,1fr)] gap-6">
+                                                    <dl className="text-sm space-y-3">
+                                                        <div>
+                                                            <dt className="text-gray-500">Acheteur</dt>
+                                                            <dd className="font-semibold">{order.buyerName}</dd>
+                                                            {order.buyerWhatsapp && <dd>{order.buyerWhatsapp}</dd>}
+                                                        </div>
+                                                        <div>
+                                                            <dt className="text-gray-500">Vendeur</dt>
+                                                            <dd className="font-semibold">{order.sellerName}</dd>
+                                                        </div>
+                                                        <div>
+                                                            <dt className="text-gray-500">Livraison</dt>
+                                                            <dd className="font-semibold">
+                                                                {order.pickupPointName ? `Retrait à « ${order.pickupPointName} »` : 'À domicile'}
+                                                            </dd>
+                                                        </div>
+                                                    </dl>
+                                                    <ul className="divide-y divide-gray-200 bg-white rounded-xl border border-gray-200">
+                                                        {(order.products || []).map((product, index) => (
+                                                            <li key={product.productId || index} className="p-3 flex items-center gap-3">
+                                                                <ProductThumb product={product} size="w-14 h-14" />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="font-semibold truncate">{product.name}</p>
+                                                                    <p className="text-sm text-gray-500">Quantité : {product.quantity}</p>
                                                                 </div>
-                                                                <p className="font-medium">{formatPrice(product.price * product.quantity)}</p>
+                                                                <p className="price whitespace-nowrap">{formatPrice(product.price * product.quantity)}</p>
                                                             </li>
                                                         ))}
                                                     </ul>
@@ -326,10 +299,10 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                         </tr>
                                     )}
                                 </React.Fragment>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                            );
+                        })}
+                    </tbody>
+                </table>
             </div>
         </div>
     );

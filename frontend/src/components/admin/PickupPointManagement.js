@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import { notify, confirmAction, statusLabel } from './adminFeedback';
+import { SectionHeader, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -40,7 +42,7 @@ const PickupPointManagement = (props) => {
     };
 
     const handleBulkDelete = async () => {
-        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedPickupPoints.length} points de retrait?`)) {
+        if (await confirmAction({ title: `Supprimer ${selectedPickupPoints.length} point(s) de retrait ?`, message: 'Les acheteurs ne pourront plus les choisir à la commande.' })) {
             try {
                 const response = await fetch(`${API_BASE_URL}/pickup-points`, {
                     method: 'DELETE',
@@ -56,10 +58,10 @@ const PickupPointManagement = (props) => {
                 }
                 await fetchPickupPoints();
                 setSelectedPickupPoints([]);
-                alert('🗑️ Points de retrait supprimés avec succès!');
+                notify('Points de retrait supprimés avec succès.', 'success');
             } catch (error) {
                 console.error('Error deleting pickup points:', error);
-                alert(`Erreur: ${error.message}`);
+                notify(error.message, 'error');
             }
         }
     };
@@ -108,10 +110,10 @@ const PickupPointManagement = (props) => {
             }
             await fetchPickupPoints();
             setShowAddModal(false);
-            alert('✅ Point de retrait ajouté avec succès!');
+            notify('Point de retrait ajouté avec succès.', 'success');
         } catch (error) {
             console.error('Error adding pickup point:', error);
-            alert(`Erreur: ${error.message}`);
+            notify(error.message, 'error');
         }
     };
 
@@ -136,15 +138,15 @@ const PickupPointManagement = (props) => {
             }
             await fetchPickupPoints();
             setShowEditModal(false);
-            alert('✅ Point de retrait mis à jour avec succès!');
+            notify('Point de retrait mis à jour avec succès.', 'success');
         } catch (error) {
             console.error('Error updating pickup point:', error);
-            alert(`Erreur: ${error.message}`);
+            notify(error.message, 'error');
         }
     };
 
     const handleDeletePickupPoint = async (pickupPointId) => {
-        if (window.confirm('Êtes-vous sûr de vouloir supprimer ce point de retrait?')) {
+        if (await confirmAction({ title: 'Supprimer ce point de retrait ?', message: 'Les acheteurs ne pourront plus le choisir à la commande.' })) {
             try {
                 const response = await fetch(`${API_BASE_URL}/pickup-points/${pickupPointId}`, {
                     method: 'DELETE',
@@ -155,126 +157,171 @@ const PickupPointManagement = (props) => {
                     throw new Error(err.detail || 'Failed to delete pickup point');
                 }
                 await fetchPickupPoints();
-                alert('🗑️ Point de retrait supprimé avec succès!');
+                notify('Point de retrait supprimé avec succès.', 'success');
             } catch (error) {
                 console.error('Error deleting pickup point:', error);
-                alert(`Erreur: ${error.message}`);
+                notify(error.message, 'error');
             }
         }
     };
     
+    // Statut affiché sur le site : seuls les points refusés ou désactivés y sont masqués
+    const handleStatusChange = async (point, newStatus) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/pickup-points/${point.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Role': 'super_admin' },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Failed to update pickup point status');
+            }
+            setPickupPoints(pickupPoints.map(p => p.id === point.id ? { ...p, status: newStatus } : p));
+            notify(`Statut de « ${point.name} » : ${statusLabel(newStatus)}.`, 'success');
+        } catch (error) {
+            console.error('Error updating pickup point status:', error);
+            notify(error.message, 'error');
+        }
+    };
+
+    const pickupFields = (data, onChange) => (
+        <>
+            <Field label="Nom du point de retrait" required>
+                <input type="text" name="name" value={data.name} onChange={onChange} className="adm-input" required />
+            </Field>
+            <Field label="Adresse" required hint="Assez précise pour être trouvée : quartier, repère proche.">
+                <input type="text" name="address" value={data.address} onChange={onChange} className="adm-input" required />
+            </Field>
+            <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Ville" required>
+                    <input type="text" name="city" value={data.city} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="Région" required>
+                    <input type="text" name="region" value={data.region} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="Nom du gestionnaire" required>
+                    <input type="text" name="managerName" value={data.managerName} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="WhatsApp du gestionnaire" required>
+                    <input type="tel" name="managerWhatsApp" value={data.managerWhatsApp} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="Téléphone" required>
+                    <input type="tel" name="phone" value={data.phone} onChange={onChange} className="adm-input" required />
+                </Field>
+                <Field label="Email" required>
+                    <input type="email" name="email" value={data.email} onChange={onChange} className="adm-input" required />
+                </Field>
+            </div>
+            <Field label="Horaires" required>
+                <input type="text" name="hours" value={data.hours} onChange={onChange} placeholder="Ex. : Lun-Sam, 8h-18h" className="adm-input" required />
+            </Field>
+            <Field label="Description" required>
+                <textarea name="description" value={data.description} onChange={onChange} className="adm-input" rows="3" required />
+            </Field>
+        </>
+    );
+
+    const COLUMNS = 6;
+
     return (
         <div>
-            <div className="flex justify-between items-center mb-6 max-sm:flex-col max-sm:space-y-4">
-                <h2 className="text-xl md:text-3xl font-bold">Gestion des Points de Retrait ({pickupPoints.length})</h2>
-                <div className="flex items-center space-x-2">
-                    <button 
-                        onClick={handleBulkDelete}
-                        disabled={selectedPickupPoints.length === 0}
-                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
-                    >
-                        Supprimer la sélection
+            <SectionHeader
+                title="Points de retrait"
+                count={pickupPoints.length}
+                description="Les points refusés ou désactivés n'apparaissent ni sur le site ni au moment de commander."
+                actions={
+                    <button onClick={() => setShowAddModal(true)} className="adm-btn adm-btn-primary">
+                        Ajouter un point de retrait
                     </button>
-                    <button onClick={() => setShowAddModal(true)} className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded">
-                        + Ajouter un Point de Retrait
-                    </button>
-                </div>
-            </div>
+                }
+            />
+
+            <SelectionBar count={selectedPickupPoints.length} onDelete={handleBulkDelete} onClear={() => setSelectedPickupPoints([])} />
 
             {showAddModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">📍 Ajouter un nouveau Point de Retrait</h2>
-                            <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+                <Modal title="Ajouter un point de retrait" onClose={() => setShowAddModal(false)}>
+                    <form onSubmit={handleAddPickupPoint} className="space-y-4">
+                        {pickupFields(newPickupPointData, handleInputChange)}
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button type="button" onClick={() => setShowAddModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
+                            <button type="submit" className="adm-btn adm-btn-primary">Ajouter le point de retrait</button>
                         </div>
-                        <form onSubmit={handleAddPickupPoint} className="space-y-4">
-                            <input type="text" name="name" value={newPickupPointData.name} onChange={handleInputChange} placeholder="Nom du point de retrait" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="address" value={newPickupPointData.address} onChange={handleInputChange} placeholder="Adresse" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="city" value={newPickupPointData.city} onChange={handleInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="region" value={newPickupPointData.region} onChange={handleInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
-                            
-                            <input type="text" name="managerName" value={newPickupPointData.managerName} onChange={handleInputChange} placeholder="Nom du gestionnaire" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="tel" name="managerWhatsApp" value={newPickupPointData.managerWhatsApp} onChange={handleInputChange} placeholder="WhatsApp du gestionnaire" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="tel" name="phone" value={newPickupPointData.phone} onChange={handleInputChange} placeholder="Téléphone du point de retrait" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="email" name="email" value={newPickupPointData.email} onChange={handleInputChange} placeholder="Email du point de retrait" className="w-full px-4 py-3 border rounded-lg" required />
-                            <input type="text" name="hours" value={newPickupPointData.hours} onChange={handleInputChange} placeholder="Horaires (ex: Lun-Sam: 8h-18h)" className="w-full px-4 py-3 border rounded-lg" required />
-                            <textarea name="description" value={newPickupPointData.description} onChange={handleInputChange} placeholder="Description du point de retrait" className="w-full px-4 py-3 border rounded-lg" required />
-                            
-                            <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-semibold">Ajouter le point de retrait</button>
-                        </form>
-                    </div>
-                </div>
+                    </form>
+                </Modal>
             )}
 
             {showEditModal && currentPickupPoint && (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                 <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto">
-                     <div className="flex justify-between items-center mb-6">
-                         <h2 className="text-2xl font-bold text-gray-900">✏️ Modifier le Point de Retrait</h2>
-                         <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-                     </div>
-                     <form onSubmit={handleUpdatePickupPoint} className="space-y-4">
-                         <input type="text" name="name" value={currentPickupPoint.name} onChange={handleEditInputChange} placeholder="Nom du point de retrait" className="w-full px-4 py-3 border rounded-lg" required />
-                         <input type="text" name="address" value={currentPickupPoint.address} onChange={handleEditInputChange} placeholder="Adresse" className="w-full px-4 py-3 border rounded-lg" required />
-                         <input type="text" name="city" value={currentPickupPoint.city} onChange={handleEditInputChange} placeholder="Ville" className="w-full px-4 py-3 border rounded-lg" required />
-                         <input type="text" name="region" value={currentPickupPoint.region} onChange={handleEditInputChange} placeholder="Région" className="w-full px-4 py-3 border rounded-lg" required />
-                         
-                         <input type="text" name="managerName" value={currentPickupPoint.managerName} onChange={handleEditInputChange} placeholder="Nom du gestionnaire" className="w-full px-4 py-3 border rounded-lg" required />
-                         <input type="tel" name="managerWhatsApp" value={currentPickupPoint.managerWhatsApp} onChange={handleEditInputChange} placeholder="WhatsApp du gestionnaire" className="w-full px-4 py-3 border rounded-lg" required />
-                         <input type="tel" name="phone" value={currentPickupPoint.phone} onChange={handleEditInputChange} placeholder="Téléphone du point de retrait" className="w-full px-4 py-3 border rounded-lg" required />
-                         <input type="email" name="email" value={currentPickupPoint.email} onChange={handleEditInputChange} placeholder="Email du point de retrait" className="w-full px-4 py-3 border rounded-lg" required />
-                         <input type="text" name="hours" value={currentPickupPoint.hours} onChange={handleEditInputChange} placeholder="Horaires (ex: Lun-Sam: 8h-18h)" className="w-full px-4 py-3 border rounded-lg" required />
-                         <textarea name="description" value={currentPickupPoint.description} onChange={handleEditInputChange} placeholder="Description du point de retrait" className="w-full px-4 py-3 border rounded-lg" required />
-                         
-                         <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold">Mettre à jour</button>
-                     </form>
-                 </div>
-             </div>
+                <Modal title={`Modifier ${currentPickupPoint.name}`} onClose={() => setShowEditModal(false)}>
+                    <form onSubmit={handleUpdatePickupPoint} className="space-y-4">
+                        {pickupFields(currentPickupPoint, handleEditInputChange)}
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button type="button" onClick={() => setShowEditModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
+                            <button type="submit" className="adm-btn adm-btn-primary">Enregistrer</button>
+                        </div>
+                    </form>
+                </Modal>
             )}
 
-            <div className="bg-white rounded-lg shadow-md overflow-auto">
-                {loading ? <p className="p-6">Chargement...</p> : (
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b">
-                            <tr>
-                                <th className="px-6 py-3 text-left">
+            <div className="adm-card overflow-x-auto">
+                <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th className="adm-th w-10">
+                                <input
+                                    type="checkbox"
+                                    aria-label="Tout sélectionner"
+                                    onChange={handleSelectAll}
+                                    checked={selectedPickupPoints.length === pickupPoints.length && pickupPoints.length > 0}
+                                />
+                            </th>
+                            <th className="adm-th">Point de retrait</th>
+                            <th className="adm-th">Gestionnaire</th>
+                            <th className="adm-th">Horaires</th>
+                            <th className="adm-th">Statut</th>
+                            <th className="adm-th"><span className="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {loading ? (
+                            <LoadingRows colSpan={COLUMNS} />
+                        ) : pickupPoints.length === 0 ? (
+                            <EmptyRow colSpan={COLUMNS}>Aucun point de retrait. Ajoutez-en un pour proposer le retrait aux acheteurs.</EmptyRow>
+                        ) : pickupPoints.map((point) => (
+                            <tr key={point.id} className={selectedPickupPoints.includes(point.id) ? 'bg-purple-50' : 'hover:bg-gray-50'}>
+                                <td className="adm-td">
                                     <input
                                         type="checkbox"
-                                        onChange={handleSelectAll}
-                                        checked={selectedPickupPoints.length === pickupPoints.length && pickupPoints.length > 0}
+                                        aria-label={`Sélectionner ${point.name}`}
+                                        checked={selectedPickupPoints.includes(point.id)}
+                                        onChange={(e) => handleSelectOne(e, point.id)}
                                     />
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Adresse</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gestionnaire</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ville</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </td>
+                                <td className="adm-td">
+                                    <p className="font-semibold">{point.name}</p>
+                                    <p className="text-xs text-gray-500">{[point.address, point.city].filter(Boolean).join(', ')}</p>
+                                </td>
+                                <td className="adm-td">
+                                    <p>{point.managerName}</p>
+                                    <p className="text-xs text-gray-500 whitespace-nowrap">{point.managerWhatsApp}</p>
+                                </td>
+                                <td className="adm-td text-gray-600">{point.hours}</td>
+                                <td className="adm-td">
+                                    <StatusSelect
+                                        value={point.status || 'pending'}
+                                        onChange={(value) => handleStatusChange(point, value)}
+                                        options={['pending', 'approved', 'rejected']}
+                                        label={`Statut de ${point.name}`}
+                                    />
+                                </td>
+                                <td className="adm-td whitespace-nowrap text-right">
+                                    <button onClick={() => handleEditClick(point)} className="adm-link !min-h-0">Modifier</button>
+                                    <button onClick={() => handleDeletePickupPoint(point.id)} className="adm-link-danger !min-h-0 ml-4">Supprimer</button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {pickupPoints.map((point) => (
-                                <tr key={point.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedPickupPoints.includes(point.id)}
-                                            onChange={(e) => handleSelectOne(e, point.id)}
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4 font-medium">{point.name}</td>
-                                    <td className="px-6 py-4 text-sm">{point.address}, {point.city}</td>
-                                    <td className="px-6 py-4 text-sm">{point.managerName}</td>
-                                    <td className="px-6 py-4 text-sm">{point.city}</td>
-                                    <td className="px-6 py-4">
-                                        <button onClick={() => handleEditClick(point)} className="text-blue-600 hover:text-blue-800 font-semibold text-sm">Modifier</button>
-                                        <button onClick={() => handleDeletePickupPoint(point.id)} className="text-red-600 hover:text-red-800 font-semibold text-sm ml-4">Supprimer</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { notify, confirmAction } from './adminFeedback';
+import { SectionHeader, SelectionBar, EmptyRow, LoadingRows, Modal, Field } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -60,7 +62,7 @@ const CategoryManagement = (props) => {
     };
 
     const handleBulkDelete = async () => {
-        if (window.confirm(`Êtes-vous sûr de vouloir supprimer ${selectedCategories.length} catégories?`)) {
+        if (await confirmAction({ title: `Supprimer ${selectedCategories.length} catégorie(s) ?`, message: 'Les produits rattachés ne seront plus classés dans ces catégories.' })) {
             try {
                 const response = await fetch(`${API_BASE_URL}/categories`, {
                     method: 'DELETE',
@@ -81,10 +83,10 @@ const CategoryManagement = (props) => {
                 }
                 await fetchCategories();
                 setSelectedCategories([]);
-                alert('🗑️ Catégories supprimées avec succès!');
+                notify('Catégories supprimées avec succès.', 'success');
             } catch (error) {
                 console.error('Error deleting categories:', error);
-                alert(`Erreur: ${error.message}`);
+                notify(error.message, 'error');
             }
         }
     };
@@ -113,15 +115,15 @@ const CategoryManagement = (props) => {
             await fetchCategories();
             setShowAddModal(false);
             setNewCategoryData({ name: '', description: '' });
-            alert('✅ Catégorie ajoutée avec succès!');
+            notify('Catégorie ajoutée avec succès.', 'success');
         } catch (error) {
             console.error('Error adding category:', error);
-            alert(`Erreur: ${error.message}`);
+            notify(error.message, 'error');
         }
     };
 
     const handleDeleteCategory = async (categoryId) => {
-        if (window.confirm('Êtes-vous sûr de vouloir supprimer cette catégorie?')) {
+        if (await confirmAction({ title: 'Supprimer cette catégorie ?', message: 'Les produits rattachés ne seront plus classés dans cette catégorie.' })) {
             try {
                 const response = await fetch(`${API_BASE_URL}/categories/${categoryId}`, {
                     method: 'DELETE',
@@ -137,89 +139,92 @@ const CategoryManagement = (props) => {
                     }
                 }
                 await fetchCategories();
-                alert('🗑️ Catégorie supprimée avec succès!');
+                notify('Catégorie supprimée avec succès.', 'success');
             } catch (error) {
                 console.error('Error deleting category:', error);
-                alert(`Erreur: ${error.message}`);
+                notify(error.message, 'error');
             }
         }
     };
     
     return (
         <div>
-            <div className="flex justify-between items-center mb-6 max-sm:flex-col max-sm:space-y-4">
-                <h2 className="text-xl md:text-3xl font-bold">Gestion des Catégories ({categories.length})</h2>
-                <div className="flex items-center space-x-2">
-                    <button 
-                        onClick={handleBulkDelete}
-                        disabled={selectedCategories.length === 0}
-                        className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
-                    >
-                        Supprimer la sélection
+            <SectionHeader
+                title="Catégories"
+                count={categories.length}
+                description="Les catégories proposées aux vendeurs et affichées dans le catalogue."
+                actions={
+                    <button onClick={() => setShowAddModal(true)} className="adm-btn adm-btn-primary">
+                        Ajouter une catégorie
                     </button>
-                    <button onClick={() => setShowAddModal(true)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded">
-                        + Ajouter une Catégorie
-                    </button>
-                </div>
-            </div>
+                }
+            />
+
+            <SelectionBar count={selectedCategories.length} onDelete={handleBulkDelete} onClear={() => setSelectedCategories([])} />
 
             {showAddModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold text-gray-900">🏷️ Ajouter une nouvelle catégorie</h2>
-                            <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+                <Modal title="Ajouter une catégorie" onClose={() => setShowAddModal(false)} size="max-w-lg">
+                    <form onSubmit={handleAddCategory} className="space-y-4">
+                        <Field label="Nom" required>
+                            <input type="text" name="name" value={newCategoryData.name} onChange={handleInputChange} placeholder="Ex. : Maison et jardin" className="adm-input" required />
+                        </Field>
+                        <Field label="Description">
+                            <textarea name="description" value={newCategoryData.description} onChange={handleInputChange} className="adm-input" rows="3" />
+                        </Field>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button type="button" onClick={() => setShowAddModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
+                            <button type="submit" className="adm-btn adm-btn-primary">Ajouter la catégorie</button>
                         </div>
-                        <form onSubmit={handleAddCategory} className="space-y-4">
-                            <input type="text" name="name" value={newCategoryData.name} onChange={handleInputChange} placeholder="Nom de la catégorie (ex: Maison et Jardin)" className="w-full px-4 py-3 border rounded-lg" required />
-                            <textarea name="description" value={newCategoryData.description} onChange={handleInputChange} placeholder="Description" className="w-full px-4 py-3 border rounded-lg" />
-                            <button type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 px-6 rounded-lg font-semibold">Ajouter la Catégorie</button>
-                        </form>
-                    </div>
-                </div>
+                    </form>
+                </Modal>
             )}
 
-            <div className="bg-white rounded-lg shadow-md overflow-auto">
-                {loading ? <p className="p-6">Chargement...</p> : (
-                    <table className="w-full">
-                        <thead className="bg-gray-50 border-b">
-                            <tr>
-                                <th className="px-6 py-3 text-left">
-                                    <input 
+            <div className="adm-card overflow-x-auto">
+                <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th className="adm-th w-10">
+                                <input
+                                    type="checkbox"
+                                    aria-label="Tout sélectionner"
+                                    onChange={handleSelectAll}
+                                    checked={selectedCategories.length === categories.length && categories.length > 0}
+                                />
+                            </th>
+                            <th className="adm-th">Catégorie</th>
+                            <th className="adm-th">Description</th>
+                            <th className="adm-th text-right">Produits</th>
+                            <th className="adm-th"><span className="sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                        {loading ? (
+                            <LoadingRows colSpan={5} />
+                        ) : categories.length === 0 ? (
+                            <EmptyRow colSpan={5}>Aucune catégorie. Ajoutez-en une pour que les vendeurs puissent classer leurs produits.</EmptyRow>
+                        ) : categories.map((cat) => (
+                            <tr key={cat.id} className={selectedCategories.includes(cat.id) ? 'bg-purple-50' : 'hover:bg-gray-50'}>
+                                <td className="adm-td">
+                                    <input
                                         type="checkbox"
-                                        onChange={handleSelectAll}
-                                        checked={selectedCategories.length === categories.length && categories.length > 0}
+                                        aria-label={`Sélectionner ${cat.name}`}
+                                        checked={selectedCategories.includes(cat.id)}
+                                        onChange={(e) => handleSelectOne(e, cat.id)}
                                     />
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre de produits</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </td>
+                                <td className="adm-td">
+                                    <p className="font-semibold">{cat.name}</p>
+                                    <p className="text-xs text-gray-500">{cat.id}</p>
+                                </td>
+                                <td className="adm-td text-gray-600 max-w-md">{cat.description}</td>
+                                <td className={`adm-td text-right tabular-nums ${cat.productCount ? '' : 'text-gray-400'}`}>{cat.productCount || 0}</td>
+                                <td className="adm-td text-right">
+                                    <button onClick={() => handleDeleteCategory(cat.id)} className="adm-link-danger !min-h-0">Supprimer</button>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {categories.map((cat) => (
-                                <tr key={cat.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4">
-                                        <input 
-                                            type="checkbox"
-                                            checked={selectedCategories.includes(cat.id)}
-                                            onChange={(e) => handleSelectOne(e, cat.id)}
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4 font-mono text-sm">{cat.id}</td>
-                                    <td className="px-6 py-4 font-medium">{cat.name}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">{cat.description}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">{cat.productCount}</td>
-                                    <td className="px-6 py-4">
-                                        <button onClick={() => handleDeleteCategory(cat.id)} className="text-red-600 hover:text-red-800 font-semibold text-sm">Supprimer</button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );

@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Header from '../layout/Header';
-import Footer from '../layout/Footer';
+import { StatusBadge, formatXAF } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -91,97 +90,100 @@ const BuyerVerification = (props) => {
 
     if (loading) {
         return (
-            <div className="flex justify-center items-center min-h-screen bg-gray-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            <div className="min-h-screen bg-gray-50 p-4 sm:p-8" aria-busy="true">
+                <div className="max-w-2xl mx-auto space-y-4">
+                    <div className="h-24 rounded-2xl loading-shimmer" />
+                    <div className="h-40 rounded-2xl loading-shimmer" />
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 p-4">
-                <div className="text-red-500 text-xl mb-4">⚠️ {error}</div>
-                <Link to="/" className="text-purple-600 underline">Retour à l'accueil</Link>
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="adm-card max-w-md w-full p-8 text-left" role="alert">
+                    <h1 className="adm-title">Profil indisponible</h1>
+                    <p className="adm-subtitle mb-6">{error}</p>
+                    <Link to="/" className="adm-btn adm-btn-secondary">Retour au site</Link>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 py-8 px-4 font-sans">
-            <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-                <div className="bg-purple-700 text-white p-6">
-                    <div className="flex justify-between items-center">
-                        <h1 className="text-2xl font-bold">👤 Profil Client Nengoo</h1>
-                        <img src="/images/logo-nengoo.png" alt="Nengoo" className="h-8 bg-white rounded p-1" />
+        <div className="min-h-screen bg-gray-50 py-6 sm:py-10 px-4 text-left">
+            <div className="max-w-2xl mx-auto">
+                <header className="on-dark flex items-center justify-between gap-4 rounded-t-2xl bg-purple-950 text-white px-5 sm:px-6 py-5">
+                    <div>
+                        <p className="text-sm text-purple-300">Vérification client</p>
+                        <h1 className="text-2xl font-extrabold">{buyer?.name || 'Client Nengoo'}</h1>
                     </div>
-                </div>
+                    <img src="/images/logo-nengoo-white.png" alt="Nengoo" className="h-8 w-auto" />
+                </header>
 
-                <div className="p-6">
-                    {/* Client Info Card */}
-                    <div className="bg-purple-50 border border-purple-100 rounded-lg p-4 mb-6">
-                        <h2 className="text-lg font-semibold text-purple-800 mb-3 border-b border-purple-200 pb-2">Informations Client</h2>
-                        <div className="grid grid-cols-1 gap-2 text-gray-700">
-                            <p><span className="font-medium">Nom:</span> {buyer?.name || 'N/A'}</p>
-                            <p><span className="font-medium">ID:</span> <code className="bg-gray-200 px-2 py-1 rounded text-sm">{buyerId}</code></p>
-                            <p><span className="font-medium">WhatsApp:</span> 
+                <div className="bg-white rounded-b-2xl border border-t-0 border-gray-200 p-5 sm:p-6">
+                    <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                        <div>
+                            <dt className="text-gray-500">WhatsApp</dt>
+                            <dd className="font-semibold">
                                 {buyer?.whatsapp ? (
-                                    <a href={`https://wa.me/${buyer.whatsapp.replace(/\D/g, '')}`} className="text-green-600 font-medium hover:underline ml-1">
-                                        {buyer.whatsapp} 📱
+                                    <a href={`https://wa.me/${buyer.whatsapp.replace(/\D/g, '')}`} className="text-green-700 hover:underline underline-offset-4">
+                                        {buyer.whatsapp}
                                     </a>
-                                ) : ' N/A'}
-                            </p>
-                            <p><span className="font-medium">Email:</span> {buyer?.email || 'N/A'}</p>
+                                ) : 'Non renseigné'}
+                            </dd>
                         </div>
-                    </div>
+                        <div>
+                            <dt className="text-gray-500">Email</dt>
+                            <dd className="font-semibold break-all">{buyer?.email || 'Non renseigné'}</dd>
+                        </div>
+                        <div className="sm:col-span-2">
+                            <dt className="text-gray-500">Identifiant</dt>
+                            <dd className="font-semibold">{buyerId}</dd>
+                        </div>
+                    </dl>
 
-                    {/* Orders History */}
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">📦 Historique des Commandes ({orders.length})</h2>
-                    
+                    <h2 className="text-xl font-extrabold mt-8 mb-3">
+                        Commandes <span className="font-semibold text-gray-500 tabular-nums">{orders.length}</span>
+                    </h2>
+
                     {orders.length === 0 ? (
-                        <p className="text-gray-500 text-center py-8">Aucune commande trouvée pour ce client.</p>
+                        <p className="py-8 text-center text-gray-600">Ce client n'a encore passé aucune commande.</p>
                     ) : (
-                        <div className="space-y-4">
+                        <ul className="space-y-3">
                             {orders.map(order => (
-                                <div key={order.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white">
-                                    <div className="flex justify-between items-start mb-3">
+                                <li key={order.id} className="rounded-xl border border-gray-200 p-4">
+                                    <div className="flex flex-wrap justify-between items-start gap-2 mb-3">
                                         <div>
-                                            <h3 className="font-bold text-gray-800">Commande #{order.id}</h3>
-                                            <p className="text-xs text-gray-500">{new Date(order.orderedDate).toLocaleDateString()} à {new Date(order.orderedDate).toLocaleTimeString()}</p>
+                                            <h3 className="font-bold">Commande {order.id}</h3>
+                                            <p className="text-xs text-gray-500">
+                                                {new Date(order.orderedDate).toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            </p>
                                         </div>
-                                        <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
-                                            order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                                            order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                                            'bg-yellow-100 text-yellow-800'
-                                        }`}>
-                                            {order.status}
-                                        </span>
+                                        <StatusBadge status={order.status} />
                                     </div>
-
-                                    <div className="bg-gray-50 rounded p-3 mb-3">
-                                        <ul className="space-y-2">
-                                            {order.products.map((p, idx) => (
-                                                <li key={idx} className="flex justify-between text-sm">
-                                                    <span className="text-gray-700">{p.quantity}x {p.name}</span>
-                                                    <span className="font-medium text-gray-900">{(p.price * p.quantity).toLocaleString()} FCFA</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-
-                                    <div className="flex justify-end border-t pt-2">
-                                        <span className="text-lg font-bold text-purple-700">
-                                            Total: {order.totalAmount.toLocaleString()} FCFA
-                                        </span>
-                                    </div>
-                                </div>
+                                    <ul className="space-y-1.5 text-sm">
+                                        {order.products.map((p, idx) => (
+                                            <li key={idx} className="flex justify-between gap-3">
+                                                <span className="text-gray-700">{p.quantity} × {p.name}</span>
+                                                <span className="price whitespace-nowrap">{formatXAF(p.price * p.quantity)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <p className="mt-3 pt-3 border-t border-gray-200 flex justify-between font-bold">
+                                        <span>Total</span>
+                                        <span className="price text-purple-800">{formatXAF(order.totalAmount)}</span>
+                                    </p>
+                                </li>
                             ))}
-                        </div>
+                        </ul>
                     )}
                 </div>
-                
-                <div className="bg-gray-50 p-4 text-center text-xs text-gray-500 border-t">
-                    Vérification générée par Nengoo App • {new Date().toLocaleString()}
-                </div>
+
+                <p className="mt-4 text-center text-xs text-gray-500">
+                    Page générée par Nengoo le {new Date().toLocaleString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.
+                </p>
             </div>
         </div>
     );
