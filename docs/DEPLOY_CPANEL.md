@@ -247,10 +247,16 @@ Garder les autres variables `REACT_APP_FIREBASE_*` déjà présentes.
 ```bash
 cd frontend
 npm install
-REACT_APP_API_BASE_URL=https://backend.nengoo.com/api npm run build   # Git Bash
+npm run build
 ```
 
-> `frontend/.env.local` (URL `127.0.0.1`) a **priorité** sur `.env.production` pendant `npm run build` : sans la variable forcée en ligne de commande, le site appellerait le backend local. `.htaccess` et `og-proxy.php` sont déjà dans `frontend/public/` et se retrouvent donc dans `build/`.
+> **Important** : `frontend/.env.local` (URL `127.0.0.1`) a **priorité** sur `.env.production` pendant `npm run build`. Pour que le build utilise l'API de production, créer une fois `frontend/.env.production.local` (non versionné, prioritaire sur `.env.local`) :
+>
+> ```ini
+> REACT_APP_API_BASE_URL=https://backend.nengoo.com/api
+> ```
+>
+> `.htaccess` et `og-proxy.php` sont déjà dans `frontend/public/` et se retrouvent donc dans `build/`.
 
 Le résultat est dans `frontend/build/`.
 
