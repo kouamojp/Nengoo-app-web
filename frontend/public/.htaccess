@@ -1,0 +1,34 @@
+Options -MultiViews
+RewriteEngine On
+
+# Forcer HTTPS et le domaine avec www
+RewriteCond %{HTTPS} off [OR]
+RewriteCond %{HTTP_HOST} !^www\. [NC]
+RewriteRule ^(.*)$ https://www.nengoo.com/$1 [L,R=301]
+
+# Sitemap généré par le backend
+RewriteRule ^sitemap\.xml$ og-proxy.php?type=sitemap [L,QSA]
+
+# Aperçus réseaux sociaux : robots → HTML Open Graph du backend
+RewriteCond %{HTTP_USER_AGENT} (facebookexternalhit|facebot|whatsapp|telegrambot|twitterbot|slackbot|linkedinbot|pinterestbot|discordbot|vkshare|googlebot|bingbot|yandexbot|duckduckbot|applebot|bot|crawler|spider|preview) [NC]
+RewriteRule ^product/([A-Za-z0-9_-]+)/?$ og-proxy.php?type=product&slug=$1 [L,QSA]
+
+# Application React (SPA) : tout ce qui n'est pas un fichier réel → index.html
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
+
+# Cache : fichiers versionnés longtemps, index.html et service worker jamais
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|css|png|jpg|jpeg|webp|svg|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "^(index\.html|sw\.js|manifest\.json)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+</IfModule>
+
+# Compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml application/xml
+</IfModule>
