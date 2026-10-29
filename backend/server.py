@@ -1935,7 +1935,10 @@ async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends
     await db.sellers.insert_one(seller.dict())
     return seller
 
-@api_router.get("/sellers", response_model=List[Seller])
+# Champs sensibles jamais renvoyés par les routes publiques des vendeurs
+SELLER_PRIVATE_FIELDS = {"password", "reset_token", "reset_token_expiry"}
+
+@api_router.get("/sellers", response_model=List[Seller], response_model_exclude=SELLER_PRIVATE_FIELDS)
 async def list_sellers():
     sellers_cursor = db.sellers.find()
     sellers = await sellers_cursor.to_list(1000)
@@ -1948,11 +1951,12 @@ async def list_sellers():
             # We add this try-except block for added robustness against corrupted data.
             valid_sellers.append(Seller(**s))
         except Exception as e:
-            # Log the error and the problematic data
-            print(f"Skipping invalid seller data: {s}, error: {e}")
+            # Only the id: the document holds the password hash, and printing accented
+            # data crashed the request (UnicodeEncodeError) under Passenger/LiteSpeed.
+            logging.warning("Skipping invalid seller %s: %s", s.get("id"), type(e).__name__)
     return valid_sellers
 
-@api_router.get("/sellers/{seller_id}", response_model=Seller)
+@api_router.get("/sellers/{seller_id}", response_model=Seller, response_model_exclude=SELLER_PRIVATE_FIELDS)
 async def get_seller(seller_id: str):
     seller = await db.sellers.find_one({"id": seller_id})
     if not seller:
