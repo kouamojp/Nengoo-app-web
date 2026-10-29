@@ -1,136 +1,116 @@
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
-import { openWhatsApp, generateProductWhatsAppMessage, createSlug } from '../../lib/utils';
+import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
+import { CartIcon, WhatsAppIcon } from '../ui/Icons';
+
+const formatPrice = (price) => {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'XAF',
+    minimumFractionDigits: 0,
+  }).format(price);
+};
+
+const isNew = (creationDate) => {
+  if (!creationDate) return false;
+  const twoDaysAgo = new Date();
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+  return new Date(creationDate) > twoDaysAgo;
+};
 
 const ProductCard = ({ product, language, addToCart }) => {
-  const navigate = useNavigate();
   const t = translations[language];
-
-  const handleProductClick = () => {
-    navigate(`/product/${product.slug || product.id}`);
-  };
-
-  const truncateProductName = (name, maxLength) => {
-    if (name.length > maxLength) {
-      return name.substring(0, maxLength) + '...';
-    }
-    return name;
-  };
-  
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XAF',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
+  const productUrl = `/product/${product.slug || product.id}`;
+  const name = product.name[language];
 
   const handleWhatsAppContact = () => {
     const message = generateProductWhatsAppMessage(product, language);
     openWhatsApp(product.sellerWhatsApp, message);
   };
 
-  const isNew = (creationDate) => {
-    if (!creationDate) return false;
-    const twoDaysAgo = new Date();
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    return new Date(creationDate) > twoDaysAgo;
-  };
-
-  const isProductNew = isNew(product.createdAt);
-  const discountPercentage = product.promoPrice && product.price > product.promoPrice
+  const hasPromo = product.promoPrice && product.promoPrice > 0;
+  const discountPercentage = hasPromo && product.price > product.promoPrice
     ? Math.round(((product.price - product.promoPrice) / product.price) * 100)
     : 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden group">
-      <div className="relative overflow-hidden">
+    <article className="group text-left flex flex-col bg-white rounded-xl border border-gray-200 hover:border-purple-300 overflow-hidden transition-colors">
+      <Link to={productUrl} className="relative block aspect-square bg-gray-100 overflow-hidden" tabIndex={-1} aria-hidden="true">
         <img
           src={product.image}
-          alt={product.name[language]}
-          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+          alt=""
+          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
           loading="lazy"
-          onClick={handleProductClick}
           onError={(e) => {
             e.target.onerror = null; // Prevent infinite loop if fallback also fails
             e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
+            e.target.className = 'w-full h-full object-contain p-6';
           }}
         />
-        {isProductNew ? (
-          <span className="absolute top-2 left-2 bg-blue-500 text-white px-2 py-1 text-xs rounded">
-            New
-          </span>
-        ) : product.inStock ? (
-          <span className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 text-xs rounded">
-            {t.inStock}
-          </span>
-        ) : (
-          <span className="absolute top-2 left-2 bg-red-500 text-white px-2 py-1 text-xs rounded">
+        {!product.inStock ? (
+          <span className="absolute top-2 left-2 bg-gray-900/80 text-white px-2 py-0.5 text-xs font-semibold rounded-md">
             {t.outOfStock}
+          </span>
+        ) : isNew(product.createdAt) && (
+          <span className="absolute top-2 left-2 bg-yellow-300 text-purple-950 px-2 py-0.5 text-xs font-bold rounded-md">
+            {t.newBadge}
           </span>
         )}
         {discountPercentage > 0 && (
-          <span className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 text-xs rounded">
-            -{discountPercentage}%
+          <span className="price absolute top-2 right-2 bg-red-600 text-white px-2 py-0.5 text-sm rounded-md">
+            -{discountPercentage} %
           </span>
         )}
-        {/* <div className="absolute top-2 right-2 flex space-x-1">
-          {[...Array(5)].map((_, i) => (
-            <span key={i} className={`text-sm ${i < Math.floor(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`}>
-              ⭐
-            </span>
-          ))}
-        </div> */}
-      </div>
-            
-      <div className="p-4">
-                <h3
-                  className="font-semibold tracking-[.01rem] text-[.95rem] leading-[1.3rem] line- sm:text-lg mb-2 cursor-pointer hover:text-purple-600 transition-colors max-sm:min-h-10"
-                  onClick={handleProductClick}
-                >
-                  {truncateProductName(product.name[language], 25)}
-                </h3>        {/* <p className="text-gray-600 text-sm mb-2">
-          {product.reviews} {t.reviews} • {product.rating} ⭐
-        </p> */}
-        <div className="max-sm:flex-col flex justify-between items-center mb-3 mt-3">
-          <div className="flex items-baseline">
-            {product.promoPrice && product.promoPrice > 0 ? (
-              <>
-                <span className="text-xl max-md:text-[1rem] font-bold text-red-600 mr-2">
-                  {formatPrice(product.promoPrice)}
-                </span>
-                <span className="text-sm max-md:text-[.6rem] text-gray-500 line-through">
-                  {formatPrice(product.price)}
-                </span>
-              </>
-            ) : (
-              <span className="text-xl font-bold text-purple-600">
+      </Link>
+
+      <div className="flex flex-col flex-1 p-3 sm:p-4">
+        <h3 className="text-[0.95rem] sm:text-base font-semibold leading-snug line-clamp-2 min-h-[2.6em]">
+          <Link to={productUrl} className="hover:text-purple-700">
+            {name}
+          </Link>
+        </h3>
+
+        <div className="mt-2 mb-3 flex flex-wrap items-baseline gap-x-2">
+          {hasPromo ? (
+            <>
+              <span className="price text-lg sm:text-xl text-red-600">
+                {formatPrice(product.promoPrice)}
+              </span>
+              <span className="text-xs sm:text-sm text-gray-500 line-through">
                 {formatPrice(product.price)}
               </span>
-            )}
-          </div>
+            </>
+          ) : (
+            <span className="price text-lg sm:text-xl text-purple-800">
+              {formatPrice(product.price)}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-auto flex gap-2">
           <button
             onClick={() => addToCart(product)}
             disabled={!product.inStock}
-            className="bg-purple-600 max-sm:mt-4 hover:bg-purple-700 disabled:bg-gray-400 text-white px-3 py-1.5 text-sm rounded-lg transition-colors"
+            className="flex-1 !min-w-0 h-10 !min-h-0 px-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-gray-300 disabled:text-gray-600 text-white text-[0.8rem] sm:text-sm font-semibold leading-tight flex items-center justify-center gap-1.5 transition-colors"
           >
-            {t.addToCart}
+            <CartIcon className="w-[1.1rem] h-[1.1rem] shrink-0 max-sm:hidden" strokeWidth={2.2} />
+            <span>{t.addToCart}</span>
           </button>
+          {product.sellerWhatsApp && (
+            <button
+              onClick={handleWhatsAppContact}
+              aria-label={`Contacter le vendeur sur WhatsApp à propos de ${name}`}
+              title="Contacter sur WhatsApp"
+              className="shrink-0 !min-w-0 !min-h-0 w-10 h-10 rounded-lg border border-green-600 text-green-700 hover:bg-green-50 flex items-center justify-center transition-colors"
+            >
+              <WhatsAppIcon className="w-5 h-5" />
+            </button>
+          )}
         </div>
-        {/* WhatsApp Contact Button */}
-        {product.sellerWhatsApp && (
-          <button
-            onClick={handleWhatsAppContact}
-            className="w-full bg-green-500 hover:bg-green-600 text-white px-3 py-2 text-sm rounded-lg flex items-center justify-center space-x-2 transition-colors"
-          >
-            <span>📱</span>
-            <span>Contacter sur WhatsApp</span>
-          </button>
-        )}
       </div>
-    </div>
+    </article>
   );
 };
 

@@ -1,10 +1,33 @@
 
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+import { StoreIcon, WhatsAppIcon, PinIcon } from '../ui/Icons';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+const DEFAULT_IMAGE = "https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg";
+
+// Ce que la plateforme permet réellement de faire
+const features = [
+  {
+    Icon: StoreIcon,
+    title: 'Des vendeurs d\'ici',
+    text: 'Chaque boutique est tenue par un commerçant ou un artisan installé au Cameroun, avec sa propre page et ses produits.',
+  },
+  {
+    Icon: WhatsAppIcon,
+    title: 'Un contact direct',
+    text: 'Une question sur un article ? Écrivez au vendeur sur WhatsApp ou par message, depuis la fiche produit.',
+  },
+  {
+    Icon: PinIcon,
+    title: 'Livraison ou retrait',
+    text: 'Faites-vous livrer chez vous ou récupérez votre commande dans un point de retrait près de chez vous.',
+  },
+];
 
 export const About = (props) => {
   const { language } = props;
@@ -30,86 +53,91 @@ export const About = (props) => {
   }, []);
 
   // Default values if API fails
-  const missionImage = aboutSettings?.mission_image_url || "https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg";
+  const missionImage = aboutSettings?.mission_image_url || DEFAULT_IMAGE;
   const missionTitle = aboutSettings?.mission_title || "Notre Mission";
   const missionText1 = aboutSettings?.mission_text_1 || "Nengoo a été créé avec pour mission de connecter les consommateurs camerounais aux meilleurs produits locaux et internationaux, tout en soutenant l'économie locale et l'artisanat traditionnel.";
   const missionText2 = aboutSettings?.mission_text_2 || "Nous croyons fermement au potentiel du commerce électronique pour transformer l'économie camerounaise et offrir de nouvelles opportunités aux entrepreneurs locaux.";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header {...props} />
-      
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h1 className="text-4xl font-bold mb-6">À propos de Nengoo</h1>
-            <p className="text-xl text-gray-600">
-              Votre marketplace camerounaise de confiance depuis 2025
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
-            <div className="md:text-left">
-              <h2 className="text-3xl font-bold mb-6">{missionTitle}</h2>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                {missionText1}
-              </p>
-              <p className="text-gray-700 leading-relaxed">
-                {missionText2}
-              </p>
-            </div>
-            <div>
-              {loading ? (
-                <div className="rounded-lg shadow-lg h-96 w-full bg-gray-200 animate-pulse flex items-center justify-center">
-                  <span className="text-gray-500">Chargement...</span>
+    <>
+      <Helmet>
+        <title>À propos — Nengoo Marketplace Cameroun</title>
+        <meta name="description" content="Nengoo réunit les vendeurs et artisans du Cameroun sur une seule marketplace : contact direct sur WhatsApp, livraison à domicile ou en point de retrait." />
+        <link rel="canonical" href="https://www.nengoo.com/about" />
+      </Helmet>
+      <div className="min-h-screen bg-gray-50 text-left">
+        <Header {...props} />
+
+        <main>
+          <section className="container mx-auto px-4 pt-8 sm:pt-14 pb-12 sm:pb-16">
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-10 lg:gap-16 items-center">
+              <div>
+                <h1 className="font-display text-5xl sm:text-6xl text-purple-950">À propos de Nengoo</h1>
+                <p className="mt-4 text-xl text-gray-700">Votre marketplace camerounaise de confiance depuis 2025.</p>
+
+                <h2 className="mt-10 text-2xl font-extrabold">{missionTitle}</h2>
+                <div className="mt-3 space-y-4 text-gray-700 leading-relaxed max-w-[60ch]">
+                  <p>{missionText1}</p>
+                  <p>{missionText2}</p>
                 </div>
+              </div>
+
+              {loading ? (
+                <div className="aspect-[4/5] max-h-[34rem] w-full rounded-2xl loading-shimmer" />
               ) : (
                 <img
                   src={missionImage}
-                  alt={missionTitle}
-                  className="rounded-lg shadow-lg h-96 w-full object-cover object-top"
+                  alt=""
+                  className="aspect-[4/5] max-h-[34rem] w-full rounded-2xl object-cover object-top"
                   onError={(e) => {
                     e.target.onerror = null;
-                    e.target.src = "https://images.pexels.com/photos/13086663/pexels-photo-13086663.jpeg";
+                    e.target.src = DEFAULT_IMAGE;
                   }}
                 />
               )}
             </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-            <div className="text-center">
-              <div className="text-4xl mb-4">🎯</div>
-              <h3 className="text-xl font-bold mb-2">Qualité Garantie</h3>
-              <p className="text-gray-600">Tous nos produits sont soigneusement sélectionnés et vérifiés.</p>
+          </section>
+
+          <section className="bg-white border-y border-gray-200" aria-labelledby="about-features">
+            <div className="container mx-auto px-4 py-12 sm:py-16">
+              <h2 id="about-features" className="text-2xl sm:text-3xl font-extrabold mb-8">Ce que Nengoo vous apporte</h2>
+              <ul className="grid md:grid-cols-3 gap-8 md:gap-10">
+                {features.map(({ Icon, title, text }) => (
+                  <li key={title}>
+                    <span className="w-12 h-12 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center">
+                      <Icon className="w-6 h-6" />
+                    </span>
+                    <h3 className="mt-4 text-xl font-bold">{title}</h3>
+                    <p className="mt-2 text-gray-600 leading-relaxed">{text}</p>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="text-center">
-              <div className="text-4xl mb-4">🚚</div>
-              <h3 className="text-xl font-bold mb-2">Livraison Rapide</h3>
-              <p className="text-gray-600">Livraison dans tout le Cameroun avec suivi en temps réel.</p>
+          </section>
+
+          <section className="container mx-auto px-4 py-12 sm:py-16">
+            <div className="on-dark rounded-2xl bg-gradient-to-br from-purple-700 to-red-600 text-white p-8 sm:p-12 grid md:grid-cols-[minmax(0,1fr)_auto] gap-6 items-center">
+              <div>
+                <h2 className="font-display text-4xl sm:text-5xl">Rejoignez le marché</h2>
+                <p className="mt-3 text-lg text-purple-100 max-w-[50ch]">
+                  Achetez auprès des vendeurs du Cameroun, ou ouvrez votre boutique et vendez à vos clients partout dans le pays.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link to="/catalog" className="inline-flex items-center h-12 px-6 rounded-full bg-white text-purple-800 font-bold hover:bg-yellow-300 hover:text-purple-950 transition-colors">
+                  Voir le catalogue
+                </Link>
+                <Link to="/signup/seller" className="inline-flex items-center h-12 px-6 rounded-full border border-white/60 text-white font-semibold hover:bg-white/10 transition-colors">
+                  Devenir vendeur
+                </Link>
+              </div>
             </div>
-            <div className="text-center">
-              <div className="text-4xl mb-4">💬</div>
-              <h3 className="text-xl font-bold mb-2">Support 24/7</h3>
-              <p className="text-gray-600">Notre équipe est toujours là pour vous aider.</p>
-            </div>
-          </div>
-          
-          <div className="bg-gradient-to-r from-purple-600 to-red-600 text-white rounded-lg p-8 text-center">
-            <h2 className="text-2xl font-bold mb-4">Rejoignez la famille Nengoo</h2>
-            <p className="mb-6">Découvrez les meilleurs produits du Cameroun et d'ailleurs</p>
-            <Link
-              to="/catalog"
-              className="bg-white text-purple-600 hover:bg-gray-100 px-8 py-3 rounded-lg font-semibold transition-colors"
-            >
-              Commencer mes achats
-            </Link>
-          </div>
-        </div>
+          </section>
+        </main>
+
+        <Footer language={language} />
       </div>
-      
-      <Footer language={language} />
-    </div>
+    </>
   );
 };
 

@@ -1,92 +1,146 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=Roboto:wght@700&display=swap" rel="stylesheet">
-  <!-- Icônes et métadonnées PWA -->
-  <link rel="icon" type="image/png" sizes="192x192" href="%PUBLIC_URL%/favicon.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="%PUBLIC_URL%/icons/logo-512x512.png" />
-  <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.png" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#7C3AED" />
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Nengoo">
-  <meta name="application-name" content="Nengoo">
-  <meta name="msapplication-TileColor" content="#7C3AED">
-  <meta name="msapplication-tap-highlight" content="no">
-  
-  <!-- Description et SEO -->
-  <meta name="description" content="Nengoo - Votre marketplace camerounaise de confiance. Achetez et vendez des produits locaux et internationaux au Cameroun." />
-  <meta name="keywords" content="cameroun, marketplace, e-commerce, vente, achat, produits locaux, nengoo">
-  
-  <!-- Open Graph / Facebook -->
-  <meta property="fb:app_id" content="123456789">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://nengoo.com/">
-  <meta property="og:title" content="Nengoo - Marketplace Cameroun">
-  <meta property="og:description" content="Votre marketplace camerounaise de confiance">
-  <meta property="og:image" content="%PUBLIC_URL%/icons/logo-512x512.png">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Icônes et métadonnées PWA -->
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="192x192"
+      href="%PUBLIC_URL%/favicon.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="512x512"
+      href="%PUBLIC_URL%/icons/logo-512x512.png"
+    />
+    <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#6B21A8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="Nengoo" />
+    <meta name="application-name" content="Nengoo" />
+    <meta name="msapplication-TileColor" content="#7C3AED" />
+    <meta name="msapplication-tap-highlight" content="no" />
 
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://nengoo.com/">
-  <meta property="twitter:title" content="Nengoo - Marketplace Cameroun">
-  <meta property="twitter:description" content="Votre marketplace camerounaise de confiance">
-  <meta property="twitter:image" content="%PUBLIC_URL%/icons/logo-512x512.png">
+    <!-- Description et SEO -->
+    <meta
+      name="description"
+      content="Nengoo - Votre marketplace camerounaise de confiance. Achetez et vendez des produits locaux et internationaux au Cameroun."
+    />
+    <meta
+      name="keywords"
+      content="cameroun, marketplace, e-commerce, vente, achat, produits locaux, nengoo"
+    />
 
-  <!-- Icônes Apple -->
-  <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/logo-512x512.png" />
-  <link rel="apple-touch-icon" sizes="152x152" href="%PUBLIC_URL%/icons/logo-512x512.png">
-  <link rel="apple-touch-icon" sizes="192x192" href="%PUBLIC_URL%/icons/logo-512x512.png">
-  
-  <!-- Manifeste PWA -->
-  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-  
-  <title>Nengoo - Marketplace Cameroun</title>
+    <!-- Open Graph / Facebook -->
+    <meta property="fb:app_id" content="123456789" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://nengoo.com/" />
+    <meta property="og:title" content="Nengoo - Marketplace Cameroun" />
+    <meta
+      property="og:description"
+      content="Votre marketplace camerounaise de confiance"
+    />
+    <meta property="og:image" content="%PUBLIC_URL%/icons/logo-512x512.png" />
 
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-FQ349LRGNQ"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://nengoo.com/" />
+    <meta property="twitter:title" content="Nengoo - Marketplace Cameroun" />
+    <meta
+      property="twitter:description"
+      content="Votre marketplace camerounaise de confiance"
+    />
+    <meta
+      property="twitter:image"
+      content="%PUBLIC_URL%/icons/logo-512x512.png"
+    />
 
-    gtag('config', 'G-FQ349LRGNQ');
-  </script>
-</head>
-<body>
-  <noscript>Vous devez activer JavaScript pour utiliser cette application.</noscript>
-  <div id="root"></div>
-  
-  <!-- Installation du Service Worker -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((registration) => {
-            // SW registered
-          })
-          .catch((registrationError) => {
-            // SW registration failed
-          });
-      });
-    }
+    <!-- Icônes Apple -->
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/logo-512x512.png" />
+    <link
+      rel="apple-touch-icon"
+      sizes="152x152"
+      href="%PUBLIC_URL%/icons/logo-512x512.png"
+    />
+    <link
+      rel="apple-touch-icon"
+      sizes="192x192"
+      href="%PUBLIC_URL%/icons/logo-512x512.png"
+    />
 
-    // Gestion de l'installation PWA
-    let deferredPrompt;
-    
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      
-      // Afficher un bouton d'installation personnalisé
-      const installButton = document.createElement('button');
-      installButton.textContent = '📱 Installer Nengoo';
-      installButton.style.cssText = `
+    <!-- Manifeste PWA -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <title>Nengoo - Marketplace Cameroun</title>
+
+    <!-- Google tag (gtag.js) -->
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-FQ349LRGNQ"
+    ></script>
+
+    <!-- Google Analytics -->
+    <script
+      id="cookieyes"
+      type="text/javascript"
+      src="https://cdn-cookieyes.com/client_data/14e3832d1d36fb7259602876/script.js"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+
+      gtag("config", "G-FQ349LRGNQ");
+    </script>
+  </head>
+  <body>
+    <noscript
+      >Vous devez activer JavaScript pour utiliser cette application.</noscript
+    >
+    <div id="root"></div>
+
+    <!-- Installation du Service Worker -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js")
+            .then((registration) => {
+              // SW registered
+            })
+            .catch((registrationError) => {
+              // SW registration failed
+            });
+        });
+      }
+
+      // Gestion de l'installation PWA
+      let deferredPrompt;
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        // Afficher un bouton d'installation personnalisé
+        const installButton = document.createElement("button");
+        installButton.textContent = "📱 Installer Nengoo";
+        installButton.style.cssText = `
         position: fixed;
         bottom: 20px;
         right: 20px;
@@ -101,35 +155,35 @@
         z-index: 1000;
         animation: bounce 2s infinite;
       `;
-      
-      // Animation CSS
-      const style = document.createElement('style');
-      style.textContent = `
+
+        // Animation CSS
+        const style = document.createElement("style");
+        style.textContent = `
         @keyframes bounce {
           0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
           40% { transform: translateY(-10px); }
           60% { transform: translateY(-5px); }
         }
       `;
-      document.head.appendChild(style);
-      
-      installButton.addEventListener('click', async () => {
-        installButton.style.display = 'none';
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        deferredPrompt = null;
-      });
-      
-      document.body.appendChild(installButton);
-    });
+        document.head.appendChild(style);
 
-    // Masquer le bouton après installation
-    window.addEventListener('appinstalled', (evt) => {
-      const installButton = document.querySelector('button');
-      if (installButton) {
-        installButton.remove();
-      }
-    });
-  </script>
-</body>
+        installButton.addEventListener("click", async () => {
+          installButton.style.display = "none";
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          deferredPrompt = null;
+        });
+
+        document.body.appendChild(installButton);
+      });
+
+      // Masquer le bouton après installation
+      window.addEventListener("appinstalled", (evt) => {
+        const installButton = document.querySelector("button");
+        if (installButton) {
+          installButton.remove();
+        }
+      });
+    </script>
+  </body>
 </html>

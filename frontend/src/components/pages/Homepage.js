@@ -15,6 +15,8 @@ import 'swiper/css/navigation';
 import 'swiper/css/pagination';
 import 'swiper/css/effect-fade';
 import './HeroSwiper.css';
+import { PinIcon } from '../ui/Icons';
+import ProductGridSkeleton from '../ui/ProductGridSkeleton';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -30,21 +32,32 @@ const Homepage = (props) => {
   const [newsletterFeedback, setNewsletterFeedback] = useState({ message: '', isError: false });
   const [heroImages, setHeroImages] = useState([]);
 
-  // Mapping des icônes et couleurs pour les catégories
+  // Icônes des catégories
   const categoryIcons = {
-    'Vêtements et Accessoires': { icon: '👗', bg: 'from-pink-400 to-red-400' },
-    'Aliments et Boissons': { icon: '🍽️', bg: 'from-green-400 to-teal-400' },
-    'Électroniques': { icon: '📱', bg: 'from-blue-400 to-indigo-400' },
-    'Maison & Jardinage': { icon: '🏠', bg: 'from-yellow-400 to-orange-400' },
-    'Artisanat': { icon: '🎨', bg: 'from-purple-400 to-pink-400' },
-    'Beauté et Soins': { icon: '💄', bg: 'from-purple-400 to-red-400' },
-    'Articles Sportifs': { icon: '⚽', bg: 'from-indigo-400 to-blue-400' },
-    'Jouets pour Enfants': { icon: '🧸', bg: 'from-orange-400 to-red-400' },
-    'Matériel Médical': { icon: '🏥', bg: 'from-red-400 to-pink-400' },
-    'Équipements Pro': { icon: '🔧', bg: 'from-gray-400 to-gray-600' },
-    'Services': { icon: '🛠️', bg: 'from-teal-400 to-green-400' },
-    'Voyages et Billets': { icon: '✈️', bg: 'from-cyan-400 to-blue-400' }
+    'Produits locaux': '🧺',
+    'Constructions': '🧱',
+    'Chaussures hommes': '👞',
+    'Chaussures femmes': '👠',
+    'Chaussures enfants': '👟',
+    'Vetements hommes': '👔',
+    'Vetements femmes': '👗',
+    'Vetements enfants': '👕',
+    'Accessoires hommes': '⌚',
+    'Accessoires femmes': '👜',
+    'Articles pour enfant': '🧸',
+    'Electroniques': '🔌',
+    'Téléphones et accessoires': '📱',
+    'Bijoux et accessoires de beauté': '💍',
+    'Fruits et légumes': '🥭',
+    'Meubles': '🛋️',
+    'Textiles et Décorations': '🧵',
+    'Autres': '📦'
   };
+
+  // Accueil : seulement les catégories qui ont des produits, les plus fournies d'abord
+  const visibleCategories = categories
+    .filter(cat => typeof cat.productCount !== 'number' || cat.productCount > 0)
+    .sort((a, b) => (b.productCount || 0) - (a.productCount || 0));
 
   useEffect(() => {
     const fetchHomepageSettings = async () => {
@@ -205,29 +218,40 @@ const Homepage = (props) => {
         <script type="application/ld+json">{JSON.stringify(organizationJsonLd)}</script>
         <script type="application/ld+json">{JSON.stringify(searchActionJsonLd)}</script>
       </Helmet>
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-left">
       <Header {...props} />
       
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
       
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-r from-purple-600 to-red-600 text-white">
-        <div className="container mx-auto px-4 py-12 sm:py-20">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div className="text-center lg:text-left">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 lg:mb-6">{t.welcome}</h1>
-              <p className="text-lg sm:text-xl mb-6 lg:mb-8 opacity-90">{t.subtitle}</p>
-              <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 justify-center lg:justify-start">
-                <Link to="/catalog" className="bg-white text-purple-600 hover:bg-gray-100 px-6 sm:px-8 py-3 rounded-lg font-semibold transition-colors text-center">
-                  {t.viewAll} 🛍️
+      <section className="on-dark relative overflow-hidden bg-gradient-to-br from-purple-700 via-purple-700 to-red-600 text-white">
+        <div className="container mx-auto px-4 pt-8 pb-12 sm:pt-14 sm:pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-10 lg:gap-16 items-center">
+            <div>
+              <h1 className="font-display text-[2.4rem] sm:text-6xl xl:text-7xl max-w-[13ch]">
+                {t.heroTitle}
+              </h1>
+              <p className="mt-4 sm:mt-5 text-base sm:text-xl text-purple-100 max-w-[44ch] leading-relaxed">
+                {t.heroText}
+              </p>
+              <div className="mt-6 sm:mt-8 flex flex-wrap gap-2 sm:gap-3">
+                <Link to="/catalog" className="inline-flex items-center h-11 sm:h-12 px-5 sm:px-6 text-sm sm:text-base rounded-full bg-white text-purple-800 font-bold hover:bg-yellow-300 hover:text-purple-950 transition-colors">
+                  {t.browseCatalog}
                 </Link>
-                {/* <Link to="/catalog/handicrafts" className="border-2 border-white hover:bg-white hover:text-purple-600 px-6 sm:px-8 py-3 rounded-lg font-semibold transition-colors text-center">
-                  {t.localSpecialties} 🎨
-                </Link> */}
+                <Link to="/pickup-points" className="inline-flex items-center gap-2 h-11 sm:h-12 px-4 sm:px-5 text-sm sm:text-base rounded-full border border-white/50 text-white font-semibold hover:bg-white/10 transition-colors">
+                  <PinIcon className="w-5 h-5" />
+                  {t.pickupPoints}
+                </Link>
               </div>
             </div>
-            <div className="relative order-first lg:order-last">
+            <div className="relative min-w-0 mx-auto w-full max-w-xl lg:max-w-none">
+              {/* Orbite du logo : l'arrière passe derrière les images, l'avant devant */}
+              <svg className="absolute -inset-x-[9%] -inset-y-[22%] w-[118%] h-[144%] pointer-events-none" viewBox="0 0 600 400" fill="none" aria-hidden="true">
+                <g transform="rotate(-12 300 200)">
+                  <path className="orbit-draw" pathLength="1" d="M10 200 A290 125 0 1 1 590 200 A290 125 0 1 1 10 200" stroke="rgba(255,255,255,0.35)" strokeWidth="5" />
+                </g>
+              </svg>
               {heroImages.length > 0 ? (
                 <Swiper
                   modules={[Navigation, Pagination, Autoplay, EffectFade]}
@@ -242,15 +266,14 @@ const Homepage = (props) => {
                   effect="fade"
                   fadeEffect={{ crossFade: true }}
                   loop={heroImages.length > 1}
-                  className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full"
-                  style={{ maxHeight: '384px' }}
+                  className="hero-swiper relative rounded-2xl shadow-[0_24px_60px_-20px_rgba(59,7,100,0.7)] w-full aspect-[4/3]"
                 >
                   {heroImages.map((imageUrl, index) => (
                     <SwiperSlide key={index}>
                       <img
                         src={imageUrl}
-                        alt={`Hero ${index + 1}`}
-                        className="w-full h-96 object-cover rounded-lg"
+                        alt={`Nengoo, visuel ${index + 1}`}
+                        className="w-full h-full object-cover"
                       />
                     </SwiperSlide>
                   ))}
@@ -258,10 +281,15 @@ const Homepage = (props) => {
               ) : (
                 <img
                   src="https://images.unsplash.com/photo-1550041499-4c5857d2b508"
-                  alt="Hero"
-                  className="rounded-lg shadow-2xl w-full max-w-md mx-auto lg:max-w-full max-h-96 object-cover"
+                  alt="Nengoo"
+                  className="relative rounded-2xl w-full aspect-[4/3] object-cover"
                 />
               )}
+              <svg className="absolute z-10 -inset-x-[9%] -inset-y-[22%] w-[118%] h-[144%] pointer-events-none" viewBox="0 0 600 400" fill="none" aria-hidden="true">
+                <g transform="rotate(-12 300 200)">
+                  <path className="orbit-draw" pathLength="1" d="M10 200 A290 125 0 0 0 590 200" stroke="#FDE047" strokeWidth="6" strokeLinecap="round" />
+                </g>
+              </svg>
               {/* <div className="absolute -bottom-4 -left-4 bg-yellow-400 text-black p-3 sm:p-4 rounded-lg font-bold text-center">
                 {t.flashSale} 🔥<br />
                 <span className="text-sm">-30% OFF</span>
@@ -326,57 +354,51 @@ const Homepage = (props) => {
       </section> */}
 
       {/* Categories Grid */}
-      <section className="py-12 lg:py-16 max-md:hidden">
-        <div className="container mx-auto px-4">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 lg:mb-12">
-            {t.categories}
-            {/* {!categoriesLoading && categories.length > 0 && (
-              <span className="text-gray-500 text-lg ml-2">({categories.length})</span>
-            )} */}
-          </h2>
-
-          {categoriesLoading ? (
-            <div className="text-center py-16">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mb-4"></div>
-              <p className="text-lg text-gray-600">Chargement des catégories...</p>
-            </div>
-          ) : categories.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6">
-              {categories.map(cat => {
-                // Récupérer l'icône et la couleur correspondantes, ou utiliser des valeurs par défaut
-                const categoryStyle = categoryIcons[cat.name] || { icon: '📦', bg: 'from-gray-400 to-gray-600' };
-
-                return (
-                  <Link
-                    key={cat.id}
-                    to={`/catalog/${cat.name}`}
-                    className={`bg-gradient-to-r ${categoryStyle.bg} text-white rounded-lg p-4 lg:p-6 text-center hover:scale-105 transition-transform shadow-lg`}
-                  >
-                    <div className="text-2xl lg:text-4xl mb-2">{categoryStyle.icon}</div>
-                    <div className="font-semibold text-sm sm:text-base">{cat.name}</div>
-                    {cat.description && (
-                      <div className="text-xs mt-1 opacity-90 line-clamp-2">{cat.description}</div>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-16 bg-white rounded-lg shadow-md">
-              <div className="text-6xl mb-4">🏷️</div>
-              <h3 className="text-xl font-semibold mb-2">Aucune catégorie disponible</h3>
-              <p className="text-gray-600 mb-4">Les catégories seront bientôt disponibles.</p>
-              <Link to="/catalog" className="text-purple-600 hover:text-purple-700 font-semibold">
-                Explorer les produits →
+      {(categoriesLoading || visibleCategories.length > 0) && (
+        <section className="pt-10 lg:pt-14">
+          <div className="container mx-auto px-4">
+            <div className="flex items-baseline justify-between gap-4 mb-5">
+              <h2 className="text-2xl sm:text-3xl font-extrabold">{t.shopByCategory}</h2>
+              <Link to="/catalog" className="shrink-0 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4">
+                {t.viewAll}
               </Link>
             </div>
-          )}
-        </div>
-      </section>
+
+            <ul className="flex md:grid md:grid-cols-4 lg:grid-cols-6 gap-3 overflow-x-auto md:overflow-visible hide-scrollbar -mx-4 px-4 md:mx-0 md:px-0 pb-1">
+              {categoriesLoading
+                ? [...Array(6)].map((_, i) => (
+                  <li key={i} className="shrink-0 w-36 md:w-auto h-[7.5rem] rounded-xl loading-shimmer" />
+                ))
+                : visibleCategories.map(cat => (
+                  <li key={cat.id} className="shrink-0 w-36 md:w-auto">
+                    <Link
+                      to={`/catalog/${encodeURIComponent(cat.name)}`}
+                      className="flex flex-col h-full p-3 rounded-xl bg-white border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-colors"
+                    >
+                      <span className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-2xl" aria-hidden="true">
+                        {categoryIcons[cat.name] || '📦'}
+                      </span>
+                      <span className="mt-3 font-semibold text-sm leading-tight line-clamp-2">{cat.name}</span>
+                      {typeof cat.productCount === 'number' && (
+                        <span className="mt-auto pt-1 text-xs text-gray-500">{t.productCount(cat.productCount)}</span>
+                      )}
+                    </Link>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       {/* Featured Products */}
-      <section className="py-12 lg:py-16 bg-white">
+      <section className="pt-10 pb-14 lg:pt-14 lg:pb-20">
         <div className="container mx-auto px-4">
+          <div className="flex items-baseline justify-between gap-4 mb-5">
+            <h2 className="text-2xl sm:text-3xl font-extrabold">{t.allProducts}</h2>
+            <Link to="/catalog" className="shrink-0 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4">
+              {t.browseCatalog}
+            </Link>
+          </div>
           {/* <div className="flex flex-col sm:flex-row justify-between items-center mb-6 lg:mb-8 space-y-4 sm:space-y-0">
             <h2 className="text-2xl sm:text-3xl font-bold">
               {t.featuredProducts}
@@ -390,23 +412,19 @@ const Homepage = (props) => {
           </div> */}
 
           {loading ? (
-            <div className="text-center py-16">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mb-4"></div>
-              <p className="text-lg text-gray-600">Chargement des produits...</p>
-            </div>
+            <ProductGridSkeleton label={t.loadingProducts} />
           ) : featuredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
               {featuredProducts.map(product => (
                 <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
               ))}
             </div>
           ) : (
-            <div className="text-center py-16 bg-gray-50 rounded-lg">
-              <div className="text-6xl mb-4">📦</div>
-              <h3 className="text-xl font-semibold mb-2">Aucun produit disponible</h3>
-              <p className="text-gray-600 mb-4">Nos produits arrivent bientôt !</p>
-              <Link to="/catalog" className="text-purple-600 hover:text-purple-700 font-semibold">
-                Explorer le catalogue →
+            <div className="py-14 px-6 bg-white rounded-xl border border-dashed border-gray-300 text-center">
+              <h3 className="text-xl font-bold mb-2">{t.noProducts}</h3>
+              <p className="text-gray-600 mb-5 max-w-md mx-auto">{t.noProductsText}</p>
+              <Link to="/catalog" className="inline-flex items-center h-11 px-5 rounded-full bg-purple-700 text-white font-semibold hover:bg-purple-800">
+                {t.browseCatalog}
               </Link>
             </div>
           )}

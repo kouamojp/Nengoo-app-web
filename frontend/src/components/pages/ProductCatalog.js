@@ -1,26 +1,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
+import ProductGridSkeleton from '../ui/ProductGridSkeleton';
+import { FilterIcon } from '../ui/Icons';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'XAF',
+  minimumFractionDigits: 0,
+}).format(price);
 
 const ProductCatalog = (props) => {
   const { language, addToCart } = props;
   const { category } = useParams();
+  const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [sortBy, setSortBy] = useState('recent');
   const [maxAllowedPrice, setMaxAllowedPrice] = useState(2000000); // Default max price
-  const [priceRange, setPriceRange] = useState([0, 2000000]); // Initialized with default max
-  const [selectedCategory, setSelectedCategory] = useState(category || 'all');
+  const [maxPrice, setMaxPrice] = useState(2000000);
   const productListRef = useRef(null);
 
+  // La catégorie vient de l'URL : les liens du pied de page et de l'accueil fonctionnent aussi depuis cette page
+  const selectedCategory = category || 'all';
   const t = translations[language];
 
   useEffect(() => {
@@ -43,12 +55,8 @@ const ProductCatalog = (props) => {
         if (data && typeof data.maxPrice === 'number' && data.maxPrice > 0) {
           const fetchedMaxPrice = Math.ceil(data.maxPrice / 1000) * 1000;
           setMaxAllowedPrice(fetchedMaxPrice);
-          setPriceRange([0, fetchedMaxPrice]);
-        } else {
-          setMaxAllowedPrice(2000000);
-          setPriceRange([0, 2000000]);
+          setMaxPrice(fetchedMaxPrice);
         }
-
       } catch (error) {
         console.error("❌ [ProductCatalog] Critical error during fetchMaxPrice:", error);
       }
@@ -59,7 +67,6 @@ const ProductCatalog = (props) => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        setCategoriesLoading(true);
         const response = await fetch(`${API_BASE_URL}/categories`);
 
         if (!response.ok) {
@@ -83,6 +90,7 @@ const ProductCatalog = (props) => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
+        setLoadError(false);
         const response = await fetch(`${API_BASE_URL}/products`);
 
         if (!response.ok) {
@@ -102,61 +110,102 @@ const ProductCatalog = (props) => {
           inStock: p.stock > 0,
           reviews: p.reviewsCount || 0,
           rating: p.rating || 0,
-          // sellerWhatsApp is missing, will be handled later
         }));
 
         setProducts(adaptedProducts);
       } catch (error) {
         console.error("❌ Erreur lors de la récupération des produits:", error);
-        alert("Erreur: Impossible de charger les produits. Vérifiez que le backend est lancé et accessible.");
+        setLoadError(true);
       } finally {
         setLoading(false);
       }
     };
 
     fetchProducts();
-  }, [language]);
-  
-  let filteredProducts = products;
-  
-  if (selectedCategory && selectedCategory !== 'all') {
-    filteredProducts = filteredProducts.filter(p => p.category === selectedCategory);
-  }
-  
-  filteredProducts = filteredProducts.filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
-  
-  filteredProducts.sort((a, b) => {
-    switch (sortBy) {
-      case 'recent':
-        // Utiliser 0 comme fallback si updatedAt est null ou undefined
-        const dateA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
-        const dateB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
-        return dateB - dateA;
-      case 'price-low': return a.price - b.price;
-      case 'price-high': return b.price - a.price;
-      case 'rating': return b.rating - a.rating;
-      case 'reviews': return b.reviews - a.reviews;
-      default:
-        if (a.name[language] && b.name[language]) {
-            return a.name[language].localeCompare(b.name[language]);
+  }, [language, reloadKey]);
+
+  const selectCategory = (name) => {
+    navigate(name === 'all' ? '/catalog' : `/catalog/${encodeURIComponent(name)}`);
+  };
+
+  // L'URL porte le nom de la catégorie ; les produits référencent son id
+  const selectedCategoryId = categories.find(cat => cat.name === selectedCategory)?.id;
+
+  // Nombre de produits par id de catégorie, calculé sur les produits chargés
+  const countByCategory = products.reduce((acc, p) => {
+    acc[p.category] = (acc[p.category] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Catégories proposées : celles qui ont des produits (et la catégorie courante), les plus fournies d'abord
+  const categoryOptions = categories
+    .filter(cat => countByCategory[cat.id] > 0 || cat.name === selectedCategory)
+    .sort((a, b) => (countByCategory[b.id] || 0) - (countByCategory[a.id] || 0));
+
+  const filteredProducts = products
+    .filter(p => selectedCategory === 'all' || p.category === selectedCategoryId)
+    .filter(p => p.price <= maxPrice)
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'recent': {
+          // Utiliser 0 comme fallback si updatedAt est null ou undefined
+          const dateA = a.updatedAt ? new Date(a.updatedAt) : new Date(0);
+          const dateB = b.updatedAt ? new Date(b.updatedAt) : new Date(0);
+          return dateB - dateA;
         }
-        return 0;
-    }
-  });
+        case 'price-low': return a.price - b.price;
+        case 'price-high': return b.price - a.price;
+        default:
+          if (a.name[language] && b.name[language]) {
+            return a.name[language].localeCompare(b.name[language]);
+          }
+          return 0;
+      }
+    });
 
-  // Préparer les catégories pour le filtre (ajouter "Tous" au début)
-  const allCategoriesFilter = [
-    { id: 'all', name: 'Tous' },
-    ...categories
-  ];
+  const filtersActive = selectedCategory !== 'all' || maxPrice < maxAllowedPrice;
 
-  const pageTitle = selectedCategory && selectedCategory !== 'all'
+  const resetFilters = () => {
+    setMaxPrice(maxAllowedPrice);
+    selectCategory('all');
+  };
+
+  const pageTitle = selectedCategory !== 'all'
     ? `${selectedCategory} — Catalogue Nengoo`
     : 'Catalogue — Nengoo Marketplace Cameroun';
 
-  const pageDescription = selectedCategory && selectedCategory !== 'all'
+  const pageDescription = selectedCategory !== 'all'
     ? `Découvrez tous les produits de la catégorie ${selectedCategory} sur Nengoo, la marketplace camerounaise de confiance.`
     : 'Parcourez des milliers de produits locaux et internationaux sur Nengoo, votre marketplace camerounaise. Livraison au Cameroun.';
+
+  const chipClass = (active) => `shrink-0 inline-flex items-center gap-1.5 h-9 !min-h-0 px-4 rounded-full text-sm font-semibold border transition-colors ${
+    active
+      ? 'bg-purple-700 border-purple-700 text-white'
+      : 'bg-white border-gray-300 text-gray-800 hover:border-purple-400'
+  }`;
+
+  const priceFilter = (
+    <div>
+      <label htmlFor="max-price" className="flex items-baseline justify-between gap-2 font-semibold">
+        <span>{t.maxPrice}</span>
+        <span className="price text-purple-800">{formatPrice(maxPrice)}</span>
+      </label>
+      <input
+        id="max-price"
+        type="range"
+        min="0"
+        max={maxAllowedPrice}
+        step="1000"
+        value={maxPrice}
+        onChange={(e) => setMaxPrice(parseInt(e.target.value, 10))}
+        className="w-full mt-3 accent-purple-700"
+      />
+      <div className="flex justify-between text-xs text-gray-500">
+        <span>{formatPrice(0)}</span>
+        <span>{formatPrice(maxAllowedPrice)}</span>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -164,145 +213,143 @@ const ProductCatalog = (props) => {
         <title>{pageTitle}</title>
         <meta name="description" content={pageDescription} />
         <link rel="canonical" href={
-          selectedCategory && selectedCategory !== 'all'
+          selectedCategory !== 'all'
             ? `https://www.nengoo.com/catalog/${encodeURIComponent(selectedCategory)}`
             : 'https://www.nengoo.com/catalog'
         } />
       </Helmet>
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 text-left">
       <Header {...props} />
-      
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Filters Sidebar */}
-          <div className="lg:w-1/4">
-            <div className="bg-white rounded-lg shadow-md p-6 max-sm:sticky top-24">
-              <h3 className="text-xl font-bold mb-6 text-left">Filtres</h3>
-              
-              {/* Category Filter */}
-              <div className="mb-6 text-left">
-                <h4 className="font-semibold mb-3">
-                  {t.categories}
-                  {!categoriesLoading && categories.length > 0 && (
-                    <span className="text-gray-500 text-sm ml-2">({categories.length})</span>
-                  )}
-                </h4>
-                <div className="space-y-2">
-                  {categoriesLoading ? (
-                    <div className="text-center py-4">
-                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-700"></div>
-                    </div>
-                  ) : allCategoriesFilter.length > 1 ? (
-                    allCategoriesFilter.map(cat => (
-                      <label key={cat.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded">
-                        <input
-                          type="radio"
-                          name="category"
-                          value={cat.id === 'all' ? 'all' : cat.name}
-                          checked={selectedCategory === (cat.id === 'all' ? 'all' : cat.name)}
-                          onChange={(e) => setSelectedCategory(e.target.value)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm">{cat.name}</span>
-                      </label>
-                    ))
-                  ) : (
-                    <p className="text-sm text-gray-500">Aucune catégorie disponible</p>
-                  )}
-                </div>
-              </div>
-              
-              {/* Price Range */}
-              <div className="mb-6">
-                <h4 className="font-semibold mb-3">Prix (XAF)</h4>
-                <div className="space-y-2">
-                  <input
-                    type="range"
-                    min="0"
-                    max={maxAllowedPrice}
-                    step="1000" // Adjusted step for more granularity if max price is high
-                    value={priceRange[1]}
-                    onChange={(e) => setPriceRange([0, parseInt(e.target.value)])}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>0 XAF</span>
-                    <span>{priceRange[1].toLocaleString()} XAF</span>
-                  </div>
-                </div>
-              </div>
+
+      <main className="container mx-auto px-4 pt-6 sm:pt-10 pb-14">
+        <div className="mb-5 sm:mb-8">
+          <h1 className="font-display text-4xl sm:text-5xl text-purple-950">
+            {selectedCategory === 'all' ? t.catalogTitle : selectedCategory}
+          </h1>
+          {!loading && !loadError && !(selectedCategory !== 'all' && categoriesLoading) && (
+            <p className="mt-2 text-gray-600">{t.productCount(filteredProducts.length)}</p>
+          )}
+        </div>
+
+        {/* Catégories (mobile et tablette) */}
+        <div className="lg:hidden -mx-4 px-4 mb-4 flex gap-2 overflow-x-auto hide-scrollbar">
+          <button type="button" onClick={() => selectCategory('all')} aria-pressed={selectedCategory === 'all'} className={chipClass(selectedCategory === 'all')}>
+            {t.allCategories}
+          </button>
+          {categoryOptions.map(cat => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => selectCategory(cat.name)}
+              aria-pressed={selectedCategory === cat.name}
+              className={chipClass(selectedCategory === cat.name)}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[15rem_minmax(0,1fr)] gap-8">
+          {/* Filtres (ordinateur) */}
+          <aside className="hidden lg:block">
+            <div className="sticky top-24 space-y-8">
+              <nav aria-label={t.categories}>
+                <h2 className="text-lg font-bold mb-3">{t.categories}</h2>
+                <ul className="space-y-0.5">
+                  {[{ id: 'all', name: 'all', label: t.allCategories, count: products.length }, ...categoryOptions.map(cat => ({ id: cat.id, name: cat.name, label: cat.name, count: countByCategory[cat.id] || 0 }))].map(item => {
+                    const active = selectedCategory === item.name;
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => selectCategory(item.name)}
+                          aria-current={active ? 'true' : undefined}
+                          className={`w-full !min-h-0 flex items-baseline justify-between gap-3 px-3 py-2 rounded-lg text-left text-sm transition-colors ${
+                            active ? 'bg-purple-100 text-purple-900 font-semibold' : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          <span>{item.label}</span>
+                          <span className={`tabular-nums text-xs ${active ? 'text-purple-700' : 'text-gray-400'}`}>{item.count}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+
+              {priceFilter}
+
+              {filtersActive && (
+                <button type="button" onClick={resetFilters} className="!min-h-0 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4">
+                  {t.resetFilters}
+                </button>
+              )}
             </div>
-          </div>
-          
-          {/* Products Grid */}
-          <div className="lg:w-3/4" ref={productListRef}>
-            {/* Sort Options */}
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-              <div className="flex flex-col sm:flex-row justify-between items-center">
-                <div>
-                  <h2 className="text-2xl font-bold">
-                    {selectedCategory === 'all' ? 'Tous les produits' : selectedCategory}
-                    <span className="text-gray-500 ml-2">({filteredProducts.length})</span>
-                  </h2>
-                  {products.length !== filteredProducts.length && (
-                    <p className="text-sm text-gray-500 mt-1">
-                      {filteredProducts.length} sur {products.length} produits affichés
-                    </p>
-                  )}
-                  {products.length === 0 && !loading && (
-                    <p className="text-sm text-orange-600 mt-1">
-                      ⚠️ Aucun produit dans la base de données
-                    </p>
+          </aside>
+
+          <section ref={productListRef} className="scroll-mt-20 min-w-0">
+            {/* Barre d'outils : prix (mobile) et tri */}
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <details className="lg:hidden group">
+                <summary className="list-none cursor-pointer inline-flex items-center gap-2 h-10 px-4 rounded-full bg-white border border-gray-300 text-sm font-semibold">
+                  <FilterIcon className="w-4 h-4" strokeWidth={2.2} />
+                  {maxPrice < maxAllowedPrice ? t.upTo(formatPrice(maxPrice)) : t.filters}
+                </summary>
+                <div className="mt-3 p-4 w-[min(22rem,calc(100vw-2rem))] bg-white rounded-xl border border-gray-200">
+                  {priceFilter}
+                  {filtersActive && (
+                    <button type="button" onClick={resetFilters} className="mt-4 !min-h-0 text-sm font-semibold text-purple-700 hover:underline underline-offset-4">
+                      {t.resetFilters}
+                    </button>
                   )}
                 </div>
+              </details>
+
+              <label className="ml-auto flex items-center gap-2 text-sm text-gray-600">
+                <span className="max-sm:sr-only">{t.sortLabel}</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 mt-4 sm:mt-0"
+                  className="h-10 pl-3 pr-8 !rounded-full border border-gray-300 bg-white text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <option value="recent">Plus récents</option>
-                  <option value="name">Trier par nom</option>
-                  <option value="price-low">Prix: Bas → Haut</option>
-                  <option value="price-high">Prix: Haut → Bas</option>
-                  <option value="rating">Meilleure note</option>
-                  <option value="reviews">Plus d'avis</option>
+                  <option value="recent">{t.sortRecent}</option>
+                  <option value="name">{t.sortName}</option>
+                  <option value="price-low">{t.sortPriceLow}</option>
+                  <option value="price-high">{t.sortPriceHigh}</option>
                 </select>
-              </div>
+              </label>
             </div>
-            
-            {/* Products Grid */}
-            {loading ? (
-              <div className="text-center py-16">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mb-4"></div>
-                <p className="text-lg text-gray-600">Chargement des produits...</p>
-              </div>
-            ) : products.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-lg shadow-md">
-                <div className="text-6xl mb-4">📦</div>
-                <h3 className="text-xl font-semibold mb-2">Aucun produit enregistré</h3>
-                <p className="text-gray-600 mb-4">La base de données ne contient aucun produit pour le moment.</p>
-                <p className="text-sm text-gray-500">Conseil: Allez dans le panneau d'administration pour ajouter des produits.</p>
+
+            {loading || (selectedCategory !== 'all' && categoriesLoading) ? (
+              <ProductGridSkeleton count={9} className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5" label={t.loadingProducts} />
+            ) : loadError ? (
+              <div className="py-14 px-6 bg-white rounded-xl border border-gray-200 text-center" role="alert">
+                <p className="text-gray-800 max-w-md mx-auto">{t.loadError}</p>
+                <button type="button" onClick={() => setReloadKey(k => k + 1)} className="mt-5 inline-flex items-center h-11 px-5 rounded-full bg-purple-700 text-white font-semibold hover:bg-purple-800">
+                  {t.retry}
+                </button>
               </div>
             ) : filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
                 {filteredProducts.map(product => (
                   <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 px-4 bg-white rounded-lg shadow-md">
-                <div className="text-6xl mb-4">🔍</div>
-                <h3 className="text-xl font-semibold mb-2">Aucun produit trouvé</h3>
-                <p className="text-gray-600 mb-4">Aucun produit ne correspond à vos critères de recherche.</p>
-                <p className="text-sm text-gray-500">
-                  {products.length} produit(s) disponible(s) - Essayez d'ajuster vos filtres ou explorez d'autres catégories.
-                </p>
+              <div className="py-14 px-6 bg-white rounded-xl border border-dashed border-gray-300 text-center">
+                <h2 className="text-xl font-bold mb-2">{products.length === 0 ? t.noProducts : t.noMatch}</h2>
+                <p className="text-gray-600 max-w-md mx-auto">{products.length === 0 ? t.noProductsText : t.noMatchText}</p>
+                {filtersActive && (
+                  <button type="button" onClick={resetFilters} className="mt-5 inline-flex items-center h-11 px-5 rounded-full bg-purple-700 text-white font-semibold hover:bg-purple-800">
+                    {t.resetFilters}
+                  </button>
+                )}
               </div>
             )}
-          </div>
+          </section>
         </div>
-      </div>
-      
+      </main>
+
       <Footer language={language} />
     </div>
     </>

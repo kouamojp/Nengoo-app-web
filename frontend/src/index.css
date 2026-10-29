@@ -5,9 +5,60 @@
 @layer base {
   body {
     font-family: theme('fontFamily.sans');
+    color: theme('colors.gray.900');
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: theme('fontFamily.heading');
+    font-stretch: 80%;
+    letter-spacing: -0.005em;
+    line-height: 1.15;
+  }
+  :focus-visible {
+    outline: 2px solid theme('colors.purple.600');
+    outline-offset: 2px;
+  }
+}
+
+/* Identité Nengoo */
+@layer components {
+  /* Titres d'affichage : Archivo très condensé et gras, comme le lettrage du logo */
+  .font-display {
+    font-family: theme('fontFamily.heading');
+    font-stretch: 68%;
+    font-weight: 850;
+    letter-spacing: -0.01em;
+    line-height: 0.98;
+  }
+
+  /* Prix : condensé, chiffres tabulaires */
+  .price {
+    font-stretch: 78%;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Sur fond violet, le contour de focus passe en jaune */
+  .on-dark :focus-visible {
+    outline-color: theme('colors.yellow.300');
+  }
+
+  /* Orbite du logo, tracée une seule fois au chargement de l'accueil */
+  .orbit-draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: orbit-draw 1.4s cubic-bezier(0.65, 0, 0.35, 1) 0.2s forwards;
+  }
+
+  @keyframes orbit-draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orbit-draw {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
   }
 }
 
@@ -248,230 +299,103 @@ code {
 
 
 
-.privacy-policy-page {
-  min-height: 100vh;
-  background-color: #f8f9fa;
-  padding: 40px 20px;
-}
-
-.privacy-policy-page .container {
-  max-width: 900px;
-  margin: 0 auto;
-  background: white;
-  padding: 50px;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.policy-header {
-  margin-bottom: 40px;
-  text-align: center;
-  border-bottom: 3px solid #007bff;
-  padding-bottom: 30px;
-}
-
-.policy-header h1 {
-  font-size: 36px;
-  color: #333;
-  margin: 0 0 15px 0;
-  font-weight: 700;
-}
-
-.last-updated {
-  color: #666;
-  font-size: 14px;
-  font-style: italic;
-  margin: 0;
-}
-
+/* Politique de confidentialité : contenu Markdown saisi dans l'admin */
 .policy-content {
-  line-height: 1.8;
-  color: #333;
+  color: theme('colors.gray.800');
+  font-size: 1.0625rem;
+  line-height: 1.7;
 }
 
-.policy-content h1 {
-  font-size: 28px;
-  color: #333;
-  margin-top: 40px;
-  margin-bottom: 20px;
-  border-bottom: 2px solid #007bff;
-  padding-bottom: 10px;
+.policy-content > * + * {
+  margin-top: 1.1em;
 }
 
+.policy-content h1,
 .policy-content h2 {
-  font-size: 24px;
-  color: #444;
-  margin-top: 35px;
-  margin-bottom: 15px;
-  font-weight: 600;
+  margin-top: 2.2em;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: theme('colors.purple.950');
 }
 
 .policy-content h3 {
-  font-size: 20px;
-  color: #555;
-  margin-top: 25px;
-  margin-bottom: 12px;
-  font-weight: 600;
+  margin-top: 1.8em;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: theme('colors.gray.900');
 }
 
 .policy-content h4 {
-  font-size: 18px;
-  color: #666;
-  margin-top: 20px;
-  margin-bottom: 10px;
-  font-weight: 600;
+  margin-top: 1.5em;
+  font-size: 1.05rem;
+  font-weight: 700;
 }
 
-.policy-content p {
-  margin-bottom: 20px;
-  text-align: center;
+.policy-content h1 + *,
+.policy-content h2 + *,
+.policy-content h3 + *,
+.policy-content h4 + * {
+  margin-top: 0.5em;
 }
 
 .policy-content ul,
 .policy-content ol {
-  margin-bottom: 20px;
-  padding-left: 40px;
+  padding-left: 1.4em;
 }
 
-.policy-content li {
-  margin-bottom: 10px;
+.policy-content ul { list-style: disc; }
+.policy-content ol { list-style: decimal; }
+
+.policy-content li + li {
+  margin-top: 0.4em;
+}
+
+.policy-content li::marker {
+  color: theme('colors.purple.700');
 }
 
 .policy-content strong {
-  color: #000;
-  font-weight: 600;
-}
-
-.policy-content em {
-  font-style: italic;
-  color: #555;
+  font-weight: 700;
+  color: theme('colors.gray.900');
 }
 
 .policy-content a {
-  color: #007bff;
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.3s ease;
+  color: theme('colors.purple.700');
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .policy-content a:hover {
-  border-bottom-color: #007bff;
-}
-
-.policy-content code {
-  background-color: #f4f4f4;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 13px;
-  color: #d63384;
-}
-
-.policy-content pre {
-  background-color: #f4f4f4;
-  padding: 15px;
-  border-radius: 5px;
-  overflow-x: auto;
-  margin-bottom: 20px;
-}
-
-.policy-content pre code {
-  background: none;
-  padding: 0;
-  color: #333;
+  color: theme('colors.purple.900');
 }
 
 .policy-content blockquote {
-  border-left: 4px solid #007bff;
-  padding-left: 20px;
-  margin: 20px 0;
-  color: #666;
-  font-style: italic;
+  padding-left: 1em;
+  border-left: 3px solid theme('colors.purple.300');
+  color: theme('colors.gray.600');
+}
+
+.policy-content code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: theme('colors.purple.50');
+  font-size: 0.9em;
 }
 
 .policy-content table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 20px;
+  font-size: 0.95rem;
 }
 
-.policy-content table th,
-.policy-content table td {
-  border: 1px solid #ddd;
-  padding: 12px;
+.policy-content th,
+.policy-content td {
+  padding: 0.6em 0.75em;
+  border-bottom: 1px solid theme('colors.gray.200');
   text-align: left;
+  vertical-align: top;
 }
 
-.policy-content table th {
-  background-color: #f8f9fa;
-  font-weight: 600;
-}
-
-.policy-footer {
-  margin-top: 50px;
-  padding-top: 30px;
-  border-top: 2px solid #e0e0e0;
-  text-align: center;
-}
-
-.back-link {
-  display: inline-block;
-  padding: 12px 30px;
-  background-color: #007bff;
-  color: white;
-  text-decoration: none;
-  border-radius: 5px;
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-}
-
-.back-link:hover {
-  background-color: #0056b3;
-}
-
-.loading,
-.error {
-  text-align: center;
-  padding: 100px 20px;
-  font-size: 18px;
-  color: #666;
-}
-
-.error {
-  color: #dc3545;
-}
-
-@media (max-width: 768px) {
-  .privacy-policy-page {
-    padding: 20px 10px;
-  }
-
-  .privacy-policy-page .container {
-    padding: 30px 20px;
-  }
-
-  .policy-header h1 {
-    font-size: 28px;
-  }
-
-  .policy-content h1 {
-    font-size: 24px;
-  }
-
-  .policy-content h2 {
-    font-size: 20px;
-  }
-
-  .policy-content h3 {
-    font-size: 18px;
-  }
-
-  .policy-content p {
-    text-align: left;
-  }
-
-  .policy-content ul,
-  .policy-content ol {
-    padding-left: 25px;
-  }
+.policy-content th {
+  font-weight: 700;
 }

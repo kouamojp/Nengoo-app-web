@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const defaultTheme = require('tailwindcss/defaultTheme');
+
 module.exports = {
   content: [
     "./src/**/*.{js,jsx,ts,tsx}",
@@ -7,8 +9,10 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"PT Sans"', ...require('tailwindcss/defaultTheme').fontFamily.sans],
-        heading: ['Roboto', ...require('tailwindcss/defaultTheme').fontFamily.sans],
+        // Archivo (variable : largeur 62–125 %) — une seule famille, la largeur
+        // condensée des titres rappelle le lettrage du logo.
+        sans: ['Archivo', ...defaultTheme.fontFamily.sans],
+        heading: ['Archivo', ...defaultTheme.fontFamily.sans],
       },
     },
   },

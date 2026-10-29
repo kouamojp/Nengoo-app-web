@@ -2,37 +2,36 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
-import InstallButton from '../pwa/InstallButton';
 import NotificationList from '../ui/NotificationList';
 import { getUnreadNotificationsCount } from '../../lib/notifications';
-import { createSlug } from '../../lib/utils';
+import { SearchIcon, CartIcon, UserIcon, BellIcon, StoreIcon, LogoutIcon } from '../ui/Icons';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQuery, user, setUser }) => {
+const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'XAF',
+  minimumFractionDigits: 0,
+}).format(price);
+
+const CountBadge = ({ count }) => (
+  count > 0 ? (
+    <span className="absolute -top-1.5 -right-2 min-w-[1.25rem] h-5 px-1 rounded-full bg-yellow-300 text-purple-950 text-[0.7rem] font-bold flex items-center justify-center ring-2 ring-purple-800">
+      {count > 99 ? '99+' : count}
+    </span>
+  ) : null
+);
+
+const actionClass = 'relative flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-purple-100 hover:text-white hover:bg-white/10 transition-colors';
+
+const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUser }) => {
   const navigate = useNavigate();
-  const [categories, setCategories] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const t = translations[language];
-
-  // Mapping des icônes pour les catégories
-  const categoryIcons = {
-    'Vêtements et Accessoires': '👗',
-    'Aliments et Boissons': '🍽️',
-    'Électroniques': '📱',
-    'Maison & Jardinage': '🏠',
-    'Artisanat': '🎨',
-    'Beauté et Soins': '💄',
-    'Articles Sportifs': '⚽',
-    'Jouets pour Enfants': '🧸',
-    'Matériel Médical': '🏥',
-    'Équipements Pro': '🔧',
-    'Services': '🛠️',
-    'Voyages et Billets': '✈️'
-  };
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => {
     // Only fetch notifications for buyers and sellers, not admins
@@ -61,26 +60,6 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showNotifications]);
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/categories`);
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        setCategories(data);
-      } catch (error) {
-        console.error("❌ [Header] Erreur lors de la récupération des catégories:", error);
-        setCategories([]);
-      }
-    };
-
-    fetchCategories();
-  }, []);
 
   useEffect(() => {
     const fetchSuggestions = async () => {
@@ -130,65 +109,52 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
   };
 
   return (
-    <header className="bg-gradient-to-r from-purple-700 to-red-600 text-white shadow-lg sticky top-0 z-50">
-      {/* Top Bar */}
-      {/* <div className="bg-purple-800 py-2">
-        <div className="container mx-auto px-4 flex justify-between items-center text-sm">
-          <div className="flex space-x-4">
-            <span className="hidden sm:inline">📍 Cameroun</span>
-            <span className="hidden md:inline">📞 +237 6XX XXX XXX</span>
-          </div>
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            <button onClick={toggleLanguage} className="hover:text-yellow-300 transition-colors text-xs sm:text-sm">
-              {language === 'fr' ? '🇫🇷 FR' : '🇬🇧 EN'}
-            </button>
-            <span className="text-xs sm:text-sm">💰 XAF</span>
-          </div>
-        </div>
-      </div> */}
-
-      {/* Main Header */}
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="max-md:hidden flex items-center space-x-2 sm:space-x-3 hover:opacity-90 transition-opacity">
-            <img 
-              src="/images/logo-nengoo.png" 
-              alt="Nengoo Logo" 
-              className="h-10 sm:h-12 w-auto"
+    <header className="on-dark text-left bg-purple-800 text-white sticky top-0 z-50 shadow-[0_1px_0_rgba(255,255,255,0.08)]">
+      <div className="container mx-auto px-4 py-2.5 md:py-3">
+        <div className="flex items-center gap-3 md:gap-8">
+          <Link to="/" className="shrink-0 rounded-md" aria-label="Nengoo, accueil">
+            <img
+              src="/images/logo-nengoo-white.png"
+              alt="Nengoo"
+              className="h-8 md:h-11 w-auto"
             />
           </Link>
 
-          {/* Search Bar - Hidden on mobile, shown on tablet+ */}
-          <div className="hidden md:flex flex-1 max-w-2xl mx-8 search-container">
-            <form onSubmit={handleSearch} className="relative w-full">
+          {/* Recherche */}
+          <div className="flex-1 max-w-2xl search-container">
+            <form onSubmit={handleSearch} className="relative w-full" role="search">
               <input
-                type="text"
+                type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
-                className="w-full px-4 py-3 text-black rounded-lg border-2 border-white focus:border-yellow-300 focus:outline-none"
+                aria-label={t.search}
+                className="w-full h-11 pl-4 pr-12 text-gray-900 placeholder:text-gray-500 bg-white !rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-yellow-300"
               />
-              <button 
+              <button
                 type="submit"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"
+                aria-label={t.search}
+                className="absolute right-1 top-1/2 -translate-y-1/2 !min-h-0 !min-w-0 w-9 h-9 rounded-full bg-purple-700 hover:bg-purple-900 text-white flex items-center justify-center transition-colors"
               >
-                🔍
+                <SearchIcon className="w-5 h-5" strokeWidth={2.2} />
               </button>
               {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-lg shadow-lg z-10 max-h-96 overflow-y-auto">
+                <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl border border-gray-200 shadow-xl z-10 max-h-96 overflow-y-auto py-1">
                   {suggestions.map(product => (
                     <Link
                       key={product.id}
                       to={`/product/${product.slug || product.id}`}
-                      className="flex items-center px-4 py-2 text-black hover:bg-gray-100"
+                      className="flex items-center gap-3 px-3 py-2 text-gray-900 hover:bg-purple-50"
                       onClick={() => {
                         setShowSuggestions(false);
                         setSearchQuery('');
                       }}
                     >
-                      <img src={product.images[0]} alt={product.name} className="w-10 h-10 object-cover mr-4"/>
-                      <span>{product.name}</span>
+                      <img src={product.images[0]} alt="" className="w-11 h-11 rounded-md object-cover bg-gray-100 shrink-0" />
+                      <span className="flex-1 min-w-0 truncate">{product.name}</span>
+                      <span className="price text-purple-800 shrink-0">
+                        {formatPrice(product.promoPrice > 0 ? product.promoPrice : product.price)}
+                      </span>
                     </Link>
                   ))}
                 </div>
@@ -196,23 +162,20 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
             </form>
           </div>
 
-          {/* Desktop User Actions */}
-          <div className="hidden md:flex items-end space-x-4">
-            {/* <InstallButton /> */}
-            
+          {/* Actions (ordinateur) — sur mobile, la barre du bas prend le relais */}
+          <nav className="hidden md:flex items-center gap-1 text-xs ml-auto">
             {user && (user.type === 'buyer' || user.type === 'seller') && (
               <div className="relative notifications-container">
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative hover:text-yellow-300 transition-colors flex flex-col items-center"
+                  className={actionClass}
+                  aria-expanded={showNotifications}
                 >
-                  <span className="text-2xl">🔔</span>
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
-                      {unreadCount}
-                    </span>
-                  )}
-                  <div className="text-sm">Notifs</div>
+                  <span className="relative">
+                    <BellIcon />
+                    <CountBadge count={unreadCount} />
+                  </span>
+                  <span>Notifs</span>
                 </button>
                 {showNotifications && (
                   <NotificationList
@@ -224,21 +187,19 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
               </div>
             )}
 
-            <Link to="/cart" className="relative hover:text-yellow-300 transition-colors">
-              <span className="text-2xl">🛒</span>
-              {cartItems.length > 0 && (
-                <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                  {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-                </span>
-              )}
-              <div className="text-sm">{t.cart}</div>
+            <Link to="/cart" className={actionClass}>
+              <span className="relative">
+                <CartIcon />
+                <CountBadge count={cartCount} />
+              </span>
+              <span>{t.cart}</span>
             </Link>
-            
+
             {user ? (
-              <div className="flex items-center space-x-4">
-                <Link to={user.type === 'seller' ? '/seller' : '/profile'} className="hover:text-yellow-300 transition-colors">
-                  <span className="text-2xl">{user.type === 'seller' ? '🏪' : '👤'}</span>
-                  <div className="text-sm">{user.name}</div>
+              <>
+                <Link to={user.type === 'seller' ? '/seller' : '/profile'} className={actionClass}>
+                  {user.type === 'seller' ? <StoreIcon /> : <UserIcon />}
+                  <span className="max-w-[7rem] truncate">{user.name}</span>
                 </Link>
                 <button
                   onClick={() => {
@@ -246,75 +207,21 @@ const Header = ({ language, toggleLanguage, cartItems, searchQuery, setSearchQue
                     localStorage.removeItem('nengoo-user');
                     navigate('/'); // Redirect to home page
                   }}
-                  className="text-sm hover:text-yellow-300 transition-colors flex items-end mt-2"
+                  className={actionClass}
                 >
-                  {t.logout}
+                  <LogoutIcon />
+                  <span>{t.logout}</span>
                 </button>
-              </div>
+              </>
             ) : (
-              <Link to="/login" className="hover:text-yellow-300 transition-colors">
-                <span className="text-2xl">👤</span>
-                <div className="text-sm">{t.signin}</div>
+              <Link to="/login" className={actionClass}>
+                <UserIcon />
+                <span>{t.signin}</span>
               </Link>
             )}
-          </div>
-        </div>
-
-        {/* Mobile Search Bar */}
-        <div className="md:hidden mt-4 search-container">
-          <form onSubmit={handleSearch} className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.search}
-              className="w-full px-4 py-2 text-black rounded-lg border-2 border-white focus:border-yellow-300 focus:outline-none"
-            />
-            <button 
-              type="submit"
-              className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg transition-colors"
-            >
-              🔍
-            </button>
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-lg shadow-lg z-10 max-h-80 overflow-y-auto">
-                {suggestions.map(product => (
-                  <Link
-                    key={product.id}
-                    to={`/product/${product.slug || product.id}`}
-                    className="flex items-center px-4 py-2 text-black hover:bg-gray-100"
-                    onClick={() => {
-                      setShowSuggestions(false);
-                      setSearchQuery('');
-                    }}
-                  >
-                    <img src={product.images[0]} alt={product.name} className="w-10 h-10 object-cover mr-4"/>
-                    <span>{product.name}</span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </form>
+          </nav>
         </div>
       </div>
-
-      {/* Categories Navigation - Desktop */}
-     {/*  {<nav className="hidden md:block bg-purple-600 border-t border-purple-500">
-        <div className="container mx-auto px-4">
-          <div className="flex space-x-6 overflow-x-auto py-3">
-            {categories.map(cat => (
-              <Link
-                key={cat.key}
-                to={`/catalog/${cat.key}`}
-                className="flex items-center space-x-2 hover:text-yellow-300 transition-colors whitespace-nowrap"
-              >
-                <span className="text-lg">{cat.icon}</span>
-                <span className="font-medium">{t[cat.key]}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </nav>} */}
     </header>
   );
 };

@@ -7,25 +7,47 @@ import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
+import { CartIcon, WhatsAppIcon, PinIcon } from '../ui/Icons';
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+const SITE_URL = 'https://www.nengoo.com';
 
-const StarRating = ({ rating, setRating, interactive = true }) => {
+const formatPrice = (price) => {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'XAF',
+    minimumFractionDigits: 0,
+  }).format(price);
+};
+
+const StarRating = ({ rating, setRating, interactive = true, size = 'text-2xl' }) => {
     const [hover, setHover] = useState(0);
+    if (!interactive) {
+        return (
+            <span className={`inline-flex ${size} leading-none`} role="img" aria-label={`${rating} / 5`}>
+                {[...Array(5)].map((_, index) => (
+                    <span key={index} className={index < Math.round(rating) ? 'text-yellow-400' : 'text-gray-300'}>★</span>
+                ))}
+            </span>
+        );
+    }
     return (
-        <div className="flex space-x-1">
+        <div className="flex gap-1" role="radiogroup">
             {[...Array(5)].map((_, index) => {
                 const starValue = index + 1;
                 return (
                     <button
                         type="button"
                         key={starValue}
-                        className={`text-2xl ${interactive ? 'cursor-pointer' : ''}`}
-                        onClick={() => interactive && setRating(starValue)}
-                        onMouseEnter={() => interactive && setHover(starValue)}
-                        onMouseLeave={() => interactive && setHover(0)}
+                        role="radio"
+                        aria-checked={rating === starValue}
+                        aria-label={`${starValue} / 5`}
+                        className={`!min-h-0 !min-w-0 ${size} leading-none cursor-pointer`}
+                        onClick={() => setRating(starValue)}
+                        onMouseEnter={() => setHover(starValue)}
+                        onMouseLeave={() => setHover(0)}
                     >
                         <span className={starValue <= (hover || rating) ? 'text-yellow-400' : 'text-gray-300'}>
                             ★
@@ -37,6 +59,17 @@ const StarRating = ({ rating, setRating, interactive = true }) => {
     );
 };
 
+const adaptProduct = (p, language) => ({
+  ...p,
+  name: { [language]: p.name },
+  description: { [language]: p.description },
+  image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
+  images: p.images || [],
+  inStock: p.stock > 0,
+  reviews: p.reviewsCount || 0,
+  rating: p.rating || 0,
+});
+
 const ProductDetail = (props) => {
   const { language, addToCart, user } = props;
   const { idOrSlug } = useParams();
@@ -45,6 +78,7 @@ const ProductDetail = (props) => {
   const [quantity, setQuantity] = useState(1);
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [category, setCategory] = useState(null);
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSendMessageModal, setShowSendMessageModal] = useState(false);
@@ -70,22 +104,17 @@ const ProductDetail = (props) => {
         return;
       }
       const productData = await productResponse.json();
-      const adaptedProduct = {
-        ...productData,
-        name: { [language]: productData.name },
-        description: { [language]: productData.description },
-        image: productData.images && productData.images.length > 0 ? productData.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
-        images: productData.images || [],
-        inStock: productData.stock > 0,
-        reviews: productData.reviewsCount || 0,
-        rating: productData.rating || 0,
-      };
-      setProduct(adaptedProduct);
+      setProduct(adaptProduct(productData, language));
+      setSelectedImage(0);
+      setQuantity(1);
 
       // Fetch related info
-      if (productData.category) fetchRelatedProducts(productData.category, productData.id);
+      if (productData.category) {
+        fetchRelatedProducts(productData.category, productData.id);
+        fetchCategory(productData.category);
+      }
       if (productData.sellerId) fetchSeller(productData.sellerId);
-      
+
       // Fetch reviews
       const reviewsResponse = await fetch(`${API_BASE_URL}/products/${idOrSlug}/reviews`);
       if (reviewsResponse.ok) {
@@ -116,8 +145,8 @@ const ProductDetail = (props) => {
   useEffect(() => {
     fetchProductData();
   }, [idOrSlug, language, user]);
-  
-  const fetchRelatedProducts = async (category, currentProductId) => {
+
+  const fetchRelatedProducts = async (categoryId, currentProductId) => {
       try {
         const response = await fetch(`${API_BASE_URL}/products`);
 
@@ -125,23 +154,28 @@ const ProductDetail = (props) => {
 
         const data = await response.json();
         const filtered = data
-          .filter(p => p.category === category && p.id !== currentProductId)
+          .filter(p => p.category === categoryId && p.id !== currentProductId)
           .slice(0, 4)
-          .map(p => ({
-            ...p,
-            name: { [language]: p.name },
-            description: { [language]: p.description },
-            image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
-            inStock: p.stock > 0,
-            reviews: p.reviewsCount || 0,
-            rating: p.rating || 0,
-          }));
+          .map(p => adaptProduct(p, language));
 
         setRelatedProducts(filtered);
       } catch (error) {
         console.error("❌ [ProductDetail] Erreur produits similaires:", error);
       }
     };
+
+  // Le produit référence sa catégorie par id : on récupère son nom pour le fil d'Ariane
+  const fetchCategory = async (categoryId) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/categories`);
+        if (!response.ok) return;
+        const data = await response.json();
+        setCategory(data.find(cat => cat.id === categoryId) || null);
+      } catch (error) {
+        console.error("❌ [ProductDetail] Erreur récupération catégorie:", error);
+      }
+    };
+
   const fetchSeller = async (sellerId) => {
       try {
         const response = await fetch(`${API_BASE_URL}/sellers/${sellerId}`);
@@ -190,10 +224,8 @@ const ProductDetail = (props) => {
   };
 
   const handleWhatsAppClick = async () => {
-    // Record the click
+    // Record the click without blocking WhatsApp if the API fails or is slow
     try {
-        // Fire and forget (don't await strictly for the UI to respond, but it's cleaner to await if it's fast)
-        // We don't want to block the user from opening WhatsApp if the API fails or is slow
         fetch(`${API_BASE_URL}/analytics/whatsapp-click`, {
             method: 'POST',
             headers: {
@@ -209,7 +241,7 @@ const ProductDetail = (props) => {
     } catch (error) {
         console.error("Error recording WhatsApp click:", error);
     }
-    
+
     // Open WhatsApp
     openWhatsApp(seller.whatsapp, generateProductWhatsAppMessage(product, language));
   };
@@ -237,7 +269,7 @@ const ProductDetail = (props) => {
             throw new Error(errorData.detail || 'Failed to submit review');
         }
         // Refresh product data to show new review and rating
-        fetchProductData(); 
+        fetchProductData();
         setNewReviewRating(0);
         setNewReviewComment('');
     } catch (error) {
@@ -247,55 +279,67 @@ const ProductDetail = (props) => {
   };
 
   if (loading) {
-      return <div>Chargement...</div>;
+      return (
+        <div className="min-h-screen bg-gray-50 text-left">
+          <Header {...props} />
+          <div className="container mx-auto px-4 pt-6 pb-14" aria-busy="true">
+            <div className="h-4 w-64 max-w-full rounded loading-shimmer mb-6" />
+            <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-8 lg:gap-12">
+              <div className="aspect-square rounded-2xl loading-shimmer" />
+              <div className="space-y-4">
+                <div className="h-10 w-4/5 rounded loading-shimmer" />
+                <div className="h-12 w-1/2 rounded loading-shimmer" />
+                <div className="h-12 w-full rounded-xl loading-shimmer" />
+                <div className="h-32 w-full rounded-xl loading-shimmer" />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
   }
 
   if (!product) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 text-left">
         <Header {...props} />
-        <div className="container mx-auto px-4 py-16 text-center">
-          <h2 className="text-2xl font-bold mb-4">Produit non trouvé</h2>
-          <Link to="/catalog" className="text-purple-600 hover:text-purple-700">
-            ← Retour au catalogue
-          </Link>
-        </div>
+        <main className="container mx-auto px-4 py-16">
+          <div className="max-w-lg mx-auto py-12 px-6 bg-white rounded-xl border border-dashed border-gray-300 text-center">
+            <h1 className="text-2xl font-extrabold mb-3">{t.productNotFound}</h1>
+            <p className="text-gray-600 mb-6">{t.productNotFoundText}</p>
+            <Link to="/catalog" className="inline-flex items-center h-11 px-5 rounded-full bg-purple-700 text-white font-semibold hover:bg-purple-800">
+              {t.browseCatalog}
+            </Link>
+          </div>
+        </main>
         <Footer language={language} />
       </div>
     );
   }
-  
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XAF',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
 
+  const name = product.name[language];
   const images = product.images.length > 0 ? product.images : [process.env.PUBLIC_URL + '/images/logo-nengoo.png'];
   const lightboxSlides = images.map(img => ({ src: img }));
 
-  const discountPercentage = product.promoPrice && product.price > product.promoPrice
+  const hasPromo = product.promoPrice && product.promoPrice > 0;
+  const discountPercentage = hasPromo && product.price > product.promoPrice
     ? Math.round(((product.price - product.promoPrice) / product.price) * 100)
     : 0;
 
   const getAbsoluteImageUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('http')) return url;
-    // Use nengoo.com as the base URL for Open Graph images
-    const baseUrl = 'https://nengoo.com';
-    return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+    return `${SITE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const ogImageUrl = getAbsoluteImageUrl(images[0]);
-  const productUrl = `https://nengoo-app-web.onrender.com/api/og/product/${product.slug || product.id}`;
-  const canonicalUrl = `https://www.nengoo.com/product/${product.slug || product.id}`;
+  // Les robots qui visitent cette URL reçoivent l'aperçu Open Graph du backend (voir .htaccess)
+  const canonicalUrl = `${SITE_URL}/product/${product.slug || product.id}`;
+  const categoryUrl = category ? `/catalog/${encodeURIComponent(category.name)}` : '/catalog';
 
   const jsonLd = {
     '@context': 'https://schema.org/',
     '@type': 'Product',
-    name: product.name[language],
+    name,
     description: product.description[language],
     image: images,
     url: canonicalUrl,
@@ -332,37 +376,39 @@ const ProductDetail = (props) => {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
     itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Accueil', item: 'https://www.nengoo.com/' },
-      { '@type': 'ListItem', position: 2, name: 'Catalogue', item: 'https://www.nengoo.com/catalog' },
-      { '@type': 'ListItem', position: 3, name: t[product.category] || product.category, item: `https://www.nengoo.com/catalog/${encodeURIComponent(product.category)}` },
-      { '@type': 'ListItem', position: 4, name: product.name[language], item: canonicalUrl },
+      { '@type': 'ListItem', position: 1, name: 'Accueil', item: `${SITE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Catalogue', item: `${SITE_URL}/catalog` },
+      ...(category ? [{ '@type': 'ListItem', position: 3, name: category.name, item: `${SITE_URL}${categoryUrl}` }] : []),
+      { '@type': 'ListItem', position: category ? 4 : 3, name, item: canonicalUrl },
     ],
   };
+
+  const secondaryButton = 'inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl border border-gray-300 bg-white text-gray-900 text-sm font-semibold hover:border-purple-400 transition-colors';
 
   return (
     <>
       <Helmet>
-        <title>{product.name[language]} — Nengoo</title>
+        <title>{name} — Nengoo</title>
         <meta name="description" content={product.description[language]?.slice(0, 160)} />
         <link rel="canonical" href={canonicalUrl} />
 
         {/* Open Graph / Facebook / WhatsApp */}
         <meta property="og:type" content="product" />
         <meta property="og:site_name" content="Nengoo" />
-        <meta property="og:title" content={product.name[language]} />
+        <meta property="og:title" content={name} />
         <meta property="og:description" content={product.description[language]} />
         <meta property="og:image" content={ogImageUrl} />
         <meta property="og:image:secure_url" content={ogImageUrl} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-        <meta property="og:url" content={productUrl} />
+        <meta property="og:url" content={canonicalUrl} />
         <meta property="og:price:amount" content={product.promoPrice || product.price} />
         <meta property="og:price:currency" content="XAF" />
 
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:url" content={productUrl} />
-        <meta name="twitter:title" content={product.name[language]} />
+        <meta name="twitter:url" content={canonicalUrl} />
+        <meta name="twitter:title" content={name} />
         <meta name="twitter:description" content={product.description[language]} />
         <meta name="twitter:image" content={ogImageUrl} />
 
@@ -370,347 +416,342 @@ const ProductDetail = (props) => {
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
         <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
       </Helmet>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 text-left">
         <Header {...props} />
-        
-        {/* Modal, Breadcrumb, etc. */}
-        
-        <div className="container mx-auto px-4 py-8">
+
+        <main className="container mx-auto px-4 pt-5 sm:pt-8 pb-14">
           {/* Breadcrumb */}
-          <nav className="mb-8 text-sm">
-            <Link to="/" className="text-purple-600 hover:text-purple-700">Accueil</Link>
-            <span className="mx-2">›</span>
-            <Link to="/catalog" className="text-purple-600 hover:text-purple-700">Catalogue</Link>
-            <span className="mx-2">›</span>
-            <Link to={`/catalog/${product.category}`} className="text-purple-600 hover:text-purple-700">{t[product.category]}</Link>
-            <span className="mx-2">›</span>
-            <span className="text-gray-600">{product.name[language]}</span>
+          <nav aria-label="Fil d'Ariane" className="mb-5 sm:mb-8 text-sm text-gray-500">
+            <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <li><Link to="/" className="hover:text-purple-700 hover:underline underline-offset-4">Accueil</Link></li>
+              <li aria-hidden="true">/</li>
+              <li><Link to="/catalog" className="hover:text-purple-700 hover:underline underline-offset-4">{t.catalogTitle}</Link></li>
+              {category && (
+                <>
+                  <li aria-hidden="true">/</li>
+                  <li><Link to={categoryUrl} className="hover:text-purple-700 hover:underline underline-offset-4">{category.name}</Link></li>
+                </>
+              )}
+              <li aria-hidden="true" className="max-sm:hidden">/</li>
+              <li className="max-sm:hidden text-gray-800 truncate max-w-[24ch]" aria-current="page">{name}</li>
+            </ol>
           </nav>
-          
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Product Images */}
-              <div className="p-6">
-                <div className="mb-4" onClick={() => setOpen(true)} style={{ cursor: 'pointer' }}>
-                    <img
-                        src={images[selectedImage]}
-                        alt={product.name[language]}
-                        className="w-full h-96 md:h-[30rem] object-cover rounded-lg"
-                        onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo-web.png';
-                        }}
-                    />
-                </div>
-                {images.length > 1 && (
-                  <div className="flex space-x-2 overflow-x-auto">
-                    {images.map((img, index) => (
+
+          <div className="grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] gap-8 lg:gap-12 items-start">
+            {/* Photos */}
+            <div className="lg:sticky lg:top-24">
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                aria-label={t.zoomPhoto}
+                className="relative block w-full !min-h-0 aspect-square rounded-2xl bg-white border border-gray-200 overflow-hidden cursor-zoom-in"
+              >
+                <img
+                  src={images[selectedImage]}
+                  alt={name}
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo-web.png';
+                  }}
+                />
+                {discountPercentage > 0 && (
+                  <span className="price absolute top-3 left-3 bg-red-600 text-white px-2.5 py-1 text-base rounded-lg">
+                    -{discountPercentage} %
+                  </span>
+                )}
+              </button>
+              {images.length > 1 && (
+                <div className="mt-3 flex gap-2 overflow-x-auto hide-scrollbar">
+                  {images.map((img, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setSelectedImage(index)}
+                      aria-label={t.photoOf(index + 1)}
+                      aria-pressed={selectedImage === index}
+                      className={`shrink-0 !min-h-0 !min-w-0 w-[4.5rem] h-[4.5rem] rounded-lg overflow-hidden bg-white border-2 transition-colors ${
+                        selectedImage === index ? 'border-purple-600' : 'border-transparent hover:border-gray-300'
+                      }`}
+                    >
                       <img
-                        key={index}
                         src={img}
-                        alt={`${product.name[language]} - photo ${index + 1}`}
-                        className={`w-20 h-20 object-cover rounded cursor-pointer border-2 ${
-                          selectedImage === index ? 'border-purple-500' : 'border-gray-200'
-                        }`}
+                        alt=""
+                        className="w-full h-full object-cover"
                         loading="lazy"
-                        onClick={() => setSelectedImage(index)}
                         onError={(e) => {
                           e.target.onerror = null;
                           e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo-web.png';
                         }}
                       />
-                    ))}
-                  </div>
-                )}
-              </div>
-              
-              {/* Product Info */}
-              <div className="p-6">
-                <h1 className="text-3xl font-bold mb-4">{product.name[language]}</h1>
-                        
-                <div className="flex items-center mb-4">
-                    <StarRating rating={product.rating} interactive={false} />
-                    <span className="text-gray-600 ml-2">({product.reviewsCount} avis)</span>
+                    </button>
+                  ))}
                 </div>
+              )}
+            </div>
 
-                {/* Price */}
-                <div className="mb-6 flex items-baseline max-sm:flex-col max-sm:items-center max-sm:space-y-2">
-                  {product.promoPrice && product.promoPrice > 0 ? (
-                    <>
-                      <span className="text-5xl font-bold text-red-600 mr-4">
-                        {formatPrice(product.promoPrice)}
-                      </span>
-                      <span className="text-2xl text-gray-500 line-through">
-                        {formatPrice(product.price)}
-                      </span>
-                      {discountPercentage > 0 && (
-                        <span className="ml-4 px-3 py-1 bg-red-500 text-white text-lg font-semibold rounded-lg">
-                          -{discountPercentage}%
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-4xl font-bold text-purple-600">
+            {/* Infos et achat */}
+            <div>
+              {category && (
+                <Link to={categoryUrl} className="text-sm font-semibold text-purple-700 hover:underline underline-offset-4">
+                  {category.name}
+                </Link>
+              )}
+              <h1 className="mt-1 text-3xl sm:text-4xl font-extrabold">{name}</h1>
+
+              {product.reviewsCount > 0 && (
+                <a href="#avis" className="mt-2 inline-flex items-center gap-2 text-sm text-gray-600 hover:text-purple-700">
+                  <StarRating rating={product.rating} interactive={false} size="text-lg" />
+                  <span>{t.reviewsCount(product.reviewsCount)}</span>
+                </a>
+              )}
+
+              {/* Price */}
+              <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                {hasPromo ? (
+                  <>
+                    <span className="price text-4xl sm:text-5xl text-red-600">
+                      {formatPrice(product.promoPrice)}
+                    </span>
+                    <span className="text-lg text-gray-500 line-through">
                       {formatPrice(product.price)}
                     </span>
-                  )}
-                </div>
-                
-                {/* Stock Status */}
-                <div className="mb-6">
-                  {product.inStock ? (
-                    <span className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                      ✅ {t.inStock}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-                      ❌ {t.outOfStock}
-                    </span>
-                  )}
-                </div>
-                
-                {/* Quantity Selector */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium mb-2">{t.quantity}</label>
-                  <div className="flex items-center space-x-3 max-sm:justify-center">
-                    <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="bg-gray-200 hover:bg-gray-300 w-10 h-10 rounded-lg flex items-center justify-center"
-                    >
-                      -
-                    </button>
-                    <span className="text-xl font-semibold w-12 text-center">{quantity}</span>
-                    <button
-                      onClick={() => setQuantity(quantity + 1)}
-                      className="bg-gray-200 hover:bg-gray-300 w-10 h-10 rounded-lg flex items-center justify-center"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Action Buttons */}
-                <div className="space-y-4">
+                  </>
+                ) : (
+                  <span className="price text-4xl sm:text-5xl text-purple-800">
+                    {formatPrice(product.price)}
+                  </span>
+                )}
+              </div>
+
+              <p className={`mt-3 inline-flex items-center gap-2 text-sm font-semibold ${product.inStock ? 'text-green-700' : 'text-gray-500'}`}>
+                <span className={`w-2 h-2 rounded-full ${product.inStock ? 'bg-green-600' : 'bg-gray-400'}`} aria-hidden="true" />
+                {product.inStock ? t.inStock : t.outOfStock}
+              </p>
+
+              {/* Quantité et panier */}
+              <div className="mt-6 flex flex-wrap gap-3">
+                <div className="inline-flex items-center h-12 rounded-xl border border-gray-300 bg-white" role="group" aria-label={t.quantity}>
                   <button
-                    onClick={() => addToCart(product, quantity)}
-                    disabled={!product.inStock}
-                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                    type="button"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    aria-label="-1"
+                    className="!min-h-0 w-11 h-full text-xl text-gray-700 hover:text-purple-700"
                   >
-                    {t.addToCart}
+                    −
                   </button>
+                  <span className="price w-10 text-center text-lg" aria-live="polite">{quantity}</span>
                   <button
-                    onClick={() => {
-                      addToCart(product, quantity);
-                      navigate('/checkout');
-                    }}
-                    disabled={!product.inStock}
-                    className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                    type="button"
+                    onClick={() => setQuantity(quantity + 1)}
+                    aria-label="+1"
+                    className="!min-h-0 w-11 h-full text-xl text-gray-700 hover:text-purple-700"
                   >
-                    {t.buyNow}
+                    +
                   </button>
-                  
-                  {/* WhatsApp Contact Button */}
-                  {seller && seller.whatsapp && (
-                    <button
-                      onClick={handleWhatsAppClick}
-                      className="w-full bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
-                    >
-                      <span>📱</span>
-                      <span>Contacter le vendeur sur WhatsApp</span>
-                    </button>
-                  )}
-
-                  {seller && (
-                    <button
-                      onClick={() => setShowSendMessageModal(true)}
-                      className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
-                    >
-                      <span>✉️</span>
-                      <span>Contacter le vendeur</span>
-                    </button>
-                  )}
-                  
-                  {/* Share Buttons */}
-                  <div className="flex space-x-2 mt-4">
-                    <a
-                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://nengoo-app-web.onrender.com/api/og/product/${product.id}`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
-                    >
-                      <span>📤</span>
-                      <span>Facebook</span>
-                    </a>
-                    <a
-                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent(product.name[language])}%20${encodeURIComponent(`https://nengoo-app-web.onrender.com/api/og/product/${product.slug || product.id}`)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 px-6 rounded-lg font-semibold flex items-center justify-center space-x-2 transition-colors"
-                    >
-                      <span>📤</span>
-                      <span>WhatsApp</span>
-                    </a>
-                  </div>
                 </div>
-                
-                {/* Seller Info Card */}
-                {seller && (
-                  <div className="mt-8 bg-gray-50 rounded-lg p-6 text-left">
-                    {/* <h3 className="text-lg font-semibold mb-4">Informations Vendeur</h3> */}
-                    <div className="flex flex-col gap-4 ">
-                      <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center text-white text-2xl font-bold">
-                        {seller.businessName.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <Link to={`/seller/${seller.id}`} className="font-semibold text-lg hover:text-purple-600 transition-colors">
-                            {seller.businessName}
-                        </Link>
-                        <p className="text-sm text-gray-600">{seller.name}</p>
-                        <div className="flex items-center space-x-4 text-sm text-gray-600 mt-1">
-                          <span className="flex items-center">
-                            📍 {seller.city}, {seller.region}
-                          </span>
-                        </div>
+                <button
+                  onClick={() => addToCart(product, quantity)}
+                  disabled={!product.inStock}
+                  className="flex-1 min-w-[12rem] h-12 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:bg-gray-300 disabled:text-gray-600 text-white font-bold inline-flex items-center justify-center gap-2 transition-colors"
+                >
+                  <CartIcon className="w-5 h-5" strokeWidth={2.2} />
+                  {t.addToCart}
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  addToCart(product, quantity);
+                  navigate('/checkout');
+                }}
+                disabled={!product.inStock}
+                className="mt-3 w-full h-12 rounded-xl border-2 border-purple-700 text-purple-800 hover:bg-purple-50 disabled:border-gray-300 disabled:text-gray-500 disabled:bg-transparent font-bold transition-colors"
+              >
+                {t.buyNow}
+              </button>
 
-                        {/* Seller Contact */}
-                        <div className="flex space-x-3 mt-3">
-                          {seller.whatsapp && (
-                            <button
-                              onClick={() => openWhatsApp(seller.whatsapp)}
-                              className="bg-green-500 text-white px-3 py-1 rounded-lg hover:bg-green-600 transition-colors text-sm flex items-center space-x-1"
-                              title="WhatsApp"
-                            >
-                              <span>📱</span>
-                              <span>WhatsApp</span>
-                            </button>
-                          )}
-                          {seller.email && (
-                            <a
-                              href={`mailto:${seller.email}`}
-                              className="bg-blue-500 text-white px-3 py-1 rounded-lg hover:bg-blue-600 transition-colors text-sm flex items-center space-x-1"
-                              title="Email"
-                            >
-                              <span>✉️</span>
-                              <span>Email</span>
-                            </a>
-                          )}
-                        </div>
-
-                        {/* Seller Description */}
-                        {seller.description && (
-                          <p className="text-sm text-gray-600 mt-3">{seller.description}</p>
-                        )}
-                      </div>
+              {/* Vendeur */}
+              {seller && (
+                <section className="mt-8 p-5 rounded-xl bg-white border border-gray-200" aria-label={t.soldBy}>
+                  <div className="flex items-center gap-4">
+                    <div className="shrink-0 w-12 h-12 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center text-xl font-extrabold" aria-hidden="true">
+                      {seller.businessName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500">{t.soldBy}</p>
+                      <Link to={`/seller/${seller.id}`} className="block font-bold text-lg leading-tight hover:text-purple-700 truncate">
+                        {seller.businessName}
+                      </Link>
+                      {(seller.city || seller.region) && (
+                        <p className="mt-0.5 flex items-center gap-1 text-sm text-gray-600">
+                          <PinIcon className="w-4 h-4 shrink-0" />
+                          {[seller.city, seller.region].filter(Boolean).join(', ')}
+                        </p>
+                      )}
                     </div>
                   </div>
-                )}
-                
-                {/* Product Description */}
-                <div className="mt-8">
-                  <h3 className="text-xl font-semibold mb-4">{t.description}</h3>
-                  <p className="text-gray-700 leading-relaxed">
+                  {seller.description && (
+                    <p className="mt-3 text-sm text-gray-600">{seller.description}</p>
+                  )}
+                  <div className="mt-4 grid sm:grid-cols-2 gap-2">
+                    {seller.whatsapp && (
+                      <button
+                        onClick={handleWhatsAppClick}
+                        className="inline-flex items-center justify-center gap-2 h-11 px-4 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
+                      >
+                        <WhatsAppIcon className="w-5 h-5" />
+                        {t.contactWhatsApp}
+                      </button>
+                    )}
+                    <button onClick={() => setShowSendMessageModal(true)} className={secondaryButton}>
+                      {t.sendMessage}
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {/* Partage */}
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <span className="text-gray-500">{t.share}</span>
+                <a
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(canonicalUrl)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-gray-800 hover:text-purple-700 hover:underline underline-offset-4"
+                >
+                  Facebook
+                </a>
+                <a
+                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`${name} ${canonicalUrl}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-gray-800 hover:text-purple-700 hover:underline underline-offset-4"
+                >
+                  WhatsApp
+                </a>
+              </div>
+
+              {/* Description */}
+              {product.description[language] && (
+                <section className="mt-10">
+                  <h2 className="text-xl font-extrabold mb-3">{t.description}</h2>
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-line max-w-[68ch]">
                     {product.description[language]}
                   </p>
-                </div>
-              </div>
+                </section>
+              )}
             </div>
           </div>
 
-            {/* Reviews Section */}
-            <div className="mt-16">
-                <h3 className="text-2xl font-bold mb-8">Avis des clients</h3>
-                {canReview && !hasAlreadyReviewed && (
-                    <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                        <h4 className="text-xl font-semibold mb-4">Laissez votre avis</h4>
-                        <form onSubmit={handleSubmitReview}>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium mb-2">Votre note</label>
-                                <StarRating rating={newReviewRating} setRating={setNewReviewRating} />
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium mb-2">Votre commentaire</label>
-                                <textarea
-                                    value={newReviewComment}
-                                    onChange={(e) => setNewReviewComment(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                                    rows="4"
-                                />
-                            </div>
-                            <button type="submit" className="bg-purple-600 text-white px-6 py-2 rounded-lg">
-                                Soumettre l'avis
-                            </button>
-                        </form>
+          {/* Avis */}
+          <section id="avis" className="mt-14 scroll-mt-24 max-w-3xl">
+            <h2 className="text-2xl font-extrabold mb-5">{t.reviewsTitle}</h2>
+            {canReview && !hasAlreadyReviewed && (
+              <form onSubmit={handleSubmitReview} className="mb-6 p-5 rounded-xl bg-white border border-gray-200">
+                <h3 className="text-lg font-bold mb-4">{t.leaveReview}</h3>
+                <fieldset className="mb-4">
+                  <legend className="block text-sm font-semibold mb-2">{t.yourRating}</legend>
+                  <StarRating rating={newReviewRating} setRating={setNewReviewRating} size="text-3xl" />
+                </fieldset>
+                <label className="block text-sm font-semibold mb-2" htmlFor="review-comment">{t.yourComment}</label>
+                <textarea
+                  id="review-comment"
+                  value={newReviewComment}
+                  onChange={(e) => setNewReviewComment(e.target.value)}
+                  className="w-full !rounded-xl border border-gray-300 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  rows="4"
+                />
+                <button type="submit" className="mt-4 inline-flex items-center h-11 px-5 rounded-full bg-purple-700 hover:bg-purple-800 text-white font-semibold">
+                  {t.submitReview}
+                </button>
+              </form>
+            )}
+            {hasAlreadyReviewed && (
+              <p className="mb-6 p-4 rounded-xl bg-purple-50 text-purple-900 text-sm">{t.alreadyReviewed}</p>
+            )}
+            {reviews.length > 0 ? (
+              <ul className="divide-y divide-gray-200 border-y border-gray-200">
+                {reviews.map(review => (
+                  <li key={review.id} className="py-5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <StarRating rating={review.rating} interactive={false} size="text-base" />
+                      <span className="font-bold">{review.buyerName}</span>
+                      <time className="text-xs text-gray-500" dateTime={review.createdAt}>
+                        {new Date(review.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </time>
                     </div>
-                )}
-                {hasAlreadyReviewed && (
-                    <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4 mb-8">
-                        Vous avez déjà laissé un avis pour ce produit.
-                    </div>
-                )}
-                <div className="space-y-6">
-                    {reviews.length > 0 ? (
-                        reviews.map(review => (
-                            <div key={review.id} className="bg-white rounded-lg shadow-md p-6">
-                                <div className="flex items-center mb-2">
-                                    <StarRating rating={review.rating} interactive={false} />
-                                    <span className="font-bold ml-4">{review.buyerName}</span>
-                                </div>
-                                <p className="text-gray-600">{review.comment}</p>
-                                <p className="text-xs text-gray-400 mt-2">{new Date(review.createdAt).toLocaleDateString()}</p>
-                            </div>
-                        ))
-                    ) : (
-                        <p>Aucun avis pour ce produit pour le moment.</p>
-                    )}
-                </div>
-            </div>
-          
+                    {review.comment && <p className="mt-2 text-gray-700">{review.comment}</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-gray-600">{t.noReviews}</p>
+            )}
+          </section>
+
           {/* Related Products */}
           {relatedProducts.length > 0 && (
-            <div className="mt-16">
-              <h3 className="text-2xl font-bold mb-8">Produits similaires</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <section className="mt-14">
+              <div className="flex items-baseline justify-between gap-4 mb-5">
+                <h2 className="text-2xl font-extrabold">{t.relatedProducts}</h2>
+                {category && (
+                  <Link to={categoryUrl} className="shrink-0 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4">
+                    {t.viewAll}
+                  </Link>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
                 {relatedProducts.map(relatedProduct => (
                   <ProductCard key={relatedProduct.id} product={relatedProduct} language={language} addToCart={addToCart} />
                 ))}
               </div>
-            </div>
+            </section>
           )}
-        </div>
-        
+        </main>
+
         <Lightbox
             open={open}
             close={() => setOpen(false)}
             slides={lightboxSlides}
-            initialIndex={selectedImage}
+            index={selectedImage}
         />
 
         {showSendMessageModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
-                    <h2 className="text-2xl font-bold mb-4">Contacter {seller.businessName}</h2>
+            <div
+              className="fixed inset-0 z-50 bg-purple-950/60 flex items-end sm:items-center justify-center p-0 sm:p-4"
+              onClick={() => setShowSendMessageModal(false)}
+            >
+                <div
+                  className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-6 text-left"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="message-title"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                    <h2 id="message-title" className="text-xl font-extrabold mb-4">{t.messageTo(seller.businessName)}</h2>
                     <form onSubmit={handleSendMessage}>
                         <textarea
-                            className="w-full border border-gray-300 rounded-lg p-2 mb-4"
+                            className="w-full !rounded-xl border border-gray-300 px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500"
                             rows="5"
-                            placeholder="Votre message..."
+                            placeholder={t.messagePlaceholder}
                             value={messageToSend}
                             onChange={(e) => setMessageToSend(e.target.value)}
+                            autoFocus
                             required
                         ></textarea>
-                        <div className="flex justify-end gap-4">
+                        <div className="flex justify-end gap-3">
                             <button
                                 type="button"
                                 onClick={() => setShowSendMessageModal(false)}
-                                className="bg-gray-300 hover:bg-gray-400 text-black py-2 px-4 rounded-lg"
+                                className="h-11 px-5 rounded-full text-gray-800 font-semibold hover:bg-gray-100"
                             >
-                                Annuler
+                                {t.cancel}
                             </button>
                             <button
                                 type="submit"
-                                className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg"
+                                className="h-11 px-5 rounded-full bg-purple-700 hover:bg-purple-800 text-white font-semibold"
                             >
-                                Envoyer
+                                {t.send}
                             </button>
                         </div>
                     </form>
