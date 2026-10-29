@@ -1938,7 +1938,8 @@ async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends
 # Champs sensibles jamais renvoyés par les routes publiques des vendeurs
 SELLER_PRIVATE_FIELDS = {"password", "reset_token", "reset_token_expiry"}
 
-@api_router.get("/sellers", response_model=List[Seller], response_model_exclude=SELLER_PRIVATE_FIELDS)
+# Sur une liste, l'exclusion doit viser chaque élément ("__all__")
+@api_router.get("/sellers", response_model=List[Seller], response_model_exclude={"__all__": SELLER_PRIVATE_FIELDS})
 async def list_sellers():
     sellers_cursor = db.sellers.find()
     sellers = await sellers_cursor.to_list(1000)
