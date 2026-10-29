@@ -50,6 +50,10 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Domaine canonique du site (SEO, aperçus réseaux sociaux, sitemap).
+# Fixé dans le code : nengoo.com redirige vers www, une valeur sans www crée une boucle pour les robots.
+SITE_URL = "https://www.nengoo.com"
+
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
@@ -1245,7 +1249,7 @@ async def generate_sitemap():
         categories_cursor = db.categories.find()
         categories = await categories_cursor.to_list(None)
 
-        frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
+        frontend_url = SITE_URL
         current_date = datetime.utcnow().strftime("%Y-%m-%d")
 
         # Build sitemap XML
@@ -1367,7 +1371,7 @@ async def get_product_og_tags(product_id: str):
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Frontend URL for redirection
-    frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
+    frontend_url = SITE_URL
     
     # Construct absolute image URL
     images = product.get("images", [])
@@ -1461,7 +1465,7 @@ async def debug_product_og_tags(product_id: str):
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    frontend_url = os.getenv("FRONTEND_URL", "https://www.nengoo.com")
+    frontend_url = SITE_URL
 
     images = product.get("images", [])
     # Check if images list exists, is not empty, and first element is valid
