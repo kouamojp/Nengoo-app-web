@@ -40,3 +40,12 @@ def test_other_numbers_do_not_match():
 def test_regex_metacharacters_are_not_injected():
     assert whatsapp_lookup(".*") == {"whatsapp": ".*"}
     assert whatsapp_lookup("vendeur@example.com") == {"whatsapp": "vendeur@example.com"}
+
+
+def test_canadian_and_russian_numbers():
+    assert matches("+15145550123", "+15145550123")
+    assert matches("+1 514 555 0123", "+15145550123")
+    assert matches("+79123456789", "+79123456789")
+    assert matches("+7 912 345-67-89", "+79123456789")
+    assert not matches("+15145550123", "+79123456789")
+    assert not matches("+79123456789", "+15145550123")

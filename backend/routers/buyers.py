@@ -5,7 +5,7 @@ from datetime import datetime
 import uuid
 import bcrypt
 
-from server import db, hash_password, verify_password, Buyer, BuyerAuthResponse, BUYER_PRIVATE_FIELDS
+from server import db, hash_password, verify_password, normalize_whatsapp, whatsapp_lookup, Buyer, BuyerAuthResponse, BUYER_PRIVATE_FIELDS
 from auth_tokens import create_access_token
 from firebase_admin_config import verify_firebase_token, is_firebase_initialized
 
@@ -34,8 +34,9 @@ class BuyerOAuthLoginRequest(BaseModel):
 
 @router.post("/signup", response_model=BuyerAuthResponse, response_model_exclude=BUYER_PRIVATE_FIELDS, status_code=status.HTTP_201_CREATED)
 async def create_buyer(buyer_data: BuyerCreate):
-    if await db.users.find_one({"whatsapp": buyer_data.whatsapp, "type": "buyer"}):
-        raise HTTPException(status_code=400, detail="Buyer with this WhatsApp number already exists.")
+    if await db.users.find_one({**whatsapp_lookup(buyer_data.whatsapp), "type": "buyer"}):
+        raise HTTPException(status_code=400, detail="Un compte avec ce numéro WhatsApp existe déjà")
+    buyer_data.whatsapp = normalize_whatsapp(buyer_data.whatsapp)
 
     hashed_password = hash_password(buyer_data.password)
     

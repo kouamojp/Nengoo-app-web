@@ -1188,9 +1188,11 @@ async def update_homepage_settings(settings: HomepageSettings):
 async def register_buyer(buyer_data: BuyerCreate):
     """Register a new buyer account"""
     # Check if buyer already exists
-    existing_buyer = await db.users.find_one({"whatsapp": buyer_data.whatsapp, "type": "buyer"})
+    # Doublon quel que soit le format enregistré ; on stocke le numéro normalisé
+    existing_buyer = await db.users.find_one({**whatsapp_lookup(buyer_data.whatsapp), "type": "buyer"})
     if existing_buyer:
         raise HTTPException(status_code=400, detail="Un compte avec ce numéro WhatsApp existe déjà")
+    buyer_data.whatsapp = normalize_whatsapp(buyer_data.whatsapp)
 
     # Hash password
     hashed_password = hash_password(buyer_data.password)
