@@ -5,7 +5,8 @@ from datetime import datetime
 import uuid
 import bcrypt
 
-from server import db, hash_password, verify_password, Buyer
+from server import db, hash_password, verify_password, Buyer, BuyerAuthResponse, BUYER_PRIVATE_FIELDS
+from auth_tokens import create_access_token
 from firebase_admin_config import verify_firebase_token, is_firebase_initialized
 
 # I am creating a new router here.
@@ -13,6 +14,10 @@ router = APIRouter(
     prefix="/buyers",
     tags=["buyers"],
 )
+
+def _authenticated(buyer: Buyer) -> BuyerAuthResponse:
+    """Acheteur + jeton d'accès (Authorization: Bearer)."""
+    return BuyerAuthResponse(**buyer.dict(), accessToken=create_access_token(buyer.id, "buyer"))
 
 class BuyerCreate(BaseModel):
     whatsapp: str
@@ -27,7 +32,7 @@ class BuyerLoginRequest(BaseModel):
 class BuyerOAuthLoginRequest(BaseModel):
     idToken: str
 
-@router.post("/signup", response_model=Buyer, status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=BuyerAuthResponse, response_model_exclude=BUYER_PRIVATE_FIELDS, status_code=status.HTTP_201_CREATED)
 async def create_buyer(buyer_data: BuyerCreate):
     if await db.users.find_one({"whatsapp": buyer_data.whatsapp, "type": "buyer"}):
         raise HTTPException(status_code=400, detail="Buyer with this WhatsApp number already exists.")
@@ -47,9 +52,9 @@ async def create_buyer(buyer_data: BuyerCreate):
     new_buyer = Buyer(**buyer_dict)
 
     await db.users.insert_one(new_buyer.dict())
-    return new_buyer
+    return _authenticated(new_buyer)
 
-@router.post("/login", response_model=Buyer)
+@router.post("/login", response_model=BuyerAuthResponse, response_model_exclude=BUYER_PRIVATE_FIELDS)
 async def buyer_login(login_data: BuyerLoginRequest):
     buyer = await db.users.find_one({"whatsapp": login_data.whatsapp, "type": "buyer"})
 
@@ -59,9 +64,9 @@ async def buyer_login(login_data: BuyerLoginRequest):
     if not buyer.get("password") or not verify_password(login_data.password, buyer["password"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
 
-    return Buyer(**buyer)
+    return _authenticated(Buyer(**buyer))
 
-@router.post("/oauth-login", response_model=Buyer)
+@router.post("/oauth-login", response_model=BuyerAuthResponse, response_model_exclude=BUYER_PRIVATE_FIELDS)
 async def buyer_oauth_login(oauth_data: BuyerOAuthLoginRequest):
     """
     OAuth login endpoint for buyers
@@ -100,7 +105,7 @@ async def buyer_oauth_login(oauth_data: BuyerOAuthLoginRequest):
                 {"$set": {"last_login": datetime.utcnow()}}
             )
             buyer['last_login'] = datetime.utcnow()
-            return Buyer(**buyer)
+            return _authenticated(Buyer(**buyer))
 
         # Check if buyer exists by email (linking existing account)
         buyer = await db.users.find_one({"email": email, "type": "buyer"})
@@ -120,7 +125,7 @@ async def buyer_oauth_login(oauth_data: BuyerOAuthLoginRequest):
             buyer['oauth_provider'] = provider_id
             buyer['oauth_uid'] = firebase_uid
             buyer['last_login'] = datetime.utcnow()
-            return Buyer(**buyer)
+            return _authenticated(Buyer(**buyer))
 
         # Create new buyer account (auto-registration)
         new_buyer_dict = {
@@ -142,7 +147,7 @@ async def buyer_oauth_login(oauth_data: BuyerOAuthLoginRequest):
         new_buyer = Buyer(**new_buyer_dict)
         await db.users.insert_one(new_buyer.dict())
 
-        return new_buyer
+        return _authenticated(new_buyer)
 
     except HTTPException:
         raise

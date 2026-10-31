@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks
+from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks, Query
 from fastapi.responses import HTMLResponse, Response
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr
@@ -9,7 +9,7 @@ import os
 import logging
 import re
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Any
 import uuid
 from datetime import datetime, timedelta
@@ -57,6 +57,11 @@ SITE_URL = "https://www.nengoo.com"
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
+# Identité par JWT (voir auth_tokens.py). Ajouté avant CORSMiddleware : les
+# middlewares s'empilent à l'envers, CORS enveloppe donc ses réponses d'erreur.
+from auth_tokens import IdentityMiddleware, create_access_token
+app.add_middleware(IdentityMiddleware)
+
 
 origins = [
     "https://www.nengoo.com",
@@ -101,6 +106,45 @@ def normalize_whatsapp(whatsapp: str) -> str:
     if not whatsapp:
         return ""
     return whatsapp.replace(" ", "").replace("-", "").strip()
+
+def whatsapp_lookup(whatsapp: str) -> dict:
+    """
+    Filtre Mongo qui retrouve un numéro quel que soit son format enregistré.
+
+    Les comptes existants mélangent « 690703689 », « +237690703689 »,
+    « +237 690703689 », « 237690703689 »… On compare donc les chiffres du
+    numéro local, l'indicatif 237 et les séparateurs étant facultatifs.
+    Une saisie sans chiffres (ancien compte identifié par un e-mail) est
+    comparée telle quelle.
+    """
+    raw = (whatsapp or "").strip()
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) < 8:
+        return {"whatsapp": raw}
+    local = digits[3:] if digits.startswith("237") and len(digits) > 9 else digits
+    sep = r"[\s.\-()]*"
+    pattern = r"^\s*\+?\s*(237)?" + sep + sep.join(local) + r"\s*$"
+    return {"whatsapp": {"$regex": pattern}}
+
+
+async def find_account_for_login(collection, whatsapp: str, password: str, extra_filter: Optional[dict] = None):
+    """
+    Compte dont le numéro correspond et dont le mot de passe est valide.
+    Plusieurs comptes peuvent partager un numéro (formats différents) : on
+    garde celui que le mot de passe ouvre, de préférence approuvé/actif.
+    Renvoie (compte, trouvé_sans_mot_de_passe_valide).
+    """
+    query = {**whatsapp_lookup(whatsapp), **(extra_filter or {})}
+    candidates = await collection.find(query).to_list(20)
+    def password_ok(account):
+        try:
+            return bool(account.get("password")) and verify_password(password, account["password"])
+        except ValueError:  # hash illisible (ancien format)
+            return False
+    valid = [c for c in candidates if password_ok(c)]
+    valid.sort(key=lambda c: (c.get("status") not in ("approved", "active"), c.get("id") is None))
+    return (valid[0] if valid else None), bool(candidates)
+
 
 def migrate_seller_data(seller_data: dict) -> dict:
     """
@@ -266,6 +310,20 @@ class AdminRole(str, Enum):
 
 # --- Pydantic Models ---
 
+_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+def _normalize_colors(colors: Optional[List[str]]) -> List[str]:
+    """Couleurs au format #RRGGBB en minuscules, sans doublon (12 max)."""
+    result: List[str] = []
+    for c in colors or []:
+        c = (c or "").strip()
+        if not _HEX_COLOR.match(c):
+            raise ValueError(f"Couleur invalide : {c!r} (format attendu #RRGGBB)")
+        c = c.lower()
+        if c not in result:
+            result.append(c)
+    return result[:12]
+
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: f"prod_{str(uuid.uuid4())[:8]}")
     slug: Optional[str] = None
@@ -290,6 +348,8 @@ class Product(BaseModel):
     views: int = 0
     favorites: int = 0
     tags: List[str] = []
+    # Couleurs disponibles, en hexadécimal (#RRGGBB)
+    colors: List[str] = []
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 
@@ -305,6 +365,12 @@ class ProductCreate(BaseModel):
     stock: int
     images: List[str]
     tags: Optional[List[str]] = []
+    colors: Optional[List[str]] = []
+
+    @field_validator("colors")
+    @classmethod
+    def _check_colors(cls, v):
+        return _normalize_colors(v)
 
 class ProductUpdate(BaseModel):
     name: Optional[str] = None
@@ -317,6 +383,12 @@ class ProductUpdate(BaseModel):
     images: Optional[List[str]] = None
     status: Optional[str] = None
     featured: Optional[bool] = None
+    colors: Optional[List[str]] = None
+
+    @field_validator("colors")
+    @classmethod
+    def _check_colors(cls, v):
+        return None if v is None else _normalize_colors(v)
 
 class Seller(BaseModel):
     id: str = Field(default_factory=lambda: f"seller_{str(uuid.uuid4())[:8]}")
@@ -342,6 +414,10 @@ class Seller(BaseModel):
     oauth_provider: Optional[str] = None  # 'google.com', 'facebook.com', 'apple.com'
     oauth_uid: Optional[str] = None  # Firebase UID
     last_login: Optional[datetime] = None
+
+class SellerAuthResponse(Seller):
+    """Vendeur connecté + jeton d'accès (à envoyer en Authorization: Bearer)."""
+    accessToken: Optional[str] = None
 
 class SellerCreate(BaseModel):
     whatsapp: str
@@ -446,6 +522,9 @@ class Admin(BaseModel):
     createdDate: datetime
     lastLogin: Optional[datetime] = None
     type: str = "admin"
+
+class AdminAuthResponse(Admin):
+    accessToken: Optional[str] = None
 
 class AdminCreate(BaseModel):
     name: str
@@ -574,6 +653,11 @@ class Buyer(BaseModel):
     oauth_provider: Optional[str] = None  # 'google.com', 'facebook.com', 'apple.com'
     oauth_uid: Optional[str] = None  # Firebase UID
     last_login: Optional[datetime] = None
+
+class BuyerAuthResponse(Buyer):
+    accessToken: Optional[str] = None
+
+BUYER_PRIVATE_FIELDS = {"password", "reset_token", "reset_token_expiry"}
 
 class BuyerUpdate(BaseModel):
     name: Optional[str] = None
@@ -1100,7 +1184,7 @@ async def update_homepage_settings(settings: HomepageSettings):
     return settings
 
 # --- Buyer Management ---
-@api_router.post("/buyers/register", response_model=Buyer)
+@api_router.post("/buyers/register", response_model=BuyerAuthResponse, response_model_exclude=BUYER_PRIVATE_FIELDS)
 async def register_buyer(buyer_data: BuyerCreate):
     """Register a new buyer account"""
     # Check if buyer already exists
@@ -1126,9 +1210,9 @@ async def register_buyer(buyer_data: BuyerCreate):
     )
 
     await db.users.insert_one(new_buyer.dict())
-    return new_buyer
+    return BuyerAuthResponse(**new_buyer.dict(), accessToken=create_access_token(new_buyer.id, "buyer"))
 
-@api_router.post("/buyers/login", response_model=Buyer)
+@api_router.post("/buyers/login", response_model=BuyerAuthResponse, response_model_exclude=BUYER_PRIVATE_FIELDS)
 async def buyer_login(login_data: BuyerLoginRequest):
     """Login for buyer accounts"""
     # Normaliser le numéro WhatsApp (supprimer les espaces)
@@ -1137,23 +1221,10 @@ async def buyer_login(login_data: BuyerLoginRequest):
     logging.info(f"[BUYER LOGIN] Attempting login with WhatsApp: {login_data.whatsapp} -> normalized: {normalized_whatsapp}")
 
     # Chercher l'acheteur avec le numéro normalisé ou le numéro original
-    buyer = await db.users.find_one({
-        "$or": [
-            {"whatsapp": normalized_whatsapp, "type": "buyer"},
-            {"whatsapp": login_data.whatsapp, "type": "buyer"}
-        ]
-    })
+    buyer, number_known = await find_account_for_login(db.users, login_data.whatsapp, login_data.password, {"type": "buyer"})
 
     if not buyer:
-        logging.warning(f"[BUYER LOGIN] Buyer not found with WhatsApp: {login_data.whatsapp}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
-
-    if not buyer.get("password"):
-        logging.warning(f"[BUYER LOGIN] Buyer {login_data.whatsapp} has no password")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Ce compte n'a pas de mot de passe. Veuillez vous inscrire.")
-
-    if not verify_password(login_data.password, buyer["password"]):
-        logging.warning(f"[BUYER LOGIN] Invalid password for buyer {login_data.whatsapp}")
+        logging.warning(f"[BUYER LOGIN] No buyer/password match (number known: {number_known})")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
 
     if buyer.get("status") != "active":
@@ -1161,7 +1232,7 @@ async def buyer_login(login_data: BuyerLoginRequest):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Votre compte est désactivé")
 
     logging.info(f"[BUYER LOGIN] Login successful for {login_data.whatsapp}")
-    return Buyer(**buyer)
+    return BuyerAuthResponse(**buyer, accessToken=create_access_token(buyer["id"], "buyer"))
 
 @api_router.get("/buyers", response_model=List[Buyer], dependencies=[Depends(super_admin_required)])
 async def list_buyers():
@@ -1200,12 +1271,25 @@ async def root():
 
 # --- Product Management ---
 @api_router.get("/products", response_model=List[Product])
-async def get_products(search: Optional[str] = None, seller_id: Optional[str] = None):
+async def get_products(
+    search: Optional[str] = None,
+    seller_id: Optional[str] = None,
+    category: Optional[str] = None,
+    # Pages publiques : ?status=approved (cache les produits archivés ou en attente).
+    # Sans ce paramètre, tous les statuts sont renvoyés (admin, espace vendeur).
+    status_filter: Optional[str] = Query(None, alias="status"),
+):
     query = {}
+    if category:
+        query["category"] = category
+    if status_filter:
+        query["status"] = status_filter
     if search:
+        # Texte libre : échappé pour ne pas être interprété comme une regex
+        pattern = re.escape(search)
         query["$or"] = [
-            {"name": {"$regex": search, "$options": "i"}},
-            {"description": {"$regex": search, "$options": "i"}},
+            {"name": {"$regex": pattern, "$options": "i"}},
+            {"description": {"$regex": pattern, "$options": "i"}},
         ]
     if seller_id:
         query["sellerId"] = seller_id
@@ -1566,10 +1650,26 @@ async def create_product(product_data: ProductCreate,
     return product
 
 @api_router.put("/products/{product_id}", response_model=Product, dependencies=[Depends(product_owner_or_moderator_required)])
-async def update_product(product_id: str, product_data: ProductUpdate):
+async def update_product(product_id: str, product_data: ProductUpdate,
+                         admin_role: Optional[str] = Depends(get_current_admin_role)):
     update_data = product_data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
+
+    # Un vendeur peut seulement mettre en vente ou archiver un produit déjà
+    # validé ; la modération (pending, rejected…) reste réservée aux admins.
+    if "status" in update_data and admin_role not in ["super_admin", "admin", "moderator"]:
+        current = await db.products.find_one({"id": product_id}, {"status": 1})
+        current_status = current.get("status") if current else None
+        allowed = {"approved", "inactive"}
+        if update_data["status"] == current_status:
+            # Formulaires qui renvoient le produit entier : statut inchangé
+            del update_data["status"]
+        elif update_data["status"] not in allowed or current_status not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Seul un modérateur peut changer le statut de ce produit.",
+            )
     
     # If name is being updated, check for duplicates
     if "name" in update_data:
@@ -1588,9 +1688,12 @@ async def update_product(product_id: str, product_data: ProductUpdate):
                     detail=f"Vous avez déjà un autre produit nommé '{update_data['name']}'."
                 )
             
-            # Also update slug if name changes
-            update_data["slug"] = await get_unique_slug(update_data["name"])
-    
+            # Nouveau slug seulement si le nom change vraiment : sinon le slug
+            # actuel (déjà pris) deviendrait « nom-1 » et casserait les liens
+            if update_data["name"].strip() != (current_product.get("name") or "").strip():
+                update_data["slug"] = await get_unique_slug(update_data["name"])
+
+    update_data["updatedAt"] = datetime.utcnow()
     await db.products.update_one({"id": product_id}, {"$set": update_data})
     updated_product = await db.products.find_one({"id": product_id})
     if not updated_product:
@@ -1618,8 +1721,14 @@ async def bulk_delete_products(request: BulkDeleteRequest,
     return
 
 @api_router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(seller_or_moderator_or_higher_required)])
-async def delete_product(product_id: str):
-    result = await db.products.delete_one({"id": product_id})
+async def delete_product(product_id: str,
+                         current_seller_id: Optional[str] = Depends(get_current_seller_optional),
+                         admin_role: Optional[str] = Depends(get_current_admin_role)):
+    query = {"id": product_id}
+    # Un vendeur ne peut supprimer que ses propres produits (comme la suppression groupée)
+    if current_seller_id and admin_role not in ["super_admin", "admin", "moderator"]:
+        query["sellerId"] = current_seller_id
+    result = await db.products.delete_one(query)
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Product not found")
     return
@@ -1914,10 +2023,14 @@ async def get_user_interactions(
     }
 
 # --- Seller Management ---
-@api_router.post("/sellers", response_model=Seller)
+# Champs sensibles jamais renvoyés par les routes publiques des vendeurs
+SELLER_PRIVATE_FIELDS = {"password", "reset_token", "reset_token_expiry"}
+
+@api_router.post("/sellers", response_model=Seller, response_model_exclude=SELLER_PRIVATE_FIELDS)
 async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends(get_current_admin_role)):
-    if await db.sellers.find_one({"whatsapp": seller_data.whatsapp}):
-        raise HTTPException(status_code=400, detail="Seller with this WhatsApp number already exists.")
+    if await db.sellers.find_one(whatsapp_lookup(seller_data.whatsapp)):
+        raise HTTPException(status_code=400, detail="Un compte vendeur existe déjà avec ce numéro WhatsApp.")
+    seller_data.whatsapp = normalize_whatsapp(seller_data.whatsapp)
 
     hashed_password = hash_password(seller_data.password)
     
@@ -1939,8 +2052,6 @@ async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends
     await db.sellers.insert_one(seller.dict())
     return seller
 
-# Champs sensibles jamais renvoyés par les routes publiques des vendeurs
-SELLER_PRIVATE_FIELDS = {"password", "reset_token", "reset_token_expiry"}
 
 # Sur une liste, l'exclusion doit viser chaque élément ("__all__")
 @api_router.get("/sellers", response_model=List[Seller], response_model_exclude={"__all__": SELLER_PRIVATE_FIELDS})
@@ -1979,28 +2090,23 @@ class SellerLoginRequest(BaseModel):
 class SellerOAuthLoginRequest(BaseModel):
     idToken: str
 
-@api_router.post("/sellers/login", response_model=Seller)
+@api_router.post("/sellers/login", response_model=SellerAuthResponse, response_model_exclude=SELLER_PRIVATE_FIELDS)
 async def seller_login(login_data: SellerLoginRequest):
     # Normaliser le numéro WhatsApp (supprimer les espaces)
     normalized_whatsapp = normalize_whatsapp(login_data.whatsapp)
 
     logging.info(f"[SELLER LOGIN] Attempting login with WhatsApp: {login_data.whatsapp} -> normalized: {normalized_whatsapp}")
 
-    # Chercher le vendeur avec le numéro normalisé ou le numéro original
-    seller = await db.sellers.find_one({
-        "$or": [
-            {"whatsapp": normalized_whatsapp},
-            {"whatsapp": login_data.whatsapp}
-        ]
-    })
+    seller, number_known = await find_account_for_login(db.sellers, login_data.whatsapp, login_data.password)
 
     if not seller:
-        logging.warning(f"[SELLER LOGIN] Seller not found with WhatsApp: {login_data.whatsapp}")
+        logging.warning(f"[SELLER LOGIN] No seller/password match (number known: {number_known})")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
 
-    if not verify_password(login_data.password, seller["password"]):
-        logging.warning(f"[SELLER LOGIN] Invalid password for seller {login_data.whatsapp}")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
+    # Anciens comptes créés sans identifiant : on en attribue un, stable
+    if not seller.get("id"):
+        seller["id"] = f"seller_{str(uuid.uuid4())[:8]}"
+        await db.sellers.update_one({"_id": seller["_id"]}, {"$set": {"id": seller["id"]}})
 
     if seller["status"] != "approved":
         logging.warning(f"[SELLER LOGIN] Seller {login_data.whatsapp} not approved: {seller['status']}")
@@ -2010,9 +2116,9 @@ async def seller_login(login_data: SellerLoginRequest):
     seller = migrate_seller_data(seller)
 
     logging.info(f"[SELLER LOGIN] Login successful for {login_data.whatsapp}")
-    return Seller(**seller)
+    return SellerAuthResponse(**seller, accessToken=create_access_token(seller["id"], "seller"))
 
-@api_router.post("/sellers/oauth-login", response_model=Seller)
+@api_router.post("/sellers/oauth-login", response_model=SellerAuthResponse, response_model_exclude=SELLER_PRIVATE_FIELDS)
 async def seller_oauth_login(oauth_data: SellerOAuthLoginRequest):
     """
     OAuth login endpoint for sellers
@@ -2061,7 +2167,7 @@ async def seller_oauth_login(oauth_data: SellerOAuthLoginRequest):
             seller['last_login'] = datetime.utcnow()
             # Migrate legacy seller data
             seller = migrate_seller_data(seller)
-            return Seller(**seller)
+            return SellerAuthResponse(**seller, accessToken=create_access_token(seller["id"], "seller"))
 
         # Check if seller exists by email
         seller = await db.sellers.find_one({"email": email})
@@ -2090,7 +2196,7 @@ async def seller_oauth_login(oauth_data: SellerOAuthLoginRequest):
             seller['last_login'] = datetime.utcnow()
             # Migrate legacy seller data
             seller = migrate_seller_data(seller)
-            return Seller(**seller)
+            return SellerAuthResponse(**seller, accessToken=create_access_token(seller["id"], "seller"))
 
         # No seller found - sellers cannot auto-register via OAuth
         raise HTTPException(
@@ -2117,7 +2223,7 @@ async def approve_seller(seller_id: str):
     updated_seller = migrate_seller_data(updated_seller)
     return Seller(**updated_seller)
 
-@api_router.put("/sellers/{seller_id}", response_model=Seller)
+@api_router.put("/sellers/{seller_id}", response_model=Seller, response_model_exclude=SELLER_PRIVATE_FIELDS)
 async def update_seller(
     seller_id: str, 
     seller_data: SellerUpdate, 
@@ -2856,7 +2962,7 @@ class AdminLoginRequest(BaseModel):
 # --- Admin Management ---
 
 
-@api_router.post("/admins/login", response_model=Admin)
+@api_router.post("/admins/login", response_model=AdminAuthResponse, response_model_exclude={"accessCode"})
 async def admin_login(login_data: AdminLoginRequest):
     admin = await db.admins.find_one({"whatsapp": login_data.whatsapp})
 
@@ -2877,9 +2983,11 @@ async def admin_login(login_data: AdminLoginRequest):
     
     # Exclure le champ _id et retourner l'objet Admin complet
     admin_data = {k: v for k, v in admin.items() if k != '_id'}
-    return Admin(**admin_data)
+    role = admin_data.get("role")
+    role = getattr(role, "value", role)
+    return AdminAuthResponse(**admin_data, accessToken=create_access_token(admin_data["id"], "admin", role))
 
-@api_router.post("/admins", response_model=Admin, status_code=status.HTTP_201_CREATED, dependencies=[Depends(super_admin_required)])
+@api_router.post("/admins", response_model=Admin, response_model_exclude={"accessCode"}, status_code=status.HTTP_201_CREATED, dependencies=[Depends(super_admin_required)])
 async def create_admin(admin_data: AdminCreate):
     if await db.admins.find_one({"whatsapp": admin_data.whatsapp}):
         raise HTTPException(status_code=400, detail="Admin with this WhatsApp number already exists.")
@@ -2894,7 +3002,7 @@ async def create_admin(admin_data: AdminCreate):
     await db.admins.insert_one(admin.dict())
     return admin
 
-@api_router.get("/admins", response_model=List[Admin], dependencies=[Depends(super_admin_required)])
+@api_router.get("/admins", response_model=List[Admin], response_model_exclude={"__all__": {"accessCode"}}, dependencies=[Depends(super_admin_required)])
 async def list_admins():
     admins_cursor = db.admins.find()
     admins_from_db = await admins_cursor.to_list(1000)

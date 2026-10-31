@@ -166,6 +166,9 @@ DB_NAME=nengoo
 # Sécurité (générer avec : openssl rand -hex 32)
 JWT_SECRET_KEY=<cle-aleatoire-longue>
 ENVIRONMENT=production
+# Anciens en-têtes d'identité (X-Seller-Id, X-Admin-Role…) acceptés sans jeton.
+# Passer à false une fois le site ET l'app à jour (voir « Bascule JWT » au §5).
+LEGACY_AUTH_HEADERS=true
 
 # AWS S3
 AWS_ACCESS_KEY_ID=<...>
@@ -399,6 +402,19 @@ mkdir -p tmp && touch tmp/restart.txt
 ```
 
 **Frontend** : `npm run build` en local → remplacer le contenu de `public_html/` (en conservant `.htaccess`, `og-proxy.php`, `.well-known/`).
+
+**Bascule JWT (une seule fois)**
+
+Les connexions renvoient un jeton (`accessToken`) que le site et l'app envoient dans `Authorization: Bearer`.
+Le middleware `backend/auth_tokens.py` vérifie que les en-têtes d'identité correspondent au jeton.
+
+1. Déployer backend, site et app avec `LEGACY_AUTH_HEADERS=true` : rien ne casse, les anciennes sessions restent valides.
+2. Attendre que les utilisateurs se soient reconnectés (sessions vendeur/acheteur : 30 jours ; admin : 12 h)
+   et que la nouvelle version de l'app soit installée.
+3. Mettre `LEGACY_AUTH_HEADERS=false` dans `.env`, puis `touch tmp/restart.txt`.
+   Une session sans jeton reçoit alors un 401 et l'utilisateur est renvoyé vers la connexion.
+
+Ne jamais changer `JWT_SECRET_KEY` sans raison : toutes les sessions seraient invalidées.
 
 ---
 
