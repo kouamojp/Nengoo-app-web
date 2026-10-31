@@ -17,6 +17,7 @@ export { default as About } from './pages/About';
 export { default as Homepage } from './pages/Homepage';
 export { default as PickupPointsMap } from './pages/PickupPointsMap';
 export { default as PrivacyPolicy } from './pages/PrivacyPolicy';
+export { default as DeleteAccount } from './pages/DeleteAccount';
 export { default as ProductCatalog } from './pages/ProductCatalog';
 export { default as ProductDetail } from './pages/ProductDetail';
 export { default as SellerShop } from './pages/SellerShop';

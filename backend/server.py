@@ -59,7 +59,8 @@ api_router = APIRouter(prefix="/api")
 
 # Identité par JWT (voir auth_tokens.py). Ajouté avant CORSMiddleware : les
 # middlewares s'empilent à l'envers, CORS enveloppe donc ses réponses d'erreur.
-from auth_tokens import IdentityMiddleware, create_access_token
+from auth_tokens import IdentityMiddleware, create_access_token, decode_access_token
+from account_deletion import erase_buyer, erase_seller
 app.add_middleware(IdentityMiddleware)
 
 
@@ -1235,6 +1236,56 @@ async def buyer_login(login_data: BuyerLoginRequest):
 
     logging.info(f"[BUYER LOGIN] Login successful for {login_data.whatsapp}")
     return BuyerAuthResponse(**buyer, accessToken=create_access_token(buyer["id"], "buyer"))
+
+# --- Suppression de compte par son titulaire ---
+class AccountDeletionRequest(BaseModel):
+    userType: str  # 'buyer' ou 'seller'
+    whatsapp: Optional[str] = None
+    password: Optional[str] = None
+
+@api_router.post("/account/delete")
+async def delete_own_account(req: AccountDeletionRequest, authorization: Optional[str] = Header(None)):
+    """
+    Supprime le compte de l'appelant (page /delete-account du site, écran
+    « Supprimer mon compte » de l'app). Identité confirmée par numéro WhatsApp
+    + mot de passe ; un compte sans mot de passe (connexion Google) est
+    confirmé par son jeton de session.
+    """
+    if req.userType not in ("buyer", "seller"):
+        raise HTTPException(status_code=400, detail="Type de compte inconnu.")
+    is_buyer = req.userType == "buyer"
+    collection = db.users if is_buyer else db.sellers
+    extra_filter = {"type": "buyer"} if is_buyer else None
+
+    if req.whatsapp and req.password:
+        account, _ = await find_account_for_login(collection, req.whatsapp, req.password, extra_filter)
+        if not account:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
+    else:
+        token = (authorization or "").strip()
+        if token.lower().startswith("bearer "):
+            token = token[7:].strip()
+        try:
+            claims = decode_access_token(token)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Saisissez votre numéro WhatsApp et votre mot de passe.")
+        if claims.get("typ") != req.userType:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Saisissez votre numéro WhatsApp et votre mot de passe.")
+        account = await collection.find_one({"id": claims["sub"], **(extra_filter or {})})
+        if not account:
+            raise HTTPException(status_code=404, detail="Compte introuvable.")
+        if account.get("password"):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Saisissez votre mot de passe pour confirmer.")
+
+    if not account.get("id"):
+        # Ancien compte vendeur sans identifiant : rien d'autre ne s'y rattache
+        await collection.delete_one({"_id": account["_id"]})
+    elif is_buyer:
+        await erase_buyer(db, account["id"])
+    else:
+        await erase_seller(db, account["id"])
+    logging.info(f"[ACCOUNT DELETE] {req.userType} {account.get('id')} deleted by its owner")
+    return {"message": "Votre compte a été supprimé."}
 
 @api_router.get("/buyers", response_model=List[Buyer], dependencies=[Depends(super_admin_required)])
 async def list_buyers():

@@ -27,6 +27,7 @@ import {
   NotificationsPage,
   PickupPointsMap ,
   PrivacyPolicy,
+  DeleteAccount,
   PrivacyPolicyEditor
 } from './components';
 import BuyerVerification from './components/admin/BuyerVerification';
@@ -172,6 +173,7 @@ function App() {
             <Route path="/search" element={<SearchResults {...appProps} />} />
             <Route path="/pickup-points" element={<PickupPointsMap {...appProps} />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy {...appProps} />} />
+            <Route path="/delete-account" element={<DeleteAccount {...appProps} />} />
 
             {/* Authentication Routes */}
             <Route path="/login" element={<Login {...appProps} />} />
