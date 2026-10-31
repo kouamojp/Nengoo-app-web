@@ -14,11 +14,6 @@ import {
   SearchResults,
   SellerShop,
   SellerDashboard,
-  SellerProducts,
-  SellerOrders,
-  SellerAnalytics,
-  SellerProfile,
-  SellerMessages,
   Login,
   BuyerSignup,
   SellerSignup,
@@ -129,7 +124,11 @@ function App() {
     setLanguage(prev => prev === 'fr' ? 'en' : 'fr');
   };
 
-  const updateUser = (userData) => {
+  const updateUser = (incoming) => {
+    // Une mise à jour de profil renvoie le compte sans jeton : on garde celui de la session
+    const userData = incoming && !incoming.accessToken && user?.accessToken && user.id === incoming.id
+      ? { ...incoming, accessToken: user.accessToken }
+      : incoming;
     setUser(userData);
     if (userData) {
       localStorage.setItem('nengoo-user', JSON.stringify(userData));
@@ -188,12 +187,11 @@ function App() {
             <Route path="/seller/:id" element={<SellerShop {...appProps} />} />
 
             {/* Seller Routes */}
+            {/* Chaque section de l'espace vendeur a son URL, dans la même coque */}
             <Route path="/seller" element={<SellerDashboard {...appProps} />} />
-            <Route path="/seller/products" element={<SellerProducts {...appProps} />} />
-            <Route path="/seller/orders" element={<SellerOrders {...appProps} />} />
-            <Route path="/seller/analytics" element={<SellerAnalytics {...appProps} />} />
-            <Route path="/seller/profile" element={<SellerProfile {...appProps} />} />
-            <Route path="/seller/messages" element={<SellerMessages {...appProps} />} />
+            {['products', 'orders', 'analytics', 'profile', 'messages'].map(section => (
+              <Route key={section} path={`/seller/${section}`} element={<SellerDashboard {...appProps} section={section} />} />
+            ))}
             
             {/* Admin Routes */}
             <Route path="/admin/login" element={<AdminLogin {...appProps} />} />

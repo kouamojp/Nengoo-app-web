@@ -109,7 +109,7 @@ const Homepage = (props) => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`${API_BASE_URL}/products`);
+        const response = await fetch(`${API_BASE_URL}/products?status=approved`);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

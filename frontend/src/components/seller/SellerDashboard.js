@@ -1,8 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import Header from '../layout/Header';
-import Footer from '../layout/Footer';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, Navigate } from 'react-router-dom';
 import SellerSidebar from './SellerSidebar';
 import SellerHeader from './SellerHeader';
 import SellerProducts from './SellerProducts';
@@ -10,123 +7,171 @@ import SellerOrders from './SellerOrders';
 import SellerAnalytics from './SellerAnalytics';
 import SellerMessages from './SellerMessages';
 import SellerProfile from './SellerProfile';
+import { StatusBadge } from '../admin/AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SellerDashboard = (props) => {
-  const { language, user, setUser } = props;
-  const [activeSection, setActiveSection] = useState('dashboard');
-  const [stats, setStats] = useState([
-    { title: "Ventes Totales", value: "0", icon: "💰", color: "from-green-400 to-green-600", change: "+0%" },
-    { title: "Commandes en Attente", value: "0", icon: "📋", color: "from-yellow-400 to-orange-500", change: "+0" },
-    { title: "Revenus du Mois", value: "0 XAF", icon: "📈", color: "from-blue-400 to-blue-600", change: "+0%" },
-    { title: "Produits Actifs", value: "0", icon: "📦", color: "from-purple-400 to-purple-600", change: "+0" }
-  ]);
-  const [recentOrders, setRecentOrders] = useState([]);
+export const formatXAF = (value) =>
+  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
 
-  const handleNavigate = (sectionId) => {
-    setActiveSection(sectionId);
-    setTimeout(() => {
-        const section = document.getElementById(`${sectionId}-section`);
-        if (section) {
-            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    }, 0); 
-  };
+const Stat = ({ label, value, hint }) => (
+  <div className="adm-card p-5">
+    <p className="text-sm font-semibold text-gray-600">{label}</p>
+    <p className="price mt-1 text-3xl text-purple-950 tabular-nums">{value}</p>
+    {hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
+  </div>
+);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!user) return;
+// Une action à faire en priorité, avec son bouton
+const Task = ({ title, text, to, cta }) => (
+  <div className="adm-card p-5 flex flex-wrap items-center gap-4 border-l-4 !border-l-purple-700">
+    <div className="flex-1 min-w-[14rem]">
+      <p className="font-bold text-purple-950">{title}</p>
+      <p className="text-sm text-gray-600">{text}</p>
+    </div>
+    <Link to={to} className="adm-btn adm-btn-primary">{cta}</Link>
+  </div>
+);
 
-      try {
-        const sellerId = user.id;
-        
-        // Fetch Orders for pending count and recent list
-        const ordersResponse = await fetch(`${API_BASE_URL}/orders?seller_id=${sellerId}`);
-        let pendingOrdersCount = 0;
-        if (ordersResponse.ok) {
-          const orders = await ordersResponse.json();
-          setRecentOrders(orders.slice(0, 5));
-          pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
-        }
-
-        // Fetch Analytics
-        const analyticsResponse = await fetch(`${API_BASE_URL}/sellers/${sellerId}/analytics`);
-        if (analyticsResponse.ok) {
-          const analytics = await analyticsResponse.json();
-          
-          // Get current month short name (e.g., "Jan", "Feb") matching backend format
-          const currentMonth = new Date().toLocaleString('en-US', { month: 'short' }); 
-          const currentMonthRevenue = analytics.monthly_revenue.find(m => m.month === currentMonth)?.revenue || 0;
-
-          setStats([
-            { title: "Ventes Totales", value: analytics.total_orders, icon: "💰", color: "from-green-400 to-green-600", change: "" },
-            { title: "Commandes en Attente", value: pendingOrdersCount, icon: "📋", color: "from-yellow-400 to-orange-500", change: "" },
-            { title: "Revenus du Mois", value: `${currentMonthRevenue.toLocaleString()} XAF`, icon: "📈", color: "from-blue-400 to-blue-600", change: "" },
-            { title: "Produits Actifs", value: analytics.total_products, icon: "📦", color: "from-purple-400 to-purple-600", change: "" }
-          ]);
-        }
-
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      }
-    };
-
-    fetchData();
-  }, [user]);
+const Overview = ({ user, orders, analytics, loading }) => {
+  const pending = orders.filter(o => o.status === 'pending');
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'short' });
+  const monthRevenue = analytics?.monthly_revenue?.find(m => m.month === currentMonth)?.revenue || 0;
+  const productCount = analytics?.total_products ?? null;
+  const firstName = (user?.name || '').split(' ')[0];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header {...props} />
-      
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-1">
-            <SellerSidebar onNavigate={handleNavigate} currentPage={activeSection} language={language} user={user} setUser={setUser} />
-          </div>
-          
-          <div id="seller-content-area" className="lg:col-span-3 space-y-8">
-            <div id="dashboard-section" className={`${activeSection === 'dashboard' ? '' : 'hidden'}`}>
-                <div>
-                    <SellerHeader title="Tableau de Bord Vendeur" language={language} user={user} />
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                      {stats.map((stat, index) => (
-                        <div key={index} className={`bg-gradient-to-r ${stat.color} text-white rounded-lg p-6 shadow-lg`}>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm opacity-90">{stat.title}</p>
-                              <p className="text-2xl font-bold">{stat.value}</p>
-                            </div>
-                            <div className="text-3xl">{stat.icon}</div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                </div>
-            </div>
+    <>
+      <SellerHeader
+        title={firstName ? `Bonjour ${firstName}` : 'Vue d\'ensemble'}
+        description={`Votre boutique ${user?.businessName || ''} en un coup d'œil.`}
+      />
 
-            <div id="products-section" className={`${activeSection === 'products' ? '' : 'hidden'}`}>
-                <SellerProducts {...props} />
-            </div>
-            <div id="orders-section" className={`${activeSection === 'orders' ? '' : 'hidden'}`}>
-                <SellerOrders {...props} />
-            </div>
-            <div id="analytics-section" className={`${activeSection === 'analytics' ? '' : 'hidden'}`}>
-                <SellerAnalytics {...props} />
-            </div>
-            <div id="messages-section" className={`${activeSection === 'messages' ? '' : 'hidden'}`}>
-                <SellerMessages {...props} />
-            </div>
-            <div id="profile-section" className={`${activeSection === 'profile' ? '' : 'hidden'}`}>
-                <SellerProfile {...props} />
-            </div>
+      {!loading && (
+        <section aria-label="À faire" className="space-y-3 mb-8">
+          {pending.length > 0 && (
+            <Task
+              title={`${pending.length} commande${pending.length > 1 ? 's' : ''} à confirmer`}
+              text="Le client attend votre confirmation pour la livraison."
+              to="/seller/orders"
+              cta="Voir les commandes"
+            />
+          )}
+          {productCount === 0 && (
+            <Task
+              title="Ajoutez votre premier produit"
+              text="Votre boutique est visible dès qu'elle contient un produit."
+              to="/seller/products"
+              cta="Ajouter un produit"
+            />
+          )}
+          {!user?.logoUrl && (
+            <Task
+              title="Ajoutez le logo de votre boutique"
+              text="Il apparaît sur vos produits et votre page boutique."
+              to="/seller/profile"
+              cta="Compléter le profil"
+            />
+          )}
+        </section>
+      )}
 
-          </div>
+      <section aria-label="Chiffres clés" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Stat label="Revenus du mois" value={loading ? '…' : formatXAF(monthRevenue)} />
+        <Stat label="Commandes" value={loading ? '…' : (analytics?.total_orders ?? orders.length)} hint="Depuis l'ouverture" />
+        <Stat label="À confirmer" value={loading ? '…' : pending.length} />
+        <Stat label="Produits" value={loading ? '…' : (productCount ?? '—')} />
+      </section>
+
+      <section className="adm-card overflow-hidden">
+        <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-extrabold text-purple-950">Dernières commandes</h2>
+          <Link to="/seller/orders" className="adm-link text-sm">Toutes les commandes</Link>
         </div>
-      </div>
-      
-      <Footer language={language} />
-    </div>
+        {orders.length === 0 ? (
+          <p className="px-5 py-10 text-center text-gray-600">
+            {loading ? 'Chargement…' : 'Aucune commande pour le moment. Elles apparaîtront ici dès qu\'un client achète.'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="adm-th">Client</th>
+                  <th className="adm-th">Date</th>
+                  <th className="adm-th text-right">Montant</th>
+                  <th className="adm-th">Statut</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {orders.slice(0, 5).map(order => (
+                  <tr key={order.id}>
+                    <td className="adm-td font-semibold">{order.buyerName}</td>
+                    <td className="adm-td text-gray-600">{new Date(order.orderedDate).toLocaleDateString('fr-FR')}</td>
+                    <td className="adm-td text-right price tabular-nums">{formatXAF(order.totalAmount)}</td>
+                    <td className="adm-td"><StatusBadge status={order.status} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
+  );
+};
+
+const SECTIONS = {
+  products: SellerProducts,
+  orders: SellerOrders,
+  analytics: SellerAnalytics,
+  messages: SellerMessages,
+  profile: SellerProfile,
+};
+
+const SellerDashboard = (props) => {
+  const { user, setUser, section = 'dashboard' } = props;
+  const [orders, setOrders] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    if (!user || user.type !== 'seller') return;
+    setLoading(true);
+    try {
+      const [ordersRes, analyticsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/orders?seller_id=${user.id}`, { headers: { 'X-Seller-Id': user.id } }),
+        fetch(`${API_BASE_URL}/sellers/${user.id}/analytics`, { headers: { 'X-Seller-Id': user.id } }),
+      ]);
+      if (ordersRes.ok) {
+        const data = await ordersRes.json();
+        setOrders([...data].sort((a, b) => new Date(b.orderedDate) - new Date(a.orderedDate)));
+      }
+      if (analyticsRes.ok) setAnalytics(await analyticsRes.json());
+    } catch (error) {
+      console.error('Erreur de chargement du tableau de bord vendeur:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => { fetchData(); }, [fetchData, section]);
+
+  // L'utilisateur est restauré depuis localStorage après le premier rendu
+  if (!user) {
+    return localStorage.getItem('nengoo-user') ? null : <Navigate to="/login/seller" replace />;
+  }
+  if (user.type !== 'seller') return <Navigate to="/" replace />;
+
+  const Section = SECTIONS[section];
+  const pendingOrders = orders.filter(o => o.status === 'pending').length;
+
+  return (
+    <SellerSidebar user={user} setUser={setUser} active={section} pendingOrders={pendingOrders}>
+      {Section
+        ? <Section {...props} />
+        : <Overview user={user} orders={orders} analytics={analytics} loading={loading} />}
+    </SellerSidebar>
   );
 };
 

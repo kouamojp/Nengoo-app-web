@@ -1,351 +1,223 @@
-
 import React, { useState, useEffect } from 'react';
-import { openWhatsApp } from '../../lib/utils';
 import SellerHeader from './SellerHeader';
+import { Field } from '../admin/AdminUI';
+import { cameroonCities } from '../../lib/mockData';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+const formatXAF = (value) =>
+  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
+
+const fromUser = (user) => ({
+  businessName: user.businessName || '',
+  email: user.email || '',
+  whatsapp: user.whatsapp || '',
+  address: user.address || '',
+  city: user.city || '',
+  description: user.description || '',
+  logoUrl: user.logoUrl || '',
+  deliveryPrice: user.deliveryPrice ?? 0,
+  facebook: user.socialMedia?.facebook || '',
+});
+
+// Ligne de lecture : libellé + valeur, ou « Non renseigné »
+const Row = ({ label, children }) => (
+  <div className="py-3 grid sm:grid-cols-3 gap-1 sm:gap-4">
+    <dt className="text-sm font-semibold text-gray-600">{label}</dt>
+    <dd className="sm:col-span-2 text-gray-900 break-words">
+      {children || <span className="text-gray-500">Non renseigné</span>}
+    </dd>
+  </div>
+);
 
 const SellerProfile = (props) => {
-  const { language, user } = props;
-  const [profileData, setProfileData] = useState(null);
+  const { user, setUser } = props;
+  const [form, setForm] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-
-  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState(null); // { type: 'success' | 'error', text }
 
   useEffect(() => {
-    // Only reset the form data if we are NOT in editing mode.
-    // This prevents the form from being reset while the user is typing,
-    // and also correctly resets the form on "Cancel".
-    if (user && !isEditing) {
-      setProfileData({
-        name: user.businessName || '',
-        email: user.email || '',
-        phone: user.whatsapp || '',
-        address: user.address || '',
-        city: user.city || '',
-        description: user.description || '',
-        logo: user.logoUrl || null,
-        joinDate: user.joinDate || new Date().toISOString(),
-        rating: user.rating || 4.5, // Mock data for now
-        totalSales: user.totalSales || 120, // Mock data for now
-        socialMedia: user.socialMedia || { whatsapp: user.whatsapp || '' },
-        deliveryPrice: user.deliveryPrice || 0,
-      });
-    }
+    // Le formulaire n'est réinitialisé qu'hors édition (sinon la saisie serait perdue)
+    if (user && !isEditing) setForm(fromUser(user));
   }, [user, isEditing]);
 
-  const handleSave = async (e) => {
-    e.preventDefault();
+  const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }));
 
-    const sellerId = user.id;
-    if (!sellerId) {
-      alert("Erreur: ID du vendeur non trouvé.");
-      return;
-    }
-
-    console.log('profileData before update:', profileData);
-
-    // Mapping frontend state to backend model
-    const updateData = {
-      businessName: profileData?.name,
-      email: profileData?.email,
-      whatsapp: profileData?.phone,
-      address: profileData?.address,
-      city: profileData?.city,
-      description: profileData?.description,
-      logoUrl: profileData?.logo,
-      socialMedia: profileData?.socialMedia,
-      deliveryPrice: profileData?.deliveryPrice
-    };
-
+  // Logo : URL S3 pré-signée, comme les images produit
+  const uploadLogo = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    setMessage(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/sellers/${sellerId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Seller-Id': sellerId,
-        },
-        body: JSON.stringify(updateData),
+      const presigned = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Seller-Id': user.id },
+        body: JSON.stringify({ fileName: file.name, fileType: file.type }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to update profile');
-      }
-
-      const updatedSeller = await response.json();
-
-      // Update local state and UI
-      props.setUser(updatedSeller);
-      setIsEditing(false);
-      alert('Profil mis à jour avec succès!');
-
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      alert(`Erreur lors de la mise à jour du profil: ${error.message}`);
+      if (!presigned.ok) throw new Error('presigned');
+      const { uploadUrl, publicUrl } = await presigned.json();
+      const put = await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      if (!put.ok) throw new Error('upload');
+      setForm(f => ({ ...f, logoUrl: publicUrl }));
+    } catch (err) {
+      console.error('Logo upload failed:', err);
+      setMessage({ type: 'error', text: 'Le logo n\'a pas pu être envoyé. Essayez une image JPG ou PNG plus légère.' });
+    } finally {
+      setUploading(false);
     }
   };
 
-  if (!profileData) {
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/sellers/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-Seller-Id': user.id },
+        body: JSON.stringify({
+          businessName: form.businessName.trim(),
+          email: form.email.trim(),
+          whatsapp: form.whatsapp.trim(),
+          address: form.address.trim(),
+          city: form.city,
+          description: form.description.trim(),
+          logoUrl: form.logoUrl || null,
+          deliveryPrice: Number(form.deliveryPrice) || 0,
+          socialMedia: { ...(user.socialMedia || {}), facebook: form.facebook.trim() || undefined },
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(typeof data.detail === 'string' ? data.detail : 'Enregistrement impossible');
+      }
+      const updated = await response.json();
+      // La réponse ne contient pas le jeton de session : on le conserve
+      setUser({ ...user, ...updated });
+      setIsEditing(false);
+      setMessage({ type: 'success', text: 'Profil enregistré.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!form) {
     return (
-      <div className="lg:col-span-3">
-        <SellerHeader title="Profil Vendeur" language={language} />
-        <div className="container mx-auto px-4 py-8 text-center">
-          <p>Chargement du profil...</p>
-        </div>
+      <div>
+        <SellerHeader title="Boutique et livraison" />
+        <p className="adm-card px-5 py-12 text-center text-gray-600">Chargement du profil…</p>
       </div>
     );
   }
 
+  const initial = (form.businessName || 'B').charAt(0).toUpperCase();
+  const logo = form.logoUrl
+    ? <img src={form.logoUrl} alt="" className="w-20 h-20 rounded-full object-cover bg-gray-100" />
+    : <span className="w-20 h-20 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-display text-4xl" aria-hidden="true">{initial}</span>;
+
   return (
-    <div className="lg:col-span-3">
-      <SellerHeader title="Profil Vendeur" language={language} />
-      
-      {/* Profile Card */}
-      <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-2xl font-bold">Informations du Profil</h2>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-          >
-            {isEditing ? 'Annuler' : '✏️ Modifier'}
+    <div>
+      <SellerHeader
+        title="Boutique et livraison"
+        description="Ces informations apparaissent sur votre page boutique et vos produits."
+        actions={!isEditing && (
+          <button type="button" onClick={() => { setMessage(null); setIsEditing(true); }} className="adm-btn adm-btn-primary">
+            Modifier
           </button>
-        </div>
+        )}
+      />
 
-        <form onSubmit={handleSave} className="space-y-6">
-          <div className="flex items-center space-x-6 mb-8">
-          {profileData.logo ? (
-            <img
-              src={profileData.logo}
-              alt="Logo"
-              className="w-24 h-24 rounded-full object-cover border-4 border-purple-200"
-            />
-          ) : (
-            <div className="w-24 h-24 rounded-full border-4 border-purple-200 bg-purple-600 flex items-center justify-center text-white text-4xl font-bold">
-              {profileData.name.charAt(0).toUpperCase()}
+      {message && (
+        <p role={message.type === 'error' ? 'alert' : 'status'}
+           className={`adm-card p-4 mb-4 ${message.type === 'error' ? 'text-red-700' : 'text-green-800'}`}>
+          {message.text}
+        </p>
+      )}
+
+      {!isEditing ? (
+        <section className="adm-card p-5 sm:p-6">
+          <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
+            {logo}
+            <div className="min-w-0">
+              <p className="text-xl font-extrabold text-purple-950 truncate">{form.businessName}</p>
+              <a href={`/seller/${user.id}`} className="adm-link text-sm">Voir ma page boutique</a>
             </div>
-          )}
-            {isEditing && (
-              <div>
-                <label className="block text-sm font-medium mb-2">URL du Logo</label>
-                <input
-                  type="url"
-                  value={profileData.logo || ''}
-                  onChange={(e) => setProfileData({ ...profileData, logo: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-            )}
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <dl className="divide-y divide-gray-100">
+            <Row label="WhatsApp">{form.whatsapp}</Row>
+            <Row label="E-mail">{form.email}</Row>
+            <Row label="Adresse">{[form.address, form.city].filter(Boolean).join(', ')}</Row>
+            <Row label="Frais de livraison">{formatXAF(form.deliveryPrice)}</Row>
+            <Row label="Présentation">{form.description}</Row>
+            <Row label="Facebook">{form.facebook && <a href={form.facebook} target="_blank" rel="noopener noreferrer" className="adm-link">{form.facebook}</a>}</Row>
+          </dl>
+        </section>
+      ) : (
+        <form onSubmit={handleSave} className="adm-card p-5 sm:p-6 space-y-5">
+          <div className="flex flex-wrap items-center gap-4">
+            {logo}
             <div>
-              <label className="block text-sm font-medium mb-2">Nom de la Boutique</label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  value={profileData.name}
-                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              ) : (
-                <p className="text-lg font-semibold text-gray-800">{profileData.name}</p>
+              <label className="adm-btn adm-btn-secondary cursor-pointer">
+                {uploading ? 'Envoi…' : form.logoUrl ? 'Changer le logo' : 'Ajouter un logo'}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only"
+                       disabled={uploading} onChange={(e) => uploadLogo(e.target.files?.[0])} />
+              </label>
+              {form.logoUrl && (
+                <button type="button" onClick={() => setForm(f => ({ ...f, logoUrl: '' }))} className="adm-link-danger text-sm ml-3">
+                  Retirer
+                </button>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Email</label>
-              {isEditing ? (
-                <input
-                  type="email"
-                  value={profileData.email}
-                  onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              ) : (
-                <p className="text-lg text-gray-800">{profileData.email}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Téléphone</label>
-              {isEditing ? (
-                <input
-                  type="tel"
-                  value={profileData.phone}
-                  onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              ) : (
-                <p className="text-lg text-gray-800">{profileData.phone}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Adresse</label>
-              {isEditing ? (
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Adresse"
-                    value={profileData.address}
-                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 mb-2"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Ville"
-                    value={profileData.city}
-                    onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              ) : (
-                <p className="text-lg text-gray-800">{profileData.address}{profileData.city ? `, ${profileData.city}` : ''}</p>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Prix de livraison</label>
-              {isEditing ? (
-                <input
-                  type="number"
-                  value={profileData.deliveryPrice}
-                  onChange={(e) => setProfileData({ ...profileData, deliveryPrice: parseFloat(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              ) : (
-                <p className="text-lg text-gray-800">{new Intl.NumberFormat('fr-CM', { style: 'currency', currency: 'XAF' }).format(profileData.deliveryPrice)}</p>
-              )}
+              <p className="mt-1 text-xs text-gray-500">Image carrée, JPG ou PNG.</p>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Description de la Boutique</label>
-            {isEditing ? (
-              <textarea
-                value={profileData.description}
-                onChange={(e) => setProfileData({ ...profileData, description: e.target.value })}
-                rows={4}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
-            ) : (
-              <p className="text-lg text-gray-800">{profileData.description}</p>
-            )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Field label="Nom de la boutique" required>
+              <input className="adm-input" required value={form.businessName} onChange={set('businessName')} />
+            </Field>
+            <Field label="WhatsApp" required hint="Numéro utilisé par les clients et pour vous connecter.">
+              <input className="adm-input" type="tel" required value={form.whatsapp} onChange={set('whatsapp')} placeholder="+237 6XX XX XX XX" />
+            </Field>
+            <Field label="E-mail" required>
+              <input className="adm-input" type="email" required value={form.email} onChange={set('email')} />
+            </Field>
+            <Field label="Ville">
+              <select className="adm-input" value={form.city} onChange={set('city')}>
+                {!cameroonCities.includes(form.city) && <option value={form.city}>{form.city || 'Choisir'}</option>}
+                {cameroonCities.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Adresse">
+              <input className="adm-input" value={form.address} onChange={set('address')} />
+            </Field>
+            <Field label="Frais de livraison (XAF)" hint="0 si la livraison est offerte.">
+              <input className="adm-input" type="number" min="0" step="100" value={form.deliveryPrice} onChange={set('deliveryPrice')} />
+            </Field>
           </div>
 
-          {/* Social Media Links */}
-          <div>
-            <label className="block text-sm font-medium mb-4">Réseaux Sociaux</label>
-            {isEditing ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">WhatsApp</label>
-                  <input
-                    type="tel"
-                    value={profileData.socialMedia?.whatsapp || ''}
-                    onChange={(e) => setProfileData({
-                      ...profileData,
-                      socialMedia: { ...profileData.socialMedia, whatsapp: e.target.value }
-                    })}
-                    placeholder="+237 6XX XXX XXX"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Facebook</label>
-                  <input
-                    type="url"
-                    value={profileData.socialMedia?.facebook || ''}
-                    onChange={(e) => setProfileData({
-                      ...profileData,
-                      socialMedia: { ...profileData.socialMedia, facebook: e.target.value }
-                    })}
-                    placeholder="https://facebook.com/..."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="flex space-x-4">
-                {profileData.socialMedia?.whatsapp && (
-                  <button
-                    onClick={() => openWhatsApp(profileData.socialMedia.whatsapp)}
-                    className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
-                  >
-                    <span>📱</span>
-                    <span>WhatsApp</span>
-                  </button>
-                )}
-                {profileData.socialMedia?.facebook && (
-                  <a
-                    href={profileData.socialMedia.facebook}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <span>📘</span>
-                    <span>Facebook</span>
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
+          <Field label="Présentation de la boutique">
+            <textarea className="adm-input" rows={4} value={form.description} onChange={set('description')} />
+          </Field>
+          <Field label="Page Facebook" hint="Facultatif.">
+            <input className="adm-input" type="url" value={form.facebook} onChange={set('facebook')} placeholder="https://facebook.com/…" />
+          </Field>
 
-          {isEditing && (
-            <div className="pt-6">
-              <button
-                type="submit"
-                className="bg-green-600 hover:bg-green-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
-              >
-                Sauvegarder les Modifications
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap gap-3 pt-2">
+            <button type="submit" disabled={saving || uploading} className="adm-btn adm-btn-primary">
+              {saving ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+            <button type="button" onClick={() => { setIsEditing(false); setMessage(null); }} className="adm-btn adm-btn-secondary">
+              Annuler
+            </button>
+          </div>
         </form>
-      </div>
-
-      {/* Stats Cards */}
-      {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-lg p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Note Moyenne</p>
-              <p className="text-3xl font-bold">{profileData.rating} ⭐</p>
-              <p className="text-sm opacity-75">Très bon vendeur</p>
-            </div>
-            <div className="text-4xl">📊</div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-green-400 to-green-600 text-white rounded-lg p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Total Ventes</p>
-              <p className="text-3xl font-bold">{profileData.totalSales}</p>
-              <p className="text-sm opacity-75">Commandes livrées</p>
-            </div>
-            <div className="text-4xl">📦</div>
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-r from-purple-400 to-purple-600 text-white rounded-lg p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm opacity-90">Membre Depuis</p>
-              <p className="text-2xl font-bold">
-                {new Date(profileData.joinDate).toLocaleDateString('fr-FR', { 
-                  year: 'numeric', 
-                  month: 'short' 
-                })}
-              </p>
-              <p className="text-sm opacity-75">Vendeur actif</p>
-            </div>
-            <div className="text-4xl">🕐</div>
-          </div>
-        </div>
-      </div> */}
+      )}
     </div>
   );
 };
 
 export default SellerProfile;
-

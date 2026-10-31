@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
+import { Modal } from '../admin/AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const SellerMessages = (props) => {
-  const { language, user } = props;
+  const { user } = props;
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -91,111 +92,78 @@ const SellerMessages = (props) => {
   const unreadCount = conversations.filter(c => c.seller_unread).length;
 
   return (
-    <div className="lg:col-span-3">
-      <SellerHeader title="Messages et Communications" language={language} user={user} />
-      
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold">Centre de Messages</h2>
-            <p className="text-gray-600">
-              {conversations.length} conversation(s) totale(s), {unreadCount} non lu(s)
-            </p>
-          </div>
-          {unreadCount > 0 && (
-            <div className="bg-red-100 text-red-800 px-4 py-2 rounded-full font-semibold">
-              {unreadCount} nouveau(x)
-            </div>
-          )}
-        </div>
-      </div>
+    <div>
+      <SellerHeader
+        title="Messages"
+        description={unreadCount > 0
+          ? `${unreadCount} conversation${unreadCount > 1 ? 's' : ''} non lue${unreadCount > 1 ? 's' : ''}`
+          : 'Les questions de vos clients sur vos produits.'}
+      />
 
-      <div className="space-y-4">
-        {loadingConversations ? <p>Chargement des conversations...</p> : conversations.map(conversation => (
-          <div 
-            key={conversation.id} 
-            className={`bg-white rounded-lg shadow-lg p-6 cursor-pointer transition-all hover:shadow-xl ${
-              conversation.seller_unread ? 'border-l-4 border-purple-500' : ''
-            }`}
-            onClick={() => handleConversationClick(conversation)}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-4">
-                <div>
-                  <h3 className="font-bold text-lg">{conversation.buyer_id}</h3>
-                  <p className="text-gray-600">Produit: {conversation.product_id}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">{new Date(conversation.last_message_timestamp).toLocaleString()}</p>
-                {conversation.seller_unread && (
-                  <span className="inline-block w-3 h-3 bg-red-500 rounded-full mt-2"></span>
-                )}
-              </div>
-            </div>
-            
-            <p className="text-gray-700 line-clamp-2">{conversation.last_message_preview}</p>
-          </div>
-        ))}
-      </div>
-
-      {conversations.length === 0 && !loadingConversations && (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4">💬</div>
-          <h3 className="text-xl font-semibold mb-2">Aucune conversation</h3>
-          <p className="text-gray-600">Vous n'avez pas encore de conversations.</p>
+      {loadingConversations ? (
+        <p className="adm-card px-5 py-12 text-center text-gray-600">Chargement des conversations…</p>
+      ) : conversations.length === 0 ? (
+        <div className="adm-card px-5 py-12 text-center">
+          <h2 className="text-lg font-extrabold text-purple-950">Aucune conversation</h2>
+          <p className="mt-1 text-gray-600">Quand un client vous écrit depuis une fiche produit, son message arrive ici.</p>
         </div>
+      ) : (
+        <ul className="adm-card divide-y divide-gray-100 overflow-hidden">
+          {conversations.map(conversation => (
+            <li key={conversation.id}>
+              <button
+                type="button"
+                onClick={() => handleConversationClick(conversation)}
+                className="w-full text-left px-5 py-4 flex gap-4 hover:bg-gray-50 focus-visible:bg-gray-50"
+              >
+                <span className={`mt-2 w-2.5 h-2.5 shrink-0 rounded-full ${conversation.seller_unread ? 'bg-purple-700' : 'bg-transparent'}`}
+                      aria-label={conversation.seller_unread ? 'Non lu' : undefined} />
+                <span className="flex-1 min-w-0">
+                  <span className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className={`truncate ${conversation.seller_unread ? 'font-bold text-purple-950' : 'font-semibold'}`}>
+                      {conversation.buyer_id}
+                    </span>
+                    <span className="text-xs text-gray-500">{new Date(conversation.last_message_timestamp).toLocaleString('fr-FR')}</span>
+                  </span>
+                  <span className="block text-xs text-gray-500">Produit {conversation.product_id}</span>
+                  <span className="block mt-1 text-sm text-gray-700 line-clamp-2">{conversation.last_message_preview}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       {selectedConversation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <div className="p-6 border-b">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold">Conversation avec {selectedConversation.buyer_id}</h3>
-                <button
-                  onClick={() => setSelectedConversation(null)}
-                  className="text-gray-400 hover:text-gray-600 text-2xl"
-                >
-                  ×
-                </button>
+        <Modal title={`Conversation avec ${selectedConversation.buyer_id}`} onClose={() => setSelectedConversation(null)}>
+          <p className="-mt-3 mb-4 text-sm text-gray-600">Produit {selectedConversation.product_id}</p>
+          <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-1" aria-live="polite">
+            {loadingMessages ? <p className="text-gray-600">Chargement des messages…</p> : messages.map(msg => (
+              <div key={msg.id} className={`flex ${msg.sender_type === 'seller' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-2xl px-4 py-2 ${msg.sender_type === 'seller' ? 'bg-purple-700 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                  <p className="whitespace-pre-wrap">{msg.message}</p>
+                  <p className={`text-xs mt-1 text-right ${msg.sender_type === 'seller' ? 'text-purple-200' : 'text-gray-500'}`}>
+                    {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
               </div>
-              <p className="text-gray-600 mt-2">À propos du produit: {selectedConversation.product_id}</p>
-            </div>
-            
-            <div className="p-6 flex-grow overflow-y-auto">
-              {loadingMessages ? <p>Chargement des messages...</p> : messages.map(msg => (
-                <div key={msg.id} className={`flex ${msg.sender_type === 'seller' ? 'justify-end' : 'justify-start'} mb-4`}>
-                  <div className={`rounded-lg px-4 py-2 ${msg.sender_type === 'seller' ? 'bg-purple-600 text-white' : 'bg-gray-200'}`}>
-                    <p>{msg.message}</p>
-                    <p className="text-xs mt-1 text-right">{new Date(msg.timestamp).toLocaleTimeString()}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <div className="p-6 border-t">
-              <form onSubmit={sendReply}>
-                <div className="flex items-center">
-                  <textarea
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    placeholder="Tapez votre réponse ici..."
-                    rows={1}
-                    required
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <button
-                    type="submit"
-                    className="ml-4 bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
-                  >
-                    Envoyer
-                  </button>
-                </div>
-              </form>
-            </div>
+            ))}
           </div>
-        </div>
+          <form onSubmit={sendReply} className="mt-4 flex items-end gap-3">
+            <label className="flex-1">
+              <span className="sr-only">Votre réponse</span>
+              <textarea
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                placeholder="Votre réponse…"
+                rows={2}
+                required
+                className="adm-input"
+              />
+            </label>
+            <button type="submit" className="adm-btn adm-btn-primary">Envoyer</button>
+          </form>
+        </Modal>
       )}
     </div>
   );

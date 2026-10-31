@@ -1,125 +1,152 @@
-
 import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
+const formatXAF = (value) =>
+  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
+
+// 1 250 000 -> « 1,3 M » ; 85 000 -> « 85 k » (étiquettes courtes du graphique)
+const compact = (value) =>
+  new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(value || 0);
+
+const Stat = ({ label, value }) => (
+  <div className="adm-card p-5">
+    <p className="text-sm font-semibold text-gray-600">{label}</p>
+    <p className="price mt-1 text-3xl text-purple-950 tabular-nums">{value}</p>
+  </div>
+);
+
+/**
+ * Revenus mensuels : une seule série, donc pas de légende (le titre la nomme).
+ * Seuls le mois courant et le meilleur mois portent une étiquette ; les autres
+ * valeurs sont au survol / au focus, et dans le tableau pour les lecteurs d'écran.
+ */
+const RevenueChart = ({ data }) => {
+  const [active, setActive] = useState(null);
+  const max = Math.max(...data.map(d => d.revenue), 0);
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'short' });
+  const bestIndex = data.reduce((best, d, i) => (d.revenue > (data[best]?.revenue ?? -1) ? i : best), 0);
+
+  if (max === 0) {
+    return <p className="py-16 text-center text-gray-600">Pas encore de ventes sur la période.</p>;
+  }
+
+  return (
+    <>
+      <div className="relative h-56 flex items-end gap-1.5 sm:gap-3 border-b border-gray-300" aria-hidden="true">
+        {data.map((d, i) => {
+          const labelled = d.month === currentMonth || i === bestIndex;
+          const height = Math.max((d.revenue / max) * 100, d.revenue > 0 ? 2 : 0);
+          return (
+            <div
+              key={d.month}
+              className="relative flex-1 h-full flex flex-col justify-end items-center"
+              onMouseEnter={() => setActive(i)}
+              onMouseLeave={() => setActive(null)}
+            >
+              {(labelled || active === i) && (
+                <span className={`price mb-1 text-xs tabular-nums whitespace-nowrap ${active === i ? 'text-purple-950' : 'text-gray-700'}`}>
+                  {active === i ? formatXAF(d.revenue) : compact(d.revenue)}
+                </span>
+              )}
+              <div
+                className={`w-full max-w-[2.5rem] rounded-t bg-purple-700 transition-opacity ${active !== null && active !== i ? 'opacity-40' : ''}`}
+                style={{ height: `${height}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex gap-1.5 sm:gap-3" aria-hidden="true">
+        {data.map(d => (
+          <span key={d.month} className={`flex-1 text-center text-xs ${d.month === currentMonth ? 'font-bold text-purple-950' : 'text-gray-600'}`}>
+            {d.month}
+          </span>
+        ))}
+      </div>
+
+      <table className="sr-only">
+        <caption>Revenus par mois</caption>
+        <thead><tr><th>Mois</th><th>Revenus</th></tr></thead>
+        <tbody>
+          {data.map(d => <tr key={d.month}><td>{d.month}</td><td>{formatXAF(d.revenue)}</td></tr>)}
+        </tbody>
+      </table>
+    </>
+  );
+};
+
 const SellerAnalytics = (props) => {
-  const { language, user } = props;
+  const { user } = props;
   const [analyticsData, setAnalyticsData] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+  const [error, setError] = useState(false);
+
   useEffect(() => {
     const fetchAnalytics = async () => {
-        if (user) {
-            try {
-                setLoading(true);
-                const response = await fetch(`${API_BASE_URL}/sellers/${user.id}/analytics`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch analytics');
-                }
-                const data = await response.json();
-                setAnalyticsData(data);
-            } catch (error) {
-                console.error('Error fetching analytics:', error);
-            } finally {
-                setLoading(false);
-            }
-        }
+      if (!user) return;
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_BASE_URL}/sellers/${user.id}/analytics`, {
+          headers: { 'X-Seller-Id': user.id },
+        });
+        if (!response.ok) throw new Error('Failed to fetch analytics');
+        setAnalyticsData(await response.json());
+        setError(false);
+      } catch (err) {
+        console.error('Error fetching analytics:', err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchAnalytics();
   }, [user]);
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XAF',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
-
-  if (loading) {
-    return (
-      <div className="lg:col-span-3">
-        <SellerHeader title="Analyses et Statistiques" language={language} user={user} />
-        <div className="container mx-auto px-4 py-8">
-          <p>Chargement des analyses...</p>
-        </div>
-      </div>
-    );
-  }
+  const topProducts = analyticsData?.top_products || [];
 
   return (
-    <div className="lg:col-span-3">
-      <SellerHeader title="Analyses et Statistiques" language={language} user={user} />
-      
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className={`bg-gradient-to-r from-green-400 to-green-600 text-white rounded-lg p-6 shadow-lg`}>
-          <p className="text-sm opacity-90">Revenus Total</p>
-          <p className="text-2xl font-bold">{formatPrice(analyticsData?.total_revenue || 0)}</p>
-        </div>
-        <div className={`bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-lg p-6 shadow-lg`}>
-          <p className="text-sm opacity-90">Commandes</p>
-          <p className="text-2xl font-bold">{analyticsData?.total_orders || 0}</p>
-        </div>
-        <div className={`bg-gradient-to-r from-purple-400 to-purple-600 text-white rounded-lg p-6 shadow-lg`}>
-          <p className="text-sm opacity-90">Clients</p>
-          <p className="text-2xl font-bold">{analyticsData?.total_customers || 0}</p>
-        </div>
-      </div>
+    <div>
+      <SellerHeader title="Statistiques" description="Vos ventes depuis l'ouverture de la boutique." />
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Revenue Chart */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-xl font-bold mb-6">Évolution du Chiffre d'Affaires</h3>
-          <div className="h-64 bg-gradient-to-t from-purple-50 to-transparent rounded-lg flex items-end justify-around p-4">
-            {analyticsData?.monthly_revenue.map((value, index) => (
-              <div key={index} className="flex flex-col items-center">
-                <div 
-                  className="bg-gradient-to-t from-purple-500 to-purple-300 rounded-t w-12"
-                  style={{ height: `${(value.revenue / Math.max(...analyticsData.monthly_revenue.map(v => v.revenue))) * 200}px` }}
-                ></div>
-                <span className="text-xs mt-2 text-gray-600">
-                  {value.month}
-                </span>
-                <span className="text-xs text-purple-600 font-semibold">
-                  {value.revenue >= 1000000 
-                    ? `${(value.revenue / 1000000).toFixed(1)}M` 
-                    : value.revenue >= 1000 
-                      ? `${(value.revenue / 1000).toFixed(0)}K` 
-                      : value.revenue}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {error && (
+        <p className="adm-card p-5 mb-6 text-red-700">Impossible de charger les statistiques. Rechargez la page pour réessayer.</p>
+      )}
 
-        {/* Top Products */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-xl font-bold mb-6">Produits les Plus Vendus</h3>
-          <div className="space-y-4">
-            {analyticsData?.top_products.map((product, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-purple-500 text-white rounded-lg flex items-center justify-center text-sm font-bold">
-                    {index + 1}
+      <section aria-label="Chiffres clés" className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <Stat label="Revenus" value={loading ? '…' : formatXAF(analyticsData?.total_revenue)} />
+        <Stat label="Commandes" value={loading ? '…' : (analyticsData?.total_orders || 0)} />
+        <Stat label="Clients" value={loading ? '…' : (analyticsData?.total_customers || 0)} />
+      </section>
+
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        <section className="adm-card p-5 sm:p-6 xl:col-span-3">
+          <h2 className="text-lg font-extrabold text-purple-950 mb-5">Revenus par mois</h2>
+          {loading
+            ? <p className="py-16 text-center text-gray-600">Chargement…</p>
+            : <RevenueChart data={analyticsData?.monthly_revenue || []} />}
+        </section>
+
+        <section className="adm-card p-5 sm:p-6 xl:col-span-2">
+          <h2 className="text-lg font-extrabold text-purple-950 mb-4">Meilleures ventes</h2>
+          {topProducts.length === 0 ? (
+            <p className="py-10 text-center text-gray-600">{loading ? 'Chargement…' : 'Vos produits les plus vendus apparaîtront ici.'}</p>
+          ) : (
+            <ol className="divide-y divide-gray-100">
+              {topProducts.map((product, index) => (
+                <li key={product.name} className="flex items-center gap-3 py-3">
+                  <span className="price w-6 text-lg text-gray-500 tabular-nums">{index + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate">{product.name}</p>
+                    <p className="text-sm text-gray-600">{product.sales} vente{product.sales > 1 ? 's' : ''}</p>
                   </div>
-                  <div>
-                    <p className="font-semibold">{product.name}</p>
-                    <p className="text-sm text-gray-600">{product.sales} ventes</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-purple-600">
-                    {formatPrice(product.revenue)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+                  <p className="price text-purple-950 tabular-nums">{formatXAF(product.revenue)}</p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       </div>
     </div>
   );

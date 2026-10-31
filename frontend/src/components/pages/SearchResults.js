@@ -30,7 +30,7 @@ const SearchResults = (props) => {
       setError(null);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/products?search=${encodeURIComponent(query)}`);
+        const response = await fetch(`${API_BASE_URL}/products?status=approved&search=${encodeURIComponent(query)}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

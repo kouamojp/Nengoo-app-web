@@ -65,7 +65,7 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
     const fetchSuggestions = async () => {
       if (searchQuery.trim().length > 1) {
         try {
-          const response = await fetch(`${API_BASE_URL}/products?search=${encodeURIComponent(searchQuery.trim())}`);
+          const response = await fetch(`${API_BASE_URL}/products?status=approved&search=${encodeURIComponent(searchQuery.trim())}`);
           if (response.ok) {
             const data = await response.json();
             setSuggestions(data);

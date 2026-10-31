@@ -31,7 +31,7 @@ const SellerShop = (props) => {
                 setSeller(sellerData);
 
                 // Fetch seller products
-                const productsResponse = await fetch(`${API_BASE_URL}/products?seller_id=${sellerId}`);
+                const productsResponse = await fetch(`${API_BASE_URL}/products?status=approved&seller_id=${sellerId}`);
                 if (!productsResponse.ok) {
                     throw new Error('Failed to fetch products');
                 }

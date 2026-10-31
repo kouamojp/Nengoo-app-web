@@ -7,6 +7,23 @@ const config = {
 };
 
 module.exports = {
+  devServer: (devServerConfig) => {
+    const client = devServerConfig.client || {};
+    const overlay = typeof client.overlay === 'object' ? client.overlay : { errors: true, warnings: false };
+    return {
+      ...devServerConfig,
+      client: {
+        ...client,
+        overlay: {
+          ...overlay,
+          // « ResizeObserver loop … » est un avertissement bénin du navigateur
+          // (Swiper, bandeau cookies) : l'overlay de dev l'affichait comme une
+          // erreur bloquante. Toutes les autres erreurs restent affichées.
+          runtimeErrors: (error) => !/ResizeObserver loop/.test(error?.message || ''),
+        },
+      },
+    };
+  },
   webpack: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

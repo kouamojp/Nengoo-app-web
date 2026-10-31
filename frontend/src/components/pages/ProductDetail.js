@@ -148,7 +148,7 @@ const ProductDetail = (props) => {
 
   const fetchRelatedProducts = async (categoryId, currentProductId) => {
       try {
-        const response = await fetch(`${API_BASE_URL}/products`);
+        const response = await fetch(`${API_BASE_URL}/products?status=approved`);
 
         if (!response.ok) return;
 
@@ -528,6 +528,25 @@ const ProductDetail = (props) => {
                 <span className={`w-2 h-2 rounded-full ${product.inStock ? 'bg-green-600' : 'bg-gray-400'}`} aria-hidden="true" />
                 {product.inStock ? t.inStock : t.outOfStock}
               </p>
+
+              {product.colors && product.colors.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">{t.availableColors}</p>
+                  <ul className="flex flex-wrap gap-2">
+                    {product.colors.map((c) => (
+                      <li key={c}>
+                        <span
+                          className="block w-8 h-8 rounded-full border border-gray-300"
+                          style={{ backgroundColor: c }}
+                          title={c}
+                          role="img"
+                          aria-label={c}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Quantité et panier */}
               <div className="mt-6 flex flex-wrap gap-3">

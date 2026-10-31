@@ -1,83 +1,97 @@
-
 import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
+import { Modal, StatusBadge, StatusSelect } from '../admin/AdminUI';
+import { WhatsAppIcon } from '../ui/Icons';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const getStatusText = (status) => {
-  switch (status) {
-    case 'pending': return 'En attente';
-    case 'shipped': return 'Expédiée';
-    case 'delivered': return 'Livrée';
-    case 'cancelled': return 'Annulée';
-    default: return status;
-  }
+const STATUSES = ['pending', 'shipped', 'delivered', 'cancelled'];
+const FILTERS = [
+  { value: 'all', label: 'Toutes' },
+  { value: 'pending', label: 'À confirmer' },
+  { value: 'shipped', label: 'Expédiées' },
+  { value: 'delivered', label: 'Livrées' },
+  { value: 'cancelled', label: 'Annulées' },
+];
+
+const formatXAF = (value) =>
+  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
+
+// Lien wa.me au format international, que le numéro ait déjà l'indicatif 237 ou non
+const whatsappLink = (phone) => {
+  const digits = (phone || '').replace(/\D/g, '');
+  if (!digits) return null;
+  return `https://wa.me/${digits.startsWith('237') ? digits : `237${digits}`}`;
 };
 
-const OrderDetailModal = ({ order, onClose, formatPrice }) => {
-  if (!order) return null;
-
+const WhatsAppButton = ({ phone, children }) => {
+  const href = whatsappLink(phone);
+  if (!href) return null;
   return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
-              <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold">Détails de la commande #{order.id}</h3>
-                  <button onClick={onClose} className="text-gray-500 hover:text-gray-800">
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-              </div>
-              <div className="space-y-4">
-                  <p><strong>Date:</strong> {new Date(order.orderedDate).toLocaleDateString()}</p>
-                  <p><strong>Statut:</strong> {getStatusText(order.status)}</p>
-                  <p><strong>Acheteur:</strong> {order.buyerName}</p>
-                  <p><strong>Moyen de livraison:</strong> {order.pickupPointName ? `Retrait au point: ${order.pickupPointName}` : 'Livraison à domicile'}</p>
-                  <p className="text-sm pt-2"><button><a className="bg-green-600 text-white px-6 py-2 rounded-md" href={`https://wa.me/237${order.buyerWhatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">Contactez le client via WhatsApp</a></button> </p>
-                  {order.shippingAddress && (
-                     <div className="bg-gray-50 p-3 rounded">
-                       <p className="font-semibold text-sm">Adresse de livraison:</p>
-                       <p className="text-sm">{order.shippingAddress}</p>
-                       <p className="text-sm">{order.shippingCity}, {order.shippingRegion}</p>
-                       <p className="text-sm">Tél: {order.shippingPhone}</p>
-                       <p className="text-sm pt-2"><button><a className="bg-green-600 text-white px-6 py-2 rounded-md" href={`https://wa.me/237${order.shippingPhone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">Contactez le client via WhatsApp</a></button> </p>
-                     </div>
-                  )}
-                  
-                  <div>
-                      <p className="font-bold">Produits:</p>
-                      <ul className="space-y-3 mt-2">
-                          {order.products.map(p => (
-                              <li key={p.productId} className="flex items-center space-x-4 bg-gray-50 p-2 rounded-lg">
-                                  <img 
-                                    src={p.image || process.env.PUBLIC_URL + '/images/logo-nengoo.png'} 
-                                    alt={p.name} 
-                                    className="w-12 h-12 object-cover rounded shadow-sm"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
-                                    }}
-                                  />
-                                  <div className="flex-1">
-                                      <p className="font-medium text-sm">{p.name}</p>
-                                      <p className="text-xs text-gray-500">Quantité: {p.quantity}</p>
-                                  </div>
-                                  <span className="font-semibold text-sm">{formatPrice(p.price * p.quantity)}</span>
-                              </li>
-                          ))}
-                      </ul>
-                  </div>
-
-                  <div className="text-right font-bold text-lg border-t pt-4">
-                      Total: {formatPrice(order.totalAmount)}
-                  </div>
-              </div>
-          </div>
-      </div>
+    <a href={href} target="_blank" rel="noopener noreferrer" className="adm-btn bg-green-700 hover:bg-green-800 text-white">
+      <WhatsAppIcon className="w-4 h-4" />
+      {children}
+    </a>
   );
 };
 
+const OrderDetail = ({ order, onClose }) => (
+  <Modal title={`Commande ${order.id}`} onClose={onClose} size="max-w-lg">
+    <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
+      <dt className="text-gray-600">Date</dt>
+      <dd>{new Date(order.orderedDate).toLocaleDateString('fr-FR', { dateStyle: 'long' })}</dd>
+      <dt className="text-gray-600">Statut</dt>
+      <dd><StatusBadge status={order.status} /></dd>
+      <dt className="text-gray-600">Client</dt>
+      <dd className="font-semibold">{order.buyerName}</dd>
+      <dt className="text-gray-600">Livraison</dt>
+      <dd>{order.pickupPointName ? `Retrait au point ${order.pickupPointName}` : 'Livraison à domicile'}</dd>
+    </dl>
+
+    {order.shippingAddress && (
+      <div className="mt-4 rounded-xl bg-gray-50 p-4 text-sm">
+        <p className="font-semibold">Adresse de livraison</p>
+        <p>{order.shippingAddress}</p>
+        <p>{[order.shippingCity, order.shippingRegion].filter(Boolean).join(', ')}</p>
+        {order.shippingPhone && <p>Tél. {order.shippingPhone}</p>}
+      </div>
+    )}
+
+    <h3 className="mt-5 mb-2 font-bold text-purple-950">Articles</h3>
+    <ul className="divide-y divide-gray-100">
+      {order.products.map((p, i) => (
+        <li key={p.productId || i} className="flex items-center gap-3 py-2">
+          <img
+            src={p.image || '/images/logo-nengoo.png'}
+            alt=""
+            className="w-12 h-12 object-cover rounded-lg bg-gray-100"
+            onError={(e) => { e.target.onerror = null; e.target.src = '/images/logo-nengoo.png'; }}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm truncate">{p.name}</p>
+            <p className="text-xs text-gray-600">Quantité : {p.quantity}</p>
+          </div>
+          <span className="price text-sm tabular-nums">{formatXAF(p.price * p.quantity)}</span>
+        </li>
+      ))}
+    </ul>
+    <p className="mt-3 pt-3 border-t border-gray-200 flex justify-between font-bold">
+      <span>Total</span>
+      <span className="price text-lg text-purple-950 tabular-nums">{formatXAF(order.totalAmount)}</span>
+    </p>
+
+    <div className="mt-5 flex flex-wrap gap-2">
+      <WhatsAppButton phone={order.shippingPhone || order.buyerWhatsapp}>Écrire au client</WhatsAppButton>
+      <button type="button" onClick={onClose} className="adm-btn adm-btn-secondary">Fermer</button>
+    </div>
+  </Modal>
+);
+
 const SellerOrders = (props) => {
-  const { language, user } = props;
+  const { user } = props;
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -85,184 +99,114 @@ const SellerOrders = (props) => {
     const fetchOrders = async () => {
       if (!user) return;
       try {
-        const sellerId = user.id; 
-        const response = await fetch(`${API_BASE_URL}/orders?seller_id=${sellerId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch orders');
-        }
+        const response = await fetch(`${API_BASE_URL}/orders?seller_id=${user.id}`, {
+          headers: { 'X-Seller-Id': user.id },
+        });
+        if (!response.ok) throw new Error('Failed to fetch orders');
         const data = await response.json();
-        setOrders(data);
-      } catch (error) {
-        console.error("Error fetching orders:", error);
-        // Handle error, e.g., show a toast message
+        setOrders([...data].sort((a, b) => new Date(b.orderedDate) - new Date(a.orderedDate)));
+      } catch (err) {
+        console.error('Error fetching orders:', err);
+        setError('Impossible de charger vos commandes. Rechargez la page pour réessayer.');
+      } finally {
+        setLoading(false);
       }
     };
-
     fetchOrders();
   }, [user]);
-
-  const filteredOrders = filterStatus === 'all' 
-    ? orders 
-    : orders.filter(order => order.status === filterStatus);
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
       const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Seller-Id': user.id,
-        },
+        headers: { 'Content-Type': 'application/json', 'X-Seller-Id': user.id },
         body: JSON.stringify({ status: newStatus }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update order status');
-      }
-
+      if (!response.ok) throw new Error('Failed to update order status');
       const updatedOrder = await response.json();
-
-      setOrders(orders.map(order => 
-        order.id === orderId 
-          ? updatedOrder
-          : order
-      ));
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      // Handle error, e.g., show a toast message
+      setOrders(list => list.map(o => (o.id === orderId ? updatedOrder : o)));
+      setError('');
+    } catch (err) {
+      console.error('Error updating order status:', err);
+      setError('Le statut n\'a pas pu être modifié. Réessayez.');
     }
   };
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'XAF',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'shipped': return 'bg-blue-100 text-blue-800';
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'pending': return '⏳';
-      case 'shipped': return '🚚';
-      case 'delivered': return '✅';
-      case 'cancelled': return '❌';
-      default: return '📋';
-    }
-  };
+  const counts = Object.fromEntries(FILTERS.map(f => [
+    f.value, f.value === 'all' ? orders.length : orders.filter(o => o.status === f.value).length,
+  ]));
+  const filteredOrders = filterStatus === 'all' ? orders : orders.filter(o => o.status === filterStatus);
 
   return (
-    <div className="lg:col-span-3">
-      <SellerHeader title="Gestion des Commandes" language={language} user={user} />
-      <OrderDetailModal order={selectedOrder} onClose={() => setSelectedOrder(null)} formatPrice={formatPrice} />
-      
-      {/* Filters and Stats */}
-      <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-        <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-          <div>
-            <h2 className="text-xl font-bold">Mes Commandes ({filteredOrders.length})</h2>
-            <p className="text-gray-600">Gérez le statut de vos commandes</p>
-          </div>
-          <div className="flex space-x-2">
-            {['all', 'pending', 'shipped', 'delivered', 'cancelled'].map(status => (
-              <button
-                key={status}
-                onClick={() => setFilterStatus(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  filterStatus === status
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                }`}
-              >
-                {status === 'all' ? 'Toutes' : getStatusText(status)}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+    <div>
+      <SellerHeader title="Commandes" description="Confirmez, expédiez et suivez les commandes de vos clients." />
+      {selectedOrder && <OrderDetail order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
 
-      {/* Orders List */}
-      <div className="space-y-6">
-        {filteredOrders.map(order => (
-          <div key={order.id} className="bg-white rounded-lg shadow-lg p-6">
-            {/* Order Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-              <div>
-                <div className="flex items-center space-x-2 justify-between">
-                  <h3 className="text-lg font-bold max-sm:text-left">Commande {order.id}</h3>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
-                    {getStatusIcon(order.status)} {getStatusText(order.status)}
-                  </span>
-                </div>
-                <div className="flex items-center space-x-6 text-sm text-gray-600 mt-2">
-                  <span>👤 {order.buyerName}</span>
-                  <span>📅 {new Date(order.orderedDate).toLocaleDateString('fr-FR')}</span>
-                  <span className="font-semibold text-purple-600">
-                    {formatPrice(order.totalAmount)}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="flex space-x-2">
-                <select
-                  value={order.status}
-                  onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="pending">En attente</option>
-                  <option value="shipped">Expédiée</option>
-                  <option value="delivered">Livrée</option>
-                  <option value="cancelled">Annulée</option>
-                </select>
-                <button 
-                  onClick={() => setSelectedOrder(order)}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Détails
-                </button>
-              </div>
-            </div>
-            
-            {/* Order Items */}
-            <div className="border-t pt-4">
-              <h4 className="font-semibold mb-3">Articles commandés:</h4>
-              <div className="space-y-2">
-                {order.products.map((item, index) => (
-                  <div key={index} className="flex justify-between items-center py-2 px-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <span className="font-medium">{item.name}</span>
-                      <span className="text-gray-600 ml-2">× {item.quantity}</span>
-                    </div>
-                    <span className="font-semibold">{formatPrice(item.price * item.quantity)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Filtrer par statut">
+        {FILTERS.map(f => (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => setFilterStatus(f.value)}
+            aria-pressed={filterStatus === f.value}
+            className={`adm-btn ${filterStatus === f.value ? 'adm-btn-primary' : 'adm-btn-secondary'}`}
+          >
+            {f.label}
+            <span className="tabular-nums opacity-75">{counts[f.value]}</span>
+          </button>
         ))}
       </div>
 
-      {filteredOrders.length === 0 && (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4">📋</div>
-          <h3 className="text-xl font-semibold mb-2">Aucune commande trouvée</h3>
-          <p className="text-gray-600">
-            {filterStatus === 'all' 
-              ? "Vous n'avez pas encore de commandes."
-              : `Aucune commande avec le statut "${getStatusText(filterStatus)}".`
-            }
+      {error && <p className="adm-card p-4 mb-4 text-red-700" role="alert">{error}</p>}
+
+      {loading ? (
+        <p className="adm-card px-5 py-12 text-center text-gray-600">Chargement des commandes…</p>
+      ) : filteredOrders.length === 0 ? (
+        <div className="adm-card px-5 py-12 text-center">
+          <h2 className="text-lg font-extrabold text-purple-950">
+            {filterStatus === 'all' ? 'Aucune commande pour le moment' : 'Aucune commande dans cette catégorie'}
+          </h2>
+          <p className="mt-1 text-gray-600">
+            {filterStatus === 'all'
+              ? 'Les commandes de vos clients apparaîtront ici. Pensez à partager le lien de votre boutique.'
+              : 'Choisissez un autre filtre pour voir vos autres commandes.'}
           </p>
         </div>
+      ) : (
+        <ul className="space-y-3">
+          {filteredOrders.map(order => (
+            <li key={order.id} className="adm-card p-4 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-purple-950">{order.buyerName}</p>
+                  <p className="text-sm text-gray-600">
+                    {new Date(order.orderedDate).toLocaleDateString('fr-FR')}
+                    {' — '}
+                    {order.products.length} article{order.products.length > 1 ? 's' : ''}
+                  </p>
+                </div>
+                <p className="price text-xl text-purple-950 tabular-nums">{formatXAF(order.totalAmount)}</p>
+              </div>
+
+              <p className="mt-2 text-sm text-gray-700 line-clamp-1">
+                {order.products.map(p => `${p.name} × ${p.quantity}`).join(', ')}
+              </p>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <StatusSelect
+                  value={order.status}
+                  onChange={(status) => updateOrderStatus(order.id, status)}
+                  options={STATUSES}
+                  label={`Statut de la commande de ${order.buyerName}`}
+                />
+                <button type="button" onClick={() => setSelectedOrder(order)} className="adm-btn adm-btn-secondary">
+                  Détails
+                </button>
+                <WhatsAppButton phone={order.shippingPhone || order.buyerWhatsapp}>Écrire au client</WhatsAppButton>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

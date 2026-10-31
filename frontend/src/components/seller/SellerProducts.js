@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { translations } from '../../lib/translations';
 import SellerHeader from './SellerHeader';
+import ColorPicker from './ColorPicker';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -14,11 +14,12 @@ const SellerProducts = (props) => {
     const [newProduct, setNewProduct] = useState({
       name: '',
       description: '',
-      category: 'clothing_accessories',
+      category: '',
       price: 0,
       promoPrice: 0,
       stock: 0,
       images: [],
+      colors: [],
     });
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [selectedProducts, setSelectedProducts] = useState([]);
@@ -54,7 +55,7 @@ const SellerProducts = (props) => {
                 }
                 await fetchProducts();
                 setSelectedProducts([]);
-                alert('🗑️ Produits supprimés avec succès!');
+                alert('Produits supprimés.');
             } catch (error) {
                 console.error('Error deleting products:', error);
                 alert(`Erreur: ${error.message}`);
@@ -105,6 +106,10 @@ const SellerProducts = (props) => {
                 }
                 const data = await response.json();
                 setAvailableCategories(data);
+                // Catégorie par défaut du formulaire : une catégorie qui existe vraiment
+                if (data.length > 0) {
+                    setNewProduct(p => (data.some(c => c.id === p.category) ? p : { ...p, category: data[0].id }));
+                }
             } catch (error) {
                 console.error("❌ Erreur lors de la récupération des catégories:", error);
                 // Optionally, alert the user or handle the error gracefully
@@ -185,11 +190,12 @@ const SellerProducts = (props) => {
         setNewProduct({
             name: '',
             description: '',
-            category: 'clothing_accessories',
+            category: availableCategories[0]?.id || '',
             price: 0,
             promoPrice: 0,
             stock: 0,
             images: [],
+            colors: [],
         });
         setSelectedFiles([]); // Clear selected files after successful upload
       } catch (error) {
@@ -296,56 +302,51 @@ const SellerProducts = (props) => {
     };
   
     return (
-      <div className="lg:col-span-3">
-        <SellerHeader title="Gestion des Produits" language={language} user={user} />
-        
-        {/* Actions Bar */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-            <div>
-              <h2 className="text-xl font-bold">Mes Produits ({products.length})</h2>
-              <p className="text-gray-600">Gérez votre catalogue de produits</p>
-            </div>
-            <div className="flex items-center space-x-2">
-                <button
-                    onClick={handleBulkDelete}
-                    disabled={selectedProducts.length === 0}
-                    className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold transition-shadow"
-                >
-                    Supprimer la sélection
-                </button>
-                <button
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
-                >
-                ➕ Ajouter un Produit
-                </button>
-            </div>
+      <div>
+        <SellerHeader
+          title="Produits"
+          description={`${products.length} produit${products.length > 1 ? 's' : ''} dans votre boutique`}
+          actions={(
+            <button type="button" onClick={() => setShowAddForm(!showAddForm)} className="adm-btn adm-btn-primary">
+              Ajouter un produit
+            </button>
+          )}
+        />
+
+        {selectedProducts.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl bg-purple-950 text-white" role="region" aria-label="Sélection">
+            <span className="font-semibold">{selectedProducts.length} sélectionné{selectedProducts.length > 1 ? 's' : ''}</span>
+            <button type="button" onClick={() => setSelectedProducts([])} className="!min-h-0 text-sm text-purple-200 hover:text-white underline underline-offset-4">
+              Tout désélectionner
+            </button>
+            <button type="button" onClick={handleBulkDelete} className="adm-btn adm-btn-danger ml-auto">
+              Supprimer la sélection
+            </button>
           </div>
-        </div>
+        )}
 
         {/* Edit Product Form */}
         {editingProduct && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <h3 className="text-xl font-bold mb-6">Modifier le Produit</h3>
+          <div className="adm-card p-5 sm:p-6 mb-6">
+            <h2 className="adm-modal-title mb-5">Modifier le produit</h2>
             <form onSubmit={handleUpdateProduct} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Nom du produit</label>
+                  <label className="adm-label">Nom du produit</label>
                   <input
                     type="text"
                     required
                     value={editingProduct.name}
                     onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Catégorie</label>
+                  <label className="adm-label">Catégorie</label>
                   <select
                     value={editingProduct.category}
                     onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   >
                     {availableCategories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -353,43 +354,61 @@ const SellerProducts = (props) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Prix (XAF)</label>
+                  <label className="adm-label">Prix (XAF)</label>
                   <input
                     type="number"
                     required
                     value={editingProduct.price}
                     onChange={(e) => setEditingProduct({ ...editingProduct, price: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Prix Promotionnel (XAF)</label>
+                  <label className="adm-label">Prix Promotionnel (XAF)</label>
                   <input
                     type="number"
                     value={editingProduct.promoPrice}
                     onChange={(e) => setEditingProduct({ ...editingProduct, promoPrice: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Stock</label>
+                  <label className="adm-label">Stock</label>
                   <input
                     type="number"
                     required
                     value={editingProduct.stock}
                     onChange={(e) => setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                 </div>
               </div>
               
+              <ColorPicker
+                value={editingProduct.colors || []}
+                onChange={(colors) => setEditingProduct({ ...editingProduct, colors })}
+              />
+
               <div>
-                  <label className="block text-sm font-medium mb-2">Images du produit</label>
+                <label className="adm-label">Visibilité</label>
+                <select
+                  value={editingProduct.status === 'inactive' ? 'inactive' : 'approved'}
+                  disabled={editingProduct.status !== 'approved' && editingProduct.status !== 'inactive'}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, status: e.target.value })}
+                  className="adm-input"
+                >
+                  <option value="approved">En vente</option>
+                  <option value="inactive">Archivé (masqué du catalogue)</option>
+                </select>
+              </div>
+
+              <div>
+                  <label className="adm-label">Images du produit</label>
                   <input
                     type="file"
                     multiple
                     onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                   <div className="mt-2 flex flex-wrap gap-2">
                       {selectedFiles.map((file, index) => (
@@ -399,27 +418,27 @@ const SellerProducts = (props) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Description</label>
+                <label className="adm-label">Description</label>
                 <textarea
                   required
                   value={editingProduct.description}
                   onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
                   rows={3}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="adm-input"
                 />
               </div>
               
-              <div className="flex space-x-4">
+              <div className="flex flex-wrap gap-3">
                 <button
                   type="submit"
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
+                  className="adm-btn adm-btn-primary"
                 >
-                  Mettre à jour le Produit
+                  Enregistrer
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditingProduct(null)}
-                  className="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                  className="adm-btn adm-btn-secondary"
                 >
                   Annuler
                 </button>
@@ -430,26 +449,26 @@ const SellerProducts = (props) => {
 
         {/* Add Product Form */}
         {showAddForm && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <h3 className="text-xl font-bold mb-6">Ajouter un Nouveau Produit</h3>
+          <div className="adm-card p-5 sm:p-6 mb-6">
+            <h2 className="adm-modal-title mb-5">Nouveau produit</h2>
             <form onSubmit={handleAddProduct} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Nom du produit</label>
+                  <label className="adm-label">Nom du produit</label>
                   <input
                     type="text"
                     required
                     value={newProduct.name}
                     onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Catégorie</label>
+                  <label className="adm-label">Catégorie</label>
                   <select
                     value={newProduct.category}
                     onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   >
                     {availableCategories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
@@ -457,43 +476,48 @@ const SellerProducts = (props) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Prix (XAF)</label>
+                  <label className="adm-label">Prix (XAF)</label>
                   <input
                     type="number"
                     required
                     value={newProduct.price}
                     onChange={(e) => setNewProduct({ ...newProduct, price: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Prix Promotionnel (XAF)</label>
+                  <label className="adm-label">Prix Promotionnel (XAF)</label>
                   <input
                     type="number"
                     value={newProduct.promoPrice}
                     onChange={(e) => setNewProduct({ ...newProduct, promoPrice: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Stock</label>
+                  <label className="adm-label">Stock</label>
                   <input
                     type="number"
                     required
                     value={newProduct.stock}
                     onChange={(e) => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) || 0 })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                 </div>
               </div>
               
+              <ColorPicker
+                value={newProduct.colors}
+                onChange={(colors) => setNewProduct({ ...newProduct, colors })}
+              />
+
               <div>
-                  <label className="block text-sm font-medium mb-2">Images du produit</label>
+                  <label className="adm-label">Images du produit</label>
                   <input
                     type="file"
                     multiple
                     onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="adm-input"
                   />
                   <div className="mt-2 flex flex-wrap gap-2">
                       {selectedFiles.map((file, index) => (
@@ -503,27 +527,27 @@ const SellerProducts = (props) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Description</label>
+                <label className="adm-label">Description</label>
                 <textarea
                   required
                   value={newProduct.description}
                   onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
                   rows={3}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="adm-input"
                 />
               </div>
               
-              <div className="flex space-x-4">
+              <div className="flex flex-wrap gap-3">
                 <button
                   type="submit"
-                  className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
+                  className="adm-btn adm-btn-primary"
                 >
-                  Ajouter le Produit
+                  Ajouter le produit
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="bg-gray-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-600 transition-colors"
+                  className="adm-btn adm-btn-secondary"
                 >
                   Annuler
                 </button>
@@ -532,102 +556,79 @@ const SellerProducts = (props) => {
           </div>
         )}
 
-        {/* Products Grid */}
+        {/* Liste des produits */}
         {loading ? (
-          <div className="text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mb-4"></div>
-            <p className="text-lg text-gray-600">Chargement des produits...</p>
-          </div>
+          <p className="adm-card px-5 py-12 text-center text-gray-600">Chargement des produits…</p>
         ) : products.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-lg shadow-md">
-            <div className="text-6xl mb-4">📦</div>
-            <h3 className="text-xl font-semibold mb-2">Aucun produit enregistré</h3>
-            <p className="text-gray-600 mb-4">Vous n'avez pas encore de produits dans votre boutique.</p>
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="bg-gradient-to-r from-green-500 to-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-shadow"
-            >
-              ➕ Ajouter votre premier produit
+          <div className="adm-card px-5 py-12 text-center">
+            <h2 className="text-lg font-extrabold text-purple-950">Aucun produit pour l'instant</h2>
+            <p className="mt-1 text-gray-600">Ajoutez un premier produit : il sera visible dans le catalogue dès sa création.</p>
+            <button type="button" onClick={() => setShowAddForm(true)} className="adm-btn adm-btn-primary mt-5">
+              Ajouter un produit
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map(product => (
-            <div key={product.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
-              <div className="relative">
-                <input
-                    type="checkbox"
-                    className="absolute top-2 left-2 z-10 h-6 w-6"
-                    checked={selectedProducts.includes(product.id)}
-                    onChange={(e) => handleSelectProduct(e, product.id)}
-                />
-                <img
-                  src={product.image}
-                  alt={product.name[language]}
-                  className="w-full h-48 object-cover"
-                />
-                <div className="absolute top-2 right-2 flex space-x-1">
-                  {product.inStock ? (
-                    <span className="bg-green-500 text-white px-2 py-1 text-xs rounded">
-                      En Stock
-                    </span>
-                  ) : (
-                    <span className="bg-red-500 text-white px-2 py-1 text-xs rounded">
-                      Rupture
-                    </span>
-                  )}
-                  <button
-                    onClick={() => setEditingProduct(product)}
-                    className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg text-sm transition-colors"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => handleDeleteProduct(product.id)}
-                    className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg text-sm transition-colors"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              </div>
-              
-              <div className="p-4">
-                <h3 className="font-semibold text-lg mb-2">{product.name[language]}</h3>
-                <div className="flex justify-between items-center mb-2">
-                  {product.promoPrice && product.promoPrice > 0 ? (
-                    <div className="flex items-baseline">
-                      <span className="text-xl font-bold text-red-600 mr-2">
-                        {formatPrice(product.promoPrice)}
-                      </span>
-                      <span className="text-sm text-gray-500 line-through">
-                        {formatPrice(product.price)}
-                      </span>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {products.map(product => {
+              const categoryName = availableCategories.find(c => c.id === product.category)?.name;
+              const hasPromo = product.promoPrice > 0 && product.promoPrice < product.price;
+              return (
+                <li key={product.id} className={`adm-card overflow-hidden flex flex-col ${product.status === 'inactive' ? 'opacity-70' : ''}`}>
+                  <div className="relative bg-gray-100">
+                    <img src={product.image} alt="" className="w-full aspect-square object-cover" loading="lazy" />
+                    <label className="absolute top-2 left-2 flex items-center justify-center w-9 h-9 rounded-lg bg-white/90 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 accent-purple-700"
+                        checked={selectedProducts.includes(product.id)}
+                        onChange={(e) => handleSelectProduct(e, product.id)}
+                        aria-label={`Sélectionner ${product.name}`}
+                      />
+                    </label>
+                    <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                      {product.status === 'inactive' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-800 text-white">Archivé</span>
+                      )}
+                      {product.status === 'pending' && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-300 text-purple-950">En attente</span>
+                      )}
                     </div>
-                  ) : (
-                    <span className="text-xl font-bold text-purple-600">
-                      {formatPrice(product.price)}
-                    </span>
-                  )}
-                  {/* <div className="flex items-center">
-                    <span className="text-yellow-400 mr-1">⭐</span>
-                    <span className="text-sm">{product.rating} ({product.reviews})</span>
-                  </div> */}
-                </div>
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                  {product.description ? product.description[language] : ''}
-                </p>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">
-                    Stock: {product.stock || 'N/A'}
-                  </span>
-                  <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full">
-                    {translations[language][product.category]}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-          </div>
+                  </div>
+
+                  <div className="p-4 flex-1 flex flex-col">
+                    <h3 className="font-semibold text-gray-900 line-clamp-2">{product.name}</h3>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className={`price text-xl tabular-nums ${hasPromo ? 'text-red-700' : 'text-purple-950'}`}>
+                        {formatPrice(hasPromo ? product.promoPrice : product.price)}
+                      </span>
+                      {hasPromo && <span className="text-sm text-gray-500 line-through">{formatPrice(product.price)}</span>}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className={`px-2 py-0.5 rounded-full font-semibold ${product.stock > 0 ? (product.stock < 5 ? 'bg-yellow-100 text-yellow-900' : 'bg-green-100 text-green-800') : 'bg-red-100 text-red-800'}`}>
+                        {product.stock > 0 ? `Stock : ${product.stock}` : 'Rupture'}
+                      </span>
+                      {categoryName && <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-800">{categoryName}</span>}
+                      {product.colors?.length > 0 && (
+                        <span className="flex items-center gap-0.5" role="img" aria-label={`${product.colors.length} couleur(s)`}>
+                          {product.colors.slice(0, 5).map(c => (
+                            <span key={c} className="w-3.5 h-3.5 rounded-full border border-gray-300" style={{ backgroundColor: c }} />
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-auto pt-4 flex gap-2">
+                      <button type="button" onClick={() => setEditingProduct(product)} className="adm-btn adm-btn-secondary flex-1">
+                        Modifier
+                      </button>
+                      <button type="button" onClick={() => handleDeleteProduct(product.id)} className="adm-btn adm-btn-secondary !text-red-700" aria-label={`Supprimer ${product.name}`}>
+                        Supprimer
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
     );

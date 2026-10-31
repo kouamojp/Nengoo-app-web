@@ -91,7 +91,7 @@ const ProductCatalog = (props) => {
       try {
         setLoading(true);
         setLoadError(false);
-        const response = await fetch(`${API_BASE_URL}/products`);
+        const response = await fetch(`${API_BASE_URL}/products?status=approved`);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
