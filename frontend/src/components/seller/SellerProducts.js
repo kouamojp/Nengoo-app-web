@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
 import ColorPicker from './ColorPicker';
+import { categorySelectOptions, categoryPath } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -348,8 +349,8 @@ const SellerProducts = (props) => {
                     onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
                     className="adm-input"
                   >
-                    {availableCategories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    {categorySelectOptions(availableCategories).map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
@@ -470,8 +471,8 @@ const SellerProducts = (props) => {
                     onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                     className="adm-input"
                   >
-                    {availableCategories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    {categorySelectOptions(availableCategories).map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
@@ -570,7 +571,7 @@ const SellerProducts = (props) => {
         ) : (
           <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {products.map(product => {
-              const categoryName = availableCategories.find(c => c.id === product.category)?.name;
+              const categoryName = categoryPath(availableCategories, product.category);
               const hasPromo = product.promoPrice > 0 && product.promoPrice < product.price;
               return (
                 <li key={product.id} className={`adm-card overflow-hidden flex flex-col ${product.status === 'inactive' ? 'opacity-70' : ''}`}>

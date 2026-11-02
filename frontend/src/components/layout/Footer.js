@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
+import { topLevelCategories } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -51,7 +52,7 @@ const Footer = ({ language }) => {
             <div>
               <h2 className="text-lg font-bold mb-4">{t.categories}</h2>
               <ul className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
-                {categories.map(category => (
+                {topLevelCategories(categories).map(category => (
                   <li key={category.id}>
                     <Link
                       to={`/catalog/${encodeURIComponent(category.name)}`}

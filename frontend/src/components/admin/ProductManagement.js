@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { notify, confirmAction } from './adminFeedback';
 import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusBadge, EmptyRow, LoadingRows, Modal, Field, ChoiceCards } from './AdminUI';
+import { categorySelectOptions, categoryPath } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -359,7 +360,7 @@ const ProductManagement = (props) => {
         const matchesSearch = (
             product.name.toLowerCase().includes(query) ||
             product.description.toLowerCase().includes(query) ||
-            (categories.find(c => c.id === product.category)?.name || '').toLowerCase().includes(query) ||
+            categoryPath(categories, product.category).toLowerCase().includes(query) ||
             product.sellerName.toLowerCase().includes(query)
         );
 
@@ -370,7 +371,7 @@ const ProductManagement = (props) => {
     });
 
     // Les produits référencent leur catégorie par id (comme le formulaire vendeur et le catalogue public)
-    const categoryName = (categoryId) => categories.find(c => c.id === categoryId)?.name;
+    const categoryName = (categoryId) => categoryPath(categories, categoryId);
 
     // Options de catégorie ; une catégorie inconnue est conservée pour ne pas être écrasée à l'enregistrement
     const categoryOptions = (currentValue) => (
@@ -378,8 +379,8 @@ const ProductManagement = (props) => {
             {currentValue && !categoryName(currentValue) && (
                 <option value={currentValue}>{currentValue} (catégorie supprimée)</option>
             )}
-            {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
+            {categorySelectOptions(categories).map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
             ))}
         </>
     );

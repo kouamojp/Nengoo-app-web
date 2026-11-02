@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { notify, confirmAction } from './adminFeedback';
 import { SectionHeader, SelectionBar, EmptyRow, LoadingRows, Modal, Field } from './AdminUI';
+import { topLevelCategories, subcategoriesOf } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -9,10 +10,10 @@ const CategoryManagement = (props) => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
-    const [newCategoryData, setNewCategoryData] = useState({
-        name: '',
-        description: '',
-    });
+    const emptyCategory = { name: '', description: '', parentId: '' };
+    const [newCategoryData, setNewCategoryData] = useState(emptyCategory);
+    // Catégorie en cours de modification (nom, description, catégorie parente)
+    const [editingCategory, setEditingCategory] = useState(null);
     const [selectedCategories, setSelectedCategories] = useState([]);
 
     const getRoleForHeader = () => {
@@ -101,7 +102,7 @@ const CategoryManagement = (props) => {
                     'Content-Type': 'application/json',
                     'X-Admin-Role': getRoleForHeader(),
                 },
-                body: JSON.stringify(newCategoryData),
+                body: JSON.stringify({ ...newCategoryData, parentId: newCategoryData.parentId || null }),
             });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -114,10 +115,37 @@ const CategoryManagement = (props) => {
             }
             await fetchCategories();
             setShowAddModal(false);
-            setNewCategoryData({ name: '', description: '' });
+            setNewCategoryData(emptyCategory);
             notify('Catégorie ajoutée avec succès.', 'success');
         } catch (error) {
             console.error('Error adding category:', error);
+            notify(error.message, 'error');
+        }
+    };
+
+    const handleUpdateCategory = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await fetch(`${API_BASE_URL}/categories/${editingCategory.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Admin-Role': getRoleForHeader(),
+                },
+                body: JSON.stringify({
+                    name: editingCategory.name,
+                    description: editingCategory.description || '',
+                    parentId: editingCategory.parentId || null,
+                }),
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.detail || 'La modification a échoué.');
+            }
+            await fetchCategories();
+            setEditingCategory(null);
+            notify('Catégorie modifiée.', 'success');
+        } catch (error) {
             notify(error.message, 'error');
         }
     };
@@ -147,12 +175,37 @@ const CategoryManagement = (props) => {
         }
     };
     
+    // Catégories principales proposées comme parent ; une catégorie qui a déjà
+    // des sous-catégories ne peut pas devenir elle-même une sous-catégorie
+    const parentOptions = (selfId) => topLevelCategories(categories).filter(c => c.id !== selfId);
+    const hasChildren = (id) => categories.some(c => c.parentId === id);
+
+    // Chaque catégorie principale suivie de ses sous-catégories
+    const rows = [];
+    topLevelCategories(categories).forEach(parent => {
+        rows.push({ cat: parent, isSub: false });
+        subcategoriesOf(categories, parent.id).forEach(child => rows.push({ cat: child, isSub: true, parent }));
+    });
+    categories.filter(c => !rows.some(r => r.cat.id === c.id)).forEach(c => rows.push({ cat: c, isSub: true }));
+
+    const parentField = (value, onChange, selfId) => (
+        <Field label="Catégorie parente" hint="Laissez « Aucune » pour une catégorie principale.">
+            <select value={value || ''} onChange={onChange} className="adm-input" disabled={selfId && hasChildren(selfId)}>
+                <option value="">Aucune (catégorie principale)</option>
+                {parentOptions(selfId).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            {selfId && hasChildren(selfId) && (
+                <span className="block text-xs text-gray-500 mt-1">Cette catégorie a des sous-catégories : elle reste une catégorie principale.</span>
+            )}
+        </Field>
+    );
+
     return (
         <div>
             <SectionHeader
                 title="Catégories"
                 count={categories.length}
-                description="Les catégories proposées aux vendeurs et affichées dans le catalogue."
+                description="Les catégories et sous-catégories proposées aux vendeurs et affichées dans le catalogue."
                 actions={
                     <button onClick={() => setShowAddModal(true)} className="adm-btn adm-btn-primary">
                         Ajouter une catégorie
@@ -168,12 +221,31 @@ const CategoryManagement = (props) => {
                         <Field label="Nom" required>
                             <input type="text" name="name" value={newCategoryData.name} onChange={handleInputChange} placeholder="Ex. : Maison et jardin" className="adm-input" required />
                         </Field>
+                        {parentField(newCategoryData.parentId, (e) => setNewCategoryData({ ...newCategoryData, parentId: e.target.value }))}
                         <Field label="Description">
                             <textarea name="description" value={newCategoryData.description} onChange={handleInputChange} className="adm-input" rows="3" />
                         </Field>
                         <div className="flex justify-end gap-2 pt-2">
                             <button type="button" onClick={() => setShowAddModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
                             <button type="submit" className="adm-btn adm-btn-primary">Ajouter la catégorie</button>
+                        </div>
+                    </form>
+                </Modal>
+            )}
+
+            {editingCategory && (
+                <Modal title="Modifier la catégorie" onClose={() => setEditingCategory(null)} size="max-w-lg">
+                    <form onSubmit={handleUpdateCategory} className="space-y-4">
+                        <Field label="Nom" required>
+                            <input type="text" value={editingCategory.name} onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })} className="adm-input" required />
+                        </Field>
+                        {parentField(editingCategory.parentId, (e) => setEditingCategory({ ...editingCategory, parentId: e.target.value }), editingCategory.id)}
+                        <Field label="Description">
+                            <textarea value={editingCategory.description || ''} onChange={(e) => setEditingCategory({ ...editingCategory, description: e.target.value })} className="adm-input" rows="3" />
+                        </Field>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button type="button" onClick={() => setEditingCategory(null)} className="adm-btn adm-btn-secondary">Annuler</button>
+                            <button type="submit" className="adm-btn adm-btn-primary">Enregistrer</button>
                         </div>
                     </form>
                 </Modal>
@@ -202,7 +274,7 @@ const CategoryManagement = (props) => {
                             <LoadingRows colSpan={5} />
                         ) : categories.length === 0 ? (
                             <EmptyRow colSpan={5}>Aucune catégorie. Ajoutez-en une pour que les vendeurs puissent classer leurs produits.</EmptyRow>
-                        ) : categories.map((cat) => (
+                        ) : rows.map(({ cat, isSub, parent }) => (
                             <tr key={cat.id} className={selectedCategories.includes(cat.id) ? 'bg-purple-50' : 'hover:bg-gray-50'}>
                                 <td className="adm-td">
                                     <input
@@ -213,13 +285,20 @@ const CategoryManagement = (props) => {
                                     />
                                 </td>
                                 <td className="adm-td">
-                                    <p className="font-semibold">{cat.name}</p>
-                                    <p className="text-xs text-gray-500">{cat.id}</p>
+                                    <div className={isSub ? 'pl-6 border-l-2 border-purple-200' : ''}>
+                                        <p className={isSub ? 'font-medium' : 'font-semibold'}>{cat.name}</p>
+                                        <p className="text-xs text-gray-500">
+                                            {isSub ? (parent ? `Sous-catégorie de ${parent.name}` : 'Sous-catégorie (parent supprimé)') : cat.id}
+                                        </p>
+                                    </div>
                                 </td>
                                 <td className="adm-td text-gray-600 max-w-md">{cat.description}</td>
                                 <td className={`adm-td text-right tabular-nums ${cat.productCount ? '' : 'text-gray-400'}`}>{cat.productCount || 0}</td>
                                 <td className="adm-td text-right">
-                                    <button onClick={() => handleDeleteCategory(cat.id)} className="adm-link-danger !min-h-0">Supprimer</button>
+                                    <div className="inline-flex gap-4">
+                                        <button onClick={() => setEditingCategory({ ...cat, parentId: cat.parentId || '' })} className="adm-link !min-h-0">Modifier</button>
+                                        <button onClick={() => handleDeleteCategory(cat.id)} className="adm-link-danger !min-h-0">Supprimer</button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

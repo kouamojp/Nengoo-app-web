@@ -17,6 +17,7 @@ import 'swiper/css/effect-fade';
 import './HeroSwiper.css';
 import { PinIcon } from '../ui/Icons';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
+import { topLevelCategories, categoryFamilyIds } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -54,10 +55,14 @@ const Homepage = (props) => {
     'Autres': '📦'
   };
 
-  // Accueil : seulement les catégories qui ont des produits, les plus fournies d'abord
-  const visibleCategories = categories
-    .filter(cat => typeof cat.productCount !== 'number' || cat.productCount > 0)
-    .sort((a, b) => (b.productCount || 0) - (a.productCount || 0));
+  // Accueil : les catégories principales qui ont des produits (sous-catégories
+  // comprises), les plus fournies d'abord
+  const familyCount = (cat) => categoryFamilyIds(categories, cat.id)
+    .reduce((sum, id) => sum + (categories.find(c => c.id === id)?.productCount || 0), 0);
+  const visibleCategories = topLevelCategories(categories)
+    .map(cat => ({ ...cat, productCount: familyCount(cat) }))
+    .filter(cat => cat.productCount > 0)
+    .sort((a, b) => b.productCount - a.productCount);
 
   useEffect(() => {
     const fetchHomepageSettings = async () => {

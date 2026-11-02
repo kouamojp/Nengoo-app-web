@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
 import { FilterIcon } from '../ui/Icons';
+import { topLevelCategories, subcategoriesOf, categoryFamilyIds } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -129,21 +130,37 @@ const ProductCatalog = (props) => {
   };
 
   // L'URL porte le nom de la catégorie ; les produits référencent son id
-  const selectedCategoryId = categories.find(cat => cat.name === selectedCategory)?.id;
+  const selectedCategoryObj = categories.find(cat => cat.name === selectedCategory);
+  const selectedCategoryId = selectedCategoryObj?.id;
+  // Une catégorie principale montre aussi les produits de ses sous-catégories
+  const selectedIds = selectedCategoryId ? categoryFamilyIds(categories, selectedCategoryId) : [];
 
   // Nombre de produits par id de catégorie, calculé sur les produits chargés
   const countByCategory = products.reduce((acc, p) => {
     acc[p.category] = (acc[p.category] || 0) + 1;
     return acc;
   }, {});
+  const familyCount = (cat) => categoryFamilyIds(categories, cat.id)
+    .reduce((sum, id) => sum + (countByCategory[id] || 0), 0);
 
-  // Catégories proposées : celles qui ont des produits (et la catégorie courante), les plus fournies d'abord
-  const categoryOptions = categories
-    .filter(cat => countByCategory[cat.id] > 0 || cat.name === selectedCategory)
-    .sort((a, b) => (countByCategory[b.id] || 0) - (countByCategory[a.id] || 0));
+  // Catégorie principale concernée par la sélection (elle-même, ou le parent d'une sous-catégorie)
+  const activeParent = selectedCategoryObj?.parentId
+    ? categories.find(cat => cat.id === selectedCategoryObj.parentId)
+    : selectedCategoryObj;
+
+  // Catégories principales proposées : celles qui ont des produits (et la courante), les plus fournies d'abord
+  const categoryOptions = topLevelCategories(categories)
+    .filter(cat => familyCount(cat) > 0 || cat.id === activeParent?.id)
+    .sort((a, b) => familyCount(b) - familyCount(a));
+
+  // Sous-catégories de la catégorie principale active qui ont des produits
+  const subcategoryOptions = activeParent
+    ? subcategoriesOf(categories, activeParent.id)
+        .filter(cat => (countByCategory[cat.id] || 0) > 0 || cat.id === selectedCategoryId)
+    : [];
 
   const filteredProducts = products
-    .filter(p => selectedCategory === 'all' || p.category === selectedCategoryId)
+    .filter(p => selectedCategory === 'all' || selectedIds.includes(p.category))
     .filter(p => p.price <= maxPrice)
     .sort((a, b) => {
       switch (sortBy) {
@@ -223,6 +240,14 @@ const ProductCatalog = (props) => {
 
       <main className="container mx-auto px-4 pt-6 sm:pt-10 pb-14">
         <div className="mb-5 sm:mb-8">
+          {selectedCategoryObj?.parentId && activeParent && (
+            <Link
+              to={`/catalog/${encodeURIComponent(activeParent.name)}`}
+              className="inline-block mb-1 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4"
+            >
+              {activeParent.name}
+            </Link>
+          )}
           <h1 className="font-display text-4xl sm:text-5xl text-purple-950">
             {selectedCategory === 'all' ? t.catalogTitle : selectedCategory}
           </h1>
@@ -241,8 +266,8 @@ const ProductCatalog = (props) => {
               key={cat.id}
               type="button"
               onClick={() => selectCategory(cat.name)}
-              aria-pressed={selectedCategory === cat.name}
-              className={chipClass(selectedCategory === cat.name)}
+              aria-pressed={activeParent?.id === cat.id}
+              className={chipClass(activeParent?.id === cat.id)}
             >
               {cat.name}
             </button>
@@ -256,8 +281,9 @@ const ProductCatalog = (props) => {
               <nav aria-label={t.categories}>
                 <h2 className="text-lg font-bold mb-3">{t.categories}</h2>
                 <ul className="space-y-0.5">
-                  {[{ id: 'all', name: 'all', label: t.allCategories, count: products.length }, ...categoryOptions.map(cat => ({ id: cat.id, name: cat.name, label: cat.name, count: countByCategory[cat.id] || 0 }))].map(item => {
+                  {[{ id: 'all', name: 'all', label: t.allCategories, count: products.length }, ...categoryOptions.map(cat => ({ id: cat.id, name: cat.name, label: cat.name, count: familyCount(cat) }))].map(item => {
                     const active = selectedCategory === item.name;
+                    const subs = activeParent?.id === item.id ? subcategoryOptions : [];
                     return (
                       <li key={item.id}>
                         <button
@@ -271,6 +297,28 @@ const ProductCatalog = (props) => {
                           <span>{item.label}</span>
                           <span className={`tabular-nums text-xs ${active ? 'text-purple-700' : 'text-gray-400'}`}>{item.count}</span>
                         </button>
+                        {subs.length > 0 && (
+                          <ul className="mt-0.5 mb-1 ml-3 pl-2 border-l border-purple-200 space-y-0.5">
+                            {subs.map(sub => {
+                              const subActive = selectedCategory === sub.name;
+                              return (
+                                <li key={sub.id}>
+                                  <button
+                                    type="button"
+                                    onClick={() => selectCategory(sub.name)}
+                                    aria-current={subActive ? 'true' : undefined}
+                                    className={`w-full !min-h-0 flex items-baseline justify-between gap-3 px-3 py-1.5 rounded-lg text-left text-sm transition-colors ${
+                                      subActive ? 'bg-purple-100 text-purple-900 font-semibold' : 'text-gray-600 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    <span>{sub.name}</span>
+                                    <span className={`tabular-nums text-xs ${subActive ? 'text-purple-700' : 'text-gray-400'}`}>{countByCategory[sub.id] || 0}</span>
+                                  </button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
                       </li>
                     );
                   })}
@@ -288,6 +336,19 @@ const ProductCatalog = (props) => {
           </aside>
 
           <section ref={productListRef} className="scroll-mt-20 min-w-0">
+            {/* Sous-catégories de la catégorie principale active */}
+            {subcategoryOptions.length > 0 && (
+              <div className="-mx-4 px-4 sm:mx-0 sm:px-0 mb-4 flex gap-2 overflow-x-auto hide-scrollbar" role="group" aria-label={t.subcategories}>
+                <button type="button" onClick={() => selectCategory(activeParent.name)} aria-pressed={selectedCategory === activeParent.name} className={chipClass(selectedCategory === activeParent.name)}>
+                  {t.allOf(activeParent.name)}
+                </button>
+                {subcategoryOptions.map(sub => (
+                  <button key={sub.id} type="button" onClick={() => selectCategory(sub.name)} aria-pressed={selectedCategory === sub.name} className={chipClass(selectedCategory === sub.name)}>
+                    {sub.name}
+                  </button>
+                ))}
+              </div>
+            )}
             {/* Barre d'outils : prix (mobile) et tri */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
               <details className="lg:hidden group">

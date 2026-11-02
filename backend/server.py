@@ -597,14 +597,19 @@ class Category(BaseModel):
     id: str = Field(default_factory=lambda: f"cat_{str(uuid.uuid4())[:8]}")
     name: str
     description: Optional[str] = None
+    # Sous-catégorie : id de la catégorie principale (un seul niveau)
+    parentId: Optional[str] = None
 
 class CategoryCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    
+    parentId: Optional[str] = None
+
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    # null explicite : la sous-catégorie redevient une catégorie principale
+    parentId: Optional[str] = None
 
 class CategoryWithCount(Category):
     productCount: int
@@ -1334,7 +1339,8 @@ async def get_products(
 ):
     query = {}
     if category:
-        query["category"] = category
+        # Une catégorie principale inclut les produits de ses sous-catégories
+        query["category"] = {"$in": await category_family_ids(category)}
     if status_filter:
         query["status"] = status_filter
     if search:
@@ -2867,6 +2873,28 @@ async def delete_pickup_point(pickup_point_id: str):
     return
 
 # --- Category Management ---
+async def check_category_parent(category_id: Optional[str], parent_id: Optional[str]) -> None:
+    """Un seul niveau : le parent existe, est une catégorie principale, et une
+    catégorie qui a déjà des sous-catégories ne peut pas devenir l'une d'elles."""
+    if not parent_id:
+        return
+    if parent_id == category_id:
+        raise HTTPException(status_code=400, detail="Une catégorie ne peut pas être sa propre catégorie parente.")
+    parent = await db.categories.find_one({"id": parent_id})
+    if not parent:
+        raise HTTPException(status_code=400, detail="Catégorie parente introuvable.")
+    if parent.get("parentId"):
+        raise HTTPException(status_code=400, detail="La catégorie parente doit être une catégorie principale, pas une sous-catégorie.")
+    if category_id and await db.categories.find_one({"parentId": category_id}):
+        raise HTTPException(status_code=400, detail="Cette catégorie a des sous-catégories : elle ne peut pas devenir elle-même une sous-catégorie.")
+
+
+async def category_family_ids(category_id: str) -> List[str]:
+    """La catégorie et ses sous-catégories, pour filtrer les produits."""
+    children = await db.categories.find({"parentId": category_id}, {"id": 1}).to_list(1000)
+    return [category_id] + [c["id"] for c in children if c.get("id")]
+
+
 @api_router.get("/categories", response_model=List[CategoryWithCount])
 async def list_categories():
     pipeline = [
@@ -2883,6 +2911,7 @@ async def list_categories():
                 "id": "$id",
                 "name": "$name",
                 "description": "$description",
+                "parentId": "$parentId",
                 "productCount": { "$size": "$products" }
             }
         }
@@ -2894,7 +2923,9 @@ async def list_categories():
 @api_router.post("/categories", response_model=Category, dependencies=[Depends(moderator_or_higher_required)])
 async def create_category(category_data: CategoryCreate):
     if await db.categories.find_one({"name": category_data.name}):
-        raise HTTPException(status_code=400, detail="A category with this name already exists.")
+        raise HTTPException(status_code=400, detail="Une catégorie porte déjà ce nom.")
+    category_data.parentId = category_data.parentId or None
+    await check_category_parent(None, category_data.parentId)
     category = Category(**category_data.dict())
     await db.categories.insert_one(category.dict())
     return category
@@ -2904,7 +2935,10 @@ async def update_category(category_id: str, category_data: CategoryUpdate):
     update_data = category_data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
-    
+    if "parentId" in update_data:
+        update_data["parentId"] = update_data["parentId"] or None
+        await check_category_parent(category_id, update_data["parentId"])
+
     await db.categories.update_one({"id": category_id}, {"$set": update_data})
     updated_category = await db.categories.find_one({"id": category_id})
     if not updated_category:
@@ -2916,6 +2950,10 @@ async def bulk_delete_categories(request: BulkDeleteRequest):
     if not request.ids:
         raise HTTPException(status_code=400, detail="No category IDs provided for deletion.")
     
+    # Une catégorie ne part pas sans ses sous-catégories
+    orphan = await db.categories.find_one({"parentId": {"$in": request.ids}, "id": {"$nin": request.ids}})
+    if orphan:
+        raise HTTPException(status_code=400, detail=f"Supprimez ou déplacez d'abord la sous-catégorie « {orphan['name']} ».")
     result = await db.categories.delete_many({"id": {"$in": request.ids}})
     
     if result.deleted_count == 0:
@@ -2929,6 +2967,8 @@ async def bulk_delete_categories(request: BulkDeleteRequest):
 
 @api_router.delete("/categories/{category_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(moderator_or_higher_required)])
 async def delete_category(category_id: str):
+    if await db.categories.find_one({"parentId": category_id}):
+        raise HTTPException(status_code=400, detail="Cette catégorie a des sous-catégories : supprimez-les ou déplacez-les d'abord.")
     result = await db.categories.delete_one({"id": category_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")

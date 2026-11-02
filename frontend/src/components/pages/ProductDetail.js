@@ -79,6 +79,8 @@ const ProductDetail = (props) => {
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [category, setCategory] = useState(null);
+  // Catégorie principale quand le produit est rangé dans une sous-catégorie
+  const [parentCategory, setParentCategory] = useState(null);
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSendMessageModal, setShowSendMessageModal] = useState(false);
@@ -170,7 +172,9 @@ const ProductDetail = (props) => {
         const response = await fetch(`${API_BASE_URL}/categories`);
         if (!response.ok) return;
         const data = await response.json();
-        setCategory(data.find(cat => cat.id === categoryId) || null);
+        const found = data.find(cat => cat.id === categoryId) || null;
+        setCategory(found);
+        setParentCategory(found?.parentId ? data.find(cat => cat.id === found.parentId) || null : null);
       } catch (error) {
         console.error("❌ [ProductDetail] Erreur récupération catégorie:", error);
       }
@@ -335,6 +339,12 @@ const ProductDetail = (props) => {
   // Les robots qui visitent cette URL reçoivent l'aperçu Open Graph du backend (voir .htaccess)
   const canonicalUrl = `${SITE_URL}/product/${product.slug || product.id}`;
   const categoryUrl = category ? `/catalog/${encodeURIComponent(category.name)}` : '/catalog';
+  const parentCategoryUrl = parentCategory ? `/catalog/${encodeURIComponent(parentCategory.name)}` : null;
+  // Fil d'Ariane : Catalogue › [catégorie principale ›] catégorie › produit
+  const categoryCrumbs = [
+    ...(parentCategory ? [{ name: parentCategory.name, url: parentCategoryUrl }] : []),
+    ...(category ? [{ name: category.name, url: categoryUrl }] : []),
+  ];
 
   const jsonLd = {
     '@context': 'https://schema.org/',
@@ -378,8 +388,8 @@ const ProductDetail = (props) => {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Accueil', item: `${SITE_URL}/` },
       { '@type': 'ListItem', position: 2, name: 'Catalogue', item: `${SITE_URL}/catalog` },
-      ...(category ? [{ '@type': 'ListItem', position: 3, name: category.name, item: `${SITE_URL}${categoryUrl}` }] : []),
-      { '@type': 'ListItem', position: category ? 4 : 3, name, item: canonicalUrl },
+      ...categoryCrumbs.map((crumb, i) => ({ '@type': 'ListItem', position: 3 + i, name: crumb.name, item: `${SITE_URL}${crumb.url}` })),
+      { '@type': 'ListItem', position: 3 + categoryCrumbs.length, name, item: canonicalUrl },
     ],
   };
 
@@ -426,12 +436,12 @@ const ProductDetail = (props) => {
               <li><Link to="/" className="hover:text-purple-700 hover:underline underline-offset-4">Accueil</Link></li>
               <li aria-hidden="true">/</li>
               <li><Link to="/catalog" className="hover:text-purple-700 hover:underline underline-offset-4">{t.catalogTitle}</Link></li>
-              {category && (
-                <>
+              {categoryCrumbs.map((crumb) => (
+                <React.Fragment key={crumb.url}>
                   <li aria-hidden="true">/</li>
-                  <li><Link to={categoryUrl} className="hover:text-purple-700 hover:underline underline-offset-4">{category.name}</Link></li>
-                </>
-              )}
+                  <li><Link to={crumb.url} className="hover:text-purple-700 hover:underline underline-offset-4">{crumb.name}</Link></li>
+                </React.Fragment>
+              ))}
               <li aria-hidden="true" className="max-sm:hidden">/</li>
               <li className="max-sm:hidden text-gray-800 truncate max-w-[24ch]" aria-current="page">{name}</li>
             </ol>
