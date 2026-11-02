@@ -8,6 +8,7 @@ import ProductCard from '../product/ProductCard';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
 import { FilterIcon } from '../ui/Icons';
 import { topLevelCategories, subcategoriesOf, categoryFamilyIds, categoryName, findCategoryByName } from '../../lib/categories';
+import { listImage } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -107,7 +108,7 @@ const ProductCatalog = (props) => {
         const adaptedProducts = shuffledData.map(p => ({
           ...p,
           name: { [language]: p.name }, // Adapt name to be an object
-          image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png', // Use first image
+          image: listImage(p) || process.env.PUBLIC_URL + '/images/logo-nengoo.png',
           inStock: p.stock > 0,
           reviews: p.reviewsCount || 0,
           rating: p.rating || 0,

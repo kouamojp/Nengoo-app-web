@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { categoryName } from '../../lib/categories';
 import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import NotificationList from '../ui/NotificationList';
@@ -26,7 +27,8 @@ const actionClass = 'relative flex flex-col items-center gap-0.5 px-2 py-1 round
 
 const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUser }) => {
   const navigate = useNavigate();
-  const [suggestions, setSuggestions] = useState([]);
+  // Suggestions pendant la saisie : { products, categories }
+  const [suggestions, setSuggestions] = useState({ products: [], categories: [] });
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -65,20 +67,19 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
     const fetchSuggestions = async () => {
       if (searchQuery.trim().length > 1) {
         try {
-          const response = await fetch(`${API_BASE_URL}/products?status=approved&search=${encodeURIComponent(searchQuery.trim())}`);
+          const response = await fetch(`${API_BASE_URL}/search/suggest?q=${encodeURIComponent(searchQuery.trim())}`);
           if (response.ok) {
-            const data = await response.json();
-            setSuggestions(data);
+            setSuggestions(await response.json());
             setShowSuggestions(true);
           } else {
-            setSuggestions([]);
+            setSuggestions({ products: [], categories: [] });
           }
         } catch (error) {
           console.error("Erreur lors de la récupération des suggestions:", error);
-          setSuggestions([]);
+          setSuggestions({ products: [], categories: [] });
         }
       } else {
-        setSuggestions([]);
+        setSuggestions({ products: [], categories: [] });
         setShowSuggestions(false);
       }
     };
@@ -138,9 +139,28 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
               >
                 <SearchIcon className="w-5 h-5" strokeWidth={2.2} />
               </button>
-              {showSuggestions && suggestions.length > 0 && (
+              {showSuggestions && (suggestions.products.length > 0 || suggestions.categories.length > 0) && (
                 <div className="absolute top-full mt-2 left-0 right-0 bg-white rounded-xl border border-gray-200 shadow-xl z-10 max-h-96 overflow-y-auto py-1">
-                  {suggestions.map(product => (
+                  {suggestions.categories.map(category => (
+                    <Link
+                      key={category.id}
+                      to={`/catalog/${encodeURIComponent(category.name)}`}
+                      className="flex items-center gap-3 px-3 py-2 text-gray-900 hover:bg-purple-50"
+                      onClick={() => {
+                        setShowSuggestions(false);
+                        setSearchQuery('');
+                      }}
+                    >
+                      <span className="w-11 h-11 rounded-md bg-purple-100 text-purple-800 flex items-center justify-center shrink-0" aria-hidden="true">
+                        <SearchIcon className="w-5 h-5" />
+                      </span>
+                      <span className="flex-1 min-w-0 truncate">
+                        <span className="block text-xs text-gray-500">{t.categories}</span>
+                        {categoryName(category, language)}
+                      </span>
+                    </Link>
+                  ))}
+                  {suggestions.products.map(product => (
                     <Link
                       key={product.id}
                       to={`/product/${product.slug || product.id}`}
@@ -150,7 +170,7 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
                         setSearchQuery('');
                       }}
                     >
-                      <img src={product.images[0]} alt="" className="w-11 h-11 rounded-md object-cover bg-gray-100 shrink-0" />
+                      <img src={product.image} alt="" className="w-11 h-11 rounded-md object-cover bg-gray-100 shrink-0" />
                       <span className="flex-1 min-w-0 truncate">{product.name}</span>
                       <span className="price text-purple-800 shrink-0">
                         {formatPrice(product.promoPrice > 0 ? product.promoPrice : product.price)}

@@ -11,6 +11,7 @@ import ProductCard from '../product/ProductCard';
 import { CartIcon, WhatsAppIcon, PinIcon } from '../ui/Icons';
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
+import { listImage, previewImage } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const SITE_URL = 'https://www.nengoo.com';
@@ -64,7 +65,7 @@ const adaptProduct = (p, language) => ({
   ...p,
   name: { [language]: p.name },
   description: { [language]: p.description },
-  image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
+  image: listImage(p) || process.env.PUBLIC_URL + '/images/logo-nengoo.png',
   images: p.images || [],
   inStock: p.stock > 0,
   reviews: p.reviewsCount || 0,
@@ -459,7 +460,7 @@ const ProductDetail = (props) => {
                 className="relative block w-full !min-h-0 aspect-square rounded-2xl bg-white border border-gray-200 overflow-hidden cursor-zoom-in"
               >
                 <img
-                  src={images[selectedImage]}
+                  src={previewImage(product, selectedImage) || images[selectedImage]}
                   alt={name}
                   className="w-full h-full object-contain"
                   onError={(e) => {
@@ -487,7 +488,7 @@ const ProductDetail = (props) => {
                       }`}
                     >
                       <img
-                        src={img}
+                        src={listImage(product, index) || img}
                         alt=""
                         className="w-full h-full object-cover"
                         loading="lazy"

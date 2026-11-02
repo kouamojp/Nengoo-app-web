@@ -1,37 +1,44 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import './App.css';
 import ScrollToTop from './components/ui/ScrollToTop';
 import Toast from './components/ui/Toast';
-import {
-  Homepage,
-  ProductCatalog,
-  ProductDetail,
-  ShoppingCart,
-  Checkout,
-  UserProfile,
-  About,
-  SearchResults,
-  SellerShop,
-  SellerDashboard,
-  Login,
-  BuyerSignup,
-  SellerSignup,
-  PendingApproval,
-  ForgotPassword,
-  ResetPassword,
-  AdminLogin,
-  AdminDashboard,
-  AdminManagement,
-  SellerProductList,
-  NotificationsPage,
-  PickupPointsMap ,
-  PrivacyPolicy,
-  DeleteAccount,
-  PrivacyPolicyEditor
-} from './components';
-import BuyerVerification from './components/admin/BuyerVerification';
+import Homepage from './components/pages/Homepage';
+import ProductCatalog from './components/pages/ProductCatalog';
+import ProductDetail from './components/pages/ProductDetail';
+import ShoppingCart from './components/cart/ShoppingCart';
+import Checkout from './components/cart/Checkout';
+import UserProfile from './components/pages/UserProfile';
+import About from './components/pages/About';
+import SearchResults from './components/pages/SearchResults';
+import SellerShop from './components/pages/SellerShop';
+import NotificationsPage from './components/pages/NotificationsPage';
+import PrivacyPolicy from './components/pages/PrivacyPolicy';
 import BottomNav from './components/layout/BottomNav';
+
+// Chargés à la demande : la plupart des visiteurs n'ouvrent jamais l'espace
+// vendeur ou admin, et la connexion embarque Firebase (lourd)
+const SellerDashboard = lazy(() => import('./components/seller/SellerDashboard'));
+const Login = lazy(() => import('./components/auth/Login'));
+const BuyerSignup = lazy(() => import('./components/auth/BuyerSignup'));
+const SellerSignup = lazy(() => import('./components/auth/SellerSignup'));
+const PendingApproval = lazy(() => import('./components/auth/PendingApproval'));
+const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('./components/auth/ResetPassword'));
+const AdminLogin = lazy(() => import('./components/admin/AdminLogin'));
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
+const AdminManagement = lazy(() => import('./components/admin/AdminManagement'));
+const SellerProductList = lazy(() => import('./components/admin/SellerProductList'));
+const PrivacyPolicyEditor = lazy(() => import('./components/admin/PrivacyPolicyEditor'));
+const BuyerVerification = lazy(() => import('./components/admin/BuyerVerification'));
+const PickupPointsMap = lazy(() => import('./components/pages/PickupPointsMap'));
+const DeleteAccount = lazy(() => import('./components/pages/DeleteAccount'));
+
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50" role="status" aria-label="Chargement">
+    <span className="w-10 h-10 rounded-full border-4 border-purple-200 border-t-purple-700 animate-spin" />
+  </div>
+);
 
 function App() {
   
@@ -160,6 +167,7 @@ function App() {
       <div className="App">
         <Router>
           <ScrollToTop />
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Homepage {...appProps} />} />
             <Route path="/catalog" element={<ProductCatalog {...appProps} />} />
@@ -205,6 +213,7 @@ function App() {
             {/* Catch-all route for unmatched paths */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
           <BottomNav cartItemCount={cartItemCount} user={user} />
         </Router>
         {toast.show && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}

@@ -5,6 +5,7 @@ import { useLocation, Link } from 'react-router-dom';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
+import { listImage } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -30,7 +31,8 @@ const SearchResults = (props) => {
       setError(null);
 
       try {
-        const response = await fetch(`${API_BASE_URL}/products?status=approved&search=${encodeURIComponent(query)}`);
+        // track : une recherche sans résultat complet alimente le journal de l'admin
+        const response = await fetch(`${API_BASE_URL}/products?status=approved&track=true&search=${encodeURIComponent(query)}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -39,7 +41,7 @@ const SearchResults = (props) => {
             ...p,
             name: { [language]: p.name },
             description: { [language]: p.description },
-            image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/300',
+            image: listImage(p) || 'https://via.placeholder.com/300',
             inStock: p.stock > 0,
             reviews: p.reviewsCount || 0,
             rating: p.rating || 0,

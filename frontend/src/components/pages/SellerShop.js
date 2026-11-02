@@ -6,6 +6,7 @@ import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
 import { openWhatsApp } from '../../lib/utils';
 import { translations } from '../../lib/translations';
+import { listImage } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -42,7 +43,7 @@ const SellerShop = (props) => {
                     ...p,
                     name: { [language]: p.name },
                     description: { [language]: p.description },
-                    image: p.images && p.images.length > 0 ? p.images[0] : process.env.PUBLIC_URL + '/images/logo-nengoo.png',
+                    image: listImage(p) || process.env.PUBLIC_URL + '/images/logo-nengoo.png',
                     inStock: p.stock > 0,
                     reviews: p.reviewsCount || 0,
                     rating: p.rating || 0,

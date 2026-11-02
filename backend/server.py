@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks, Query, Request
+from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks, Query, Request, Response
 from fastapi.responses import HTMLResponse, Response
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr
@@ -63,6 +63,8 @@ from auth_tokens import IdentityMiddleware, create_access_token, decode_access_t
 import login_limiter
 from category_tree import normalize_name, suggest_category_name
 from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
+from product_search import normalize_query, search_products, search_products_detailed
+from image_variants import aligned_variants, refresh_product_variants
 from account_deletion import erase_buyer, erase_seller
 app.add_middleware(IdentityMiddleware)
 
@@ -369,6 +371,10 @@ class Product(BaseModel):
     condition: Optional[ProductCondition] = None
     # Caractéristiques libres : {"Taille": "M", "Matière": "Coton"}
     specs: Dict[str, str] = {}
+    # Versions WebP réduites, alignées sur images ('' = pas encore créée) :
+    # 400 px pour les listes, 1000 px pour la fiche (voir image_variants.py)
+    thumbnails: List[str] = []
+    previews: List[str] = []
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 
@@ -1376,14 +1382,55 @@ async def root():
     return {"message": "Hello Nengoo API"}
 
 # --- Product Management ---
+async def category_search_names() -> Dict[str, str]:
+    """Texte de catégorie indexé pour chaque id : « Robes Mode femme »."""
+    categories = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1, "nameEn": 1, "parentId": 1}).to_list(1000)
+    by_id = {c.get("id"): c for c in categories if c.get("id")}
+    names = {}
+    for cid, c in by_id.items():
+        parent = by_id.get(c.get("parentId")) or {}
+        names[cid] = " ".join(filter(None, [c.get("name"), c.get("nameEn"), parent.get("name"), parent.get("nameEn")]))
+    return names
+
+
+async def log_search_miss(search: str) -> None:
+    """Journal des recherches sans résultat (pour savoir ce qui manque au catalogue)."""
+    key = normalize_query(search)
+    if not key:
+        return
+    await db.search_misses.update_one(
+        {"_id": key},
+        {"$set": {"query": search.strip()[:100], "lastAt": datetime.utcnow()}, "$inc": {"count": 1},
+         "$setOnInsert": {"firstAt": datetime.utcnow()}},
+        upsert=True,
+    )
+
+
+PRODUCT_SORTS = {
+    "recent": lambda p: -(p.get("updatedAt") or p.get("createdAt") or datetime.min).timestamp(),
+    "price_asc": lambda p: (p.get("promoPrice") or p.get("price") or 0),
+    "price_desc": lambda p: -(p.get("promoPrice") or p.get("price") or 0),
+}
+
+
 @api_router.get("/products", response_model=List[Product])
 async def get_products(
+    response: Response,
     search: Optional[str] = None,
     seller_id: Optional[str] = None,
     category: Optional[str] = None,
     # Pages publiques : ?status=approved (cache les produits archivés ou en attente).
     # Sans ce paramètre, tous les statuts sont renvoyés (admin, espace vendeur).
     status_filter: Optional[str] = Query(None, alias="status"),
+    # Pagination (facultative : sans limit, toute la liste comme avant)
+    limit: Optional[int] = Query(None, ge=1, le=200),
+    skip: int = Query(0, ge=0),
+    # recent | price_asc | price_desc ; avec une recherche, pertinence par défaut
+    sort: Optional[str] = Query(None),
+    min_price: Optional[float] = Query(None, alias="minPrice"),
+    max_price: Optional[float] = Query(None, alias="maxPrice"),
+    # Page de résultats : une recherche sans résultat est enregistrée
+    track: bool = False,
 ):
     query = {}
     if category:
@@ -1395,18 +1442,67 @@ async def get_products(
             # Pages publiques : une fiche sans photo ou sans prix n'est pas vendable
             query["price"] = {"$gt": 0}
             query["images"] = {"$elemMatch": {"$nin": ["", None]}}
-    if search:
-        # Texte libre : échappé pour ne pas être interprété comme une regex
-        pattern = re.escape(search)
-        query["$or"] = [
-            {"name": {"$regex": pattern, "$options": "i"}},
-            {"description": {"$regex": pattern, "$options": "i"}},
-        ]
     if seller_id:
         query["sellerId"] = seller_id
-        
-    products = await db.products.find(query).to_list(1000)
+
+    products = await db.products.find(query).to_list(None)
+    if min_price is not None or max_price is not None:
+        def paid(p):
+            return p.get("promoPrice") or p.get("price") or 0
+        products = [p for p in products
+                    if (min_price is None or paid(p) >= min_price) and (max_price is None or paid(p) <= max_price)]
+    if search and search.strip():
+        # Tolérante aux fautes, accents, pluriels et synonymes ; les plus pertinents d'abord
+        products, complete = search_products_detailed(products, search, await category_search_names())
+        # Aucun produit ne contient tous les mots : le catalogue ne répond pas à la demande
+        if track and not complete and status_filter == "approved":
+            await log_search_miss(search)
+    if sort in PRODUCT_SORTS:
+        products.sort(key=PRODUCT_SORTS[sort])
+
+    response.headers["X-Total-Count"] = str(len(products))
+    if limit is not None:
+        products = products[skip:skip + limit]
     return [Product(**p) for p in products]
+
+
+@api_router.get("/search/suggest")
+async def search_suggest(q: str = Query("", max_length=100), limit: int = Query(6, ge=1, le=12)):
+    """Suggestions pendant la saisie : quelques produits et catégories."""
+    if len(q.strip()) < 2:
+        return {"products": [], "categories": []}
+    products = await db.products.find(
+        {"status": "approved", "price": {"$gt": 0}, "images": {"$elemMatch": {"$nin": ["", None]}}},
+        {"_id": 0, "id": 1, "slug": 1, "name": 1, "price": 1, "promoPrice": 1, "images": 1, "thumbnails": 1,
+         "category": 1, "brand": 1, "tags": 1, "description": 1},
+    ).to_list(None)
+    names = await category_search_names()
+    found = search_products(products, q, names)[:limit]
+    used = {p.get("category") for p in products}
+    categories = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1, "nameEn": 1, "parentId": 1}).to_list(1000)
+    # Catégories qui contiennent des produits, cherchées sur leur seul nom
+    category_docs = [{"id": c["id"], "name": names.get(c["id"], c["name"]), "c": c}
+                     for c in categories if c.get("id") and (c["id"] in used or any(
+                         sub.get("parentId") == c["id"] and sub.get("id") in used for sub in categories))]
+    matched = search_products(category_docs, q)[:3]
+    return {
+        "products": [{
+            "id": p["id"], "slug": p.get("slug"), "name": p.get("name"), "price": p.get("price"),
+            "promoPrice": p.get("promoPrice"),
+            # Petite version WebP quand elle existe
+            "image": next((i for i in (p.get("thumbnails") or [])[:1] if i), None)
+            or next((i for i in p.get("images") or [] if i), None),
+        } for p in found],
+        "categories": [{"id": d["c"]["id"], "name": d["c"]["name"], "nameEn": d["c"].get("nameEn")} for d in matched],
+    }
+
+
+@api_router.get("/admin/search-misses", dependencies=[Depends(moderator_or_higher_required)])
+async def list_search_misses(limit: int = Query(50, ge=1, le=500), days: int = Query(30, ge=1, le=365)):
+    """Recherches sans résultat des derniers jours, les plus fréquentes d'abord."""
+    since = datetime.utcnow() - timedelta(days=days)
+    misses = await db.search_misses.find({"lastAt": {"$gte": since}}).sort("count", -1).to_list(limit)
+    return [{"query": m.get("query"), "count": m.get("count", 0), "lastAt": m.get("lastAt")} for m in misses]
 
 class MaxPriceResponse(BaseModel):
     maxPrice: float
@@ -1712,7 +1808,7 @@ async def get_product(product_identifier: str):
     return Product(**product)
 
 @api_router.post("/products", response_model=Product, dependencies=[Depends(seller_or_moderator_or_higher_required)])
-async def create_product(product_data: ProductCreate, 
+async def create_product(product_data: ProductCreate, background_tasks: BackgroundTasks,
                        current_seller_id: Optional[str] = Depends(get_current_seller_optional),
                        admin_role: Optional[str] = Depends(get_current_admin_role)):
     
@@ -1764,10 +1860,12 @@ async def create_product(product_data: ProductCreate,
     product.sellerId = seller_id_to_use
     product.sellerName = seller_name_to_use
     await db.products.insert_one(product.dict())
+    # Versions réduites des photos, après la réponse
+    background_tasks.add_task(refresh_product_variants, db, product.id)
     return product
 
 @api_router.put("/products/{product_id}", response_model=Product, dependencies=[Depends(product_owner_or_moderator_required)])
-async def update_product(product_id: str, product_data: ProductUpdate,
+async def update_product(product_id: str, product_data: ProductUpdate, background_tasks: BackgroundTasks,
                          admin_role: Optional[str] = Depends(get_current_admin_role)):
     update_data = product_data.dict(exclude_unset=True)
     if not update_data:
@@ -1828,11 +1926,24 @@ async def update_product(product_id: str, product_data: ProductUpdate,
             if update_data["name"].strip() != (current_product.get("name") or "").strip():
                 update_data["slug"] = await get_unique_slug(update_data["name"])
 
+    new_images = False
+    if "images" in update_data:
+        current = await db.products.find_one({"id": product_id}, {"images": 1, "thumbnails": 1, "previews": 1}) or {}
+        if update_data["images"] != current.get("images"):
+            # Les versions réduites des photos gardées sont conservées, les autres suivront
+            old = current.get("images") or []
+            known = {url: {"thumbnails": t, "previews": pv}
+                     for url, t, pv in zip(old, current.get("thumbnails") or [], current.get("previews") or [])}
+            update_data.update(aligned_variants(update_data["images"], known))
+            new_images = True
+
     update_data["updatedAt"] = datetime.utcnow()
     await db.products.update_one({"id": product_id}, {"$set": update_data})
     updated_product = await db.products.find_one({"id": product_id})
     if not updated_product:
         raise HTTPException(status_code=404, detail="Product not found")
+    if new_images:
+        background_tasks.add_task(refresh_product_variants, db, product_id)
     return Product(**updated_product)
 
 @api_router.delete("/products", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(seller_or_moderator_or_higher_required)])

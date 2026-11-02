@@ -18,6 +18,7 @@ import './HeroSwiper.css';
 import { PinIcon } from '../ui/Icons';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
 import { topLevelCategories, categoryFamilyIds, categoryName } from '../../lib/categories';
+import { listImage } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -152,7 +153,7 @@ const Homepage = (props) => {
           ...p,
           name: { [language]: p.name },
           description: { [language]: p.description },
-          image: p.images && p.images.length > 0 ? p.images[0] : 'https://via.placeholder.com/300',
+          image: listImage(p) || 'https://via.placeholder.com/300',
           inStock: p.stock > 0,
           reviews: p.reviewsCount || 0,
           rating: p.rating || 0,
