@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
 import ColorPicker from './ColorPicker';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
+import ProductDetailsFields from './ProductDetailsFields';
+import { productFormError, productPayload, withSpecList } from '../../lib/productRules';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -21,6 +23,9 @@ const SellerProducts = (props) => {
       stock: 0,
       images: [],
       colors: [],
+      brand: '',
+      condition: '',
+      specList: [],
     });
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [selectedProducts, setSelectedProducts] = useState([]);
@@ -127,6 +132,11 @@ const SellerProducts = (props) => {
         alert("Vous devez être connecté en tant que vendeur pour ajouter un produit.");
         return;
       }
+      const formError = productFormError(newProduct, selectedFiles.length);
+      if (formError) {
+        alert(formError);
+        return;
+      }
 
       const uploadedImageUrls = [];
       for (const file of selectedFiles) {
@@ -165,7 +175,7 @@ const SellerProducts = (props) => {
       }
 
       const productData = {
-          ...newProduct,
+          ...productPayload(newProduct),
           sellerId: props.user.id,
           sellerName: props.user.businessName,
           images: uploadedImageUrls,
@@ -197,6 +207,9 @@ const SellerProducts = (props) => {
             stock: 0,
             images: [],
             colors: [],
+            brand: '',
+            condition: '',
+            specList: [],
         });
         setSelectedFiles([]); // Clear selected files after successful upload
       } catch (error) {
@@ -208,6 +221,12 @@ const SellerProducts = (props) => {
       e.preventDefault();
 
       if (!editingProduct) return;
+      const imageCount = selectedFiles.length || (editingProduct.images || []).filter(Boolean).length;
+      const formError = productFormError(editingProduct, imageCount, products.find(p => p.id === editingProduct.id));
+      if (formError) {
+        alert(formError);
+        return;
+      }
 
       const uploadedImageUrls = [];
       if (selectedFiles.length > 0) {
@@ -248,7 +267,7 @@ const SellerProducts = (props) => {
       }
 
       const productData = {
-          ...editingProduct,
+          ...productPayload(editingProduct),
           images: uploadedImageUrls.length > 0 ? uploadedImageUrls : editingProduct.images,
       };
 
@@ -390,6 +409,8 @@ const SellerProducts = (props) => {
                 onChange={(colors) => setEditingProduct({ ...editingProduct, colors })}
               />
 
+              <ProductDetailsFields value={editingProduct} onChange={setEditingProduct} />
+
               <div>
                 <label className="adm-label">Visibilité</label>
                 <select
@@ -427,6 +448,7 @@ const SellerProducts = (props) => {
                   rows={3}
                   className="adm-input"
                 />
+                <span className="block text-xs text-gray-500 mt-1">Au moins 20 caractères : matière, taille, usage… Une description précise aide les clients à trouver le produit.</span>
               </div>
               
               <div className="flex flex-wrap gap-3">
@@ -512,6 +534,8 @@ const SellerProducts = (props) => {
                 onChange={(colors) => setNewProduct({ ...newProduct, colors })}
               />
 
+              <ProductDetailsFields value={newProduct} onChange={setNewProduct} />
+
               <div>
                   <label className="adm-label">Images du produit</label>
                   <input
@@ -536,6 +560,7 @@ const SellerProducts = (props) => {
                   rows={3}
                   className="adm-input"
                 />
+                <span className="block text-xs text-gray-500 mt-1">Au moins 20 caractères : matière, taille, usage… Une description précise aide les clients à trouver le produit.</span>
               </div>
               
               <div className="flex flex-wrap gap-3">
@@ -618,7 +643,7 @@ const SellerProducts = (props) => {
                       )}
                     </div>
                     <div className="mt-auto pt-4 flex gap-2">
-                      <button type="button" onClick={() => setEditingProduct(product)} className="adm-btn adm-btn-secondary flex-1">
+                      <button type="button" onClick={() => setEditingProduct(withSpecList(product))} className="adm-btn adm-btn-secondary flex-1">
                         Modifier
                       </button>
                       <button type="button" onClick={() => handleDeleteProduct(product.id)} className="adm-btn adm-btn-secondary !text-red-700" aria-label={`Supprimer ${product.name}`}>

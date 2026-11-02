@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { notify, confirmAction } from './adminFeedback';
 import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusBadge, EmptyRow, LoadingRows, Modal, Field, ChoiceCards } from './AdminUI';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
+import ProductDetailsFields from '../seller/ProductDetailsFields';
+import { productFormError, productPayload, productDetailsPayload, withSpecList } from '../../lib/productRules';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -30,6 +32,9 @@ const ProductManagement = (props) => {
         sellerName: '',
         stock: 0,
         images: [''],
+        brand: '',
+        condition: '',
+        specList: [],
     });
     const [selectedFile, setSelectedFile] = useState(null);
     const [imageUrl, setImageUrl] = useState('');
@@ -174,6 +179,11 @@ const ProductManagement = (props) => {
     const handleUpdateProduct = async (e) => {
         e.preventDefault();
         if (!editingProduct) return;
+        const formError = productFormError(editingProduct, 1, products.find(p => p.id === editingProduct.id));
+        if (formError) {
+            notify(formError, 'error');
+            return;
+        }
 
         setUploading(true);
         try {
@@ -216,7 +226,8 @@ const ProductManagement = (props) => {
                 name: editingProduct.name,
                 description: editingProduct.description,
                 price: parseFloat(editingProduct.price),
-                promoPrice: parseFloat(editingProduct.promoPrice),
+                promoPrice: Number(editingProduct.promoPrice) || null,
+                ...productDetailsPayload(editingProduct),
                 stock: parseInt(editingProduct.stock, 10),
                 category: editingProduct.category,
                 status: editingProduct.status,
@@ -271,6 +282,11 @@ const ProductManagement = (props) => {
             notify('Veuillez sélectionner une image pour le produit.', 'error');
             return;
         }
+        const formError = productFormError(newProductData, 1);
+        if (formError) {
+            notify(formError, 'error');
+            return;
+        }
 
         setUploading(true);
         let finalImageUrl = '';
@@ -313,7 +329,7 @@ const ProductManagement = (props) => {
             const finalSellerName = newProductData.sellerName || (user ? user.name : 'Admin');
 
             const productToCreate = {
-                ...newProductData,
+                ...productPayload(newProductData),
                 sellerId: finalSellerId,
                 sellerName: finalSellerName,
                 images: [finalImageUrl],
@@ -335,6 +351,7 @@ const ProductManagement = (props) => {
             setShowAddModal(false);
             setNewProductData({
                 name: '', description: '', category: '', price: 0, promoPrice: 0, sellerId: '', sellerName: '', stock: 0, images: [''],
+                brand: '', condition: '', specList: [],
             });
             setSelectedFile(null);
             setImageUrl('');
@@ -493,6 +510,7 @@ const ProductManagement = (props) => {
                                 <input type="number" name="stock" value={editingProduct.stock} onChange={handleEditInputChange} min="0" className="adm-input" />
                             </Field>
                         </div>
+                        <ProductDetailsFields value={editingProduct} onChange={setEditingProduct} />
                         <Field label="Statut">
                             <select name="status" value={editingProduct.status} onChange={handleEditInputChange} className="adm-input">
                                 <option value="approved">Approuvé</option>
@@ -516,7 +534,7 @@ const ProductManagement = (props) => {
                         <Field label="Nom du produit" required>
                             <input type="text" name="name" value={newProductData.name} onChange={handleInputChange} placeholder="Ex. : Smartphone Samsung Galaxy" className="adm-input" required />
                         </Field>
-                        <Field label="Description" required>
+                        <Field label="Description" required hint="Au moins 20 caractères.">
                             <textarea name="description" value={newProductData.description} onChange={handleInputChange} className="adm-input" rows="3" required />
                         </Field>
                         <Field
@@ -540,6 +558,7 @@ const ProductManagement = (props) => {
                                 <input type="number" name="stock" value={newProductData.stock} onChange={handleInputChange} min="0" className="adm-input" required />
                             </Field>
                         </div>
+                        <ProductDetailsFields value={newProductData} onChange={setNewProductData} />
                         <Field label="Vendeur" hint="Sans vendeur choisi, le produit est attribué à l'administration.">
                             <select name="sellerId" value={newProductData.sellerId} onChange={handleInputChange} className="adm-input">
                                 <option value="">Administration</option>
@@ -659,7 +678,7 @@ const ProductManagement = (props) => {
                                 <td className={`adm-td text-right tabular-nums ${product.stock > 0 ? '' : 'text-red-600 font-semibold'}`}>{product.stock}</td>
                                 <td className="adm-td"><StatusBadge status={product.status} /></td>
                                 <td className="adm-td whitespace-nowrap text-right">
-                                    <button onClick={() => setEditingProduct(product)} className="adm-link !min-h-0">Modifier</button>
+                                    <button onClick={() => setEditingProduct(withSpecList(product))} className="adm-link !min-h-0">Modifier</button>
                                     <button onClick={() => handleDeleteProduct(product.id)} className="adm-link-danger !min-h-0 ml-4">Supprimer</button>
                                 </td>
                             </tr>

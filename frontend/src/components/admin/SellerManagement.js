@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import CityDatalist from '../ui/CityDatalist';
+import { CITIES_DATALIST_ID } from '../../lib/cities';
 import { Link } from 'react-router-dom';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
 import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field, formatXAF } from './AdminUI';
@@ -291,7 +293,8 @@ const SellerManagement = (props) => {
             </Field>
             <div className="grid sm:grid-cols-3 gap-4">
                 <Field label="Ville" required>
-                    <input type="text" name="city" value={data.city} onChange={onChange} className="adm-input" required />
+                    <input type="text" name="city" list={CITIES_DATALIST_ID} value={data.city} onChange={onChange} className="adm-input" required />
+                    <CityDatalist />
                 </Field>
                 <Field label="Région" required>
                     <input type="text" name="region" value={data.region} onChange={onChange} className="adm-input" required />

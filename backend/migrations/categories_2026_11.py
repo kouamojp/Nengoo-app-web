@@ -69,9 +69,9 @@ class Journal:
         if self.apply:
             self.db[col].insert_one(doc)
 
-    def save(self, log_dir):
+    def save(self, log_dir, prefix="migration-categories"):
         os.makedirs(log_dir, exist_ok=True)
-        path = os.path.join(log_dir, datetime.datetime.now().strftime("migration-categories-%Y%m%d-%H%M%S.json"))
+        path = os.path.join(log_dir, datetime.datetime.now().strftime(f"{prefix}-%Y%m%d-%H%M%S.json"))
         with open(path, "w", encoding="utf-8") as f:
             f.write(json_util.dumps({"database": self.db.name, "indexes": self.indexes,
                                      "entries": self.entries}, indent=1))

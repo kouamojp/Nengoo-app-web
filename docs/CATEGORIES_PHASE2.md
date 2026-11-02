@@ -138,3 +138,25 @@ Pour la modifier, éditer `backend/category_tree.py` (`TREE`), puis relancer la 
   Testé sur `nengoo_test` : la base revient octet pour octet à son état d'origine.
 - Les reclassements faits ensuite dans l'administration ne sont pas dans ce journal : ils se défont produit par produit, ou par restauration de la sauvegarde de l'étape 2.
 - **Annuler le code** : redéployer le commit précédent. Le code accepte une base migrée ou non.
+
+## Suite : règles de saisie et nettoyage du catalogue
+
+**Règles appliquées par le serveur** (et vérifiées avant envoi sur le site et dans l'app) :
+
+- Nouveau produit : au moins une photo, prix supérieur à 0, description d'au moins 20 caractères, prix promo inférieur au prix normal. En modification, seuls les champs changés sont contrôlés : une fiche ancienne reste modifiable.
+- Le catalogue public n'affiche plus les produits sans photo ou à prix nul.
+- Vendeurs : numéro WhatsApp utilisable obligatoire (indicatif du pays), ville écrite de façon uniforme. Un vendeur ne peut plus changer lui-même le statut de son compte.
+- Villes : liste proposée dans les formulaires (`GET /api/cities`), « DOUALA » ou « douala  » enregistré « Douala ». Une ville hors liste reste acceptée.
+- Produits : marque, état (neuf, occasion, reconditionné) et caractéristiques libres, affichés sur la fiche produit.
+
+**Nettoyage des données existantes** (`migrations/catalog_cleanup_2026_11.py`, même usage que la migration des catégories) :
+
+```
+python -m migrations.catalog_cleanup_2026_11 --url "$MONGO_URL" --db nengoo                          # simulation
+python -m migrations.catalog_cleanup_2026_11 --url "$MONGO_URL" --db nengoo --allow-remote --apply   # écriture
+python -m migrations.catalog_cleanup_2026_11 --url "$MONGO_URL" --db nengoo --allow-remote --undo <journal>
+```
+
+Simulation sur la production le 2 novembre 2026 : 41 prix promo retirés (33 égaux au prix, 8 supérieurs, dont des fautes de frappe comme 900 021 F pour un article à 15 000 F ; le client paie désormais le prix normal), 2 vendeurs sans identifiant, 16 villes uniformisées. Le journal est enregistré même si le script s'arrête sur une erreur.
+
+**À corriger par les vendeurs** (impossible automatiquement) : 164 descriptions trop courtes, 35 doublons, 9 produits sans photo, 2 à prix nul, 5 numéros WhatsApp inutilisables (adresses e-mail, `SYSTEM_NENGOO`, `fotsotjp`, un numéro camerounais à 8 chiffres). La liste par vendeur est produite hors du dépôt (`nengoo-backups/fiches-a-corriger-AAAAMMJJ.csv`).

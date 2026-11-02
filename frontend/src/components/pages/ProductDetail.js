@@ -354,15 +354,16 @@ const ProductDetail = (props) => {
     description: product.description[language],
     image: images,
     url: canonicalUrl,
-    ...(seller && {
+    ...((product.brand || seller) && {
       brand: {
         '@type': 'Brand',
-        name: seller.businessName || seller.name,
+        name: product.brand || seller.businessName || seller.name,
       },
     }),
     offers: {
       '@type': 'Offer',
       url: canonicalUrl,
+      ...(product.condition && { itemCondition: { new: 'https://schema.org/NewCondition', used: 'https://schema.org/UsedCondition', refurbished: 'https://schema.org/RefurbishedCondition' }[product.condition] }),
       priceCurrency: 'XAF',
       price: product.promoPrice || product.price,
       availability: product.inStock
@@ -556,6 +557,25 @@ const ProductDetail = (props) => {
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {/* Marque, état et caractéristiques renseignés par le vendeur */}
+              {(product.brand || product.condition || Object.keys(product.specs || {}).length > 0) && (
+                <div className="mt-5">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">{t.productDetails}</p>
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-sm">
+                    {[
+                      ...(product.brand ? [[t.brand, product.brand]] : []),
+                      ...(product.condition ? [[t.condition, t.conditions[product.condition]]] : []),
+                      ...Object.entries(product.specs || {}),
+                    ].map(([label, value]) => (
+                      <React.Fragment key={label}>
+                        <dt className="text-gray-500">{label}</dt>
+                        <dd className="font-medium text-gray-900">{value}</dd>
+                      </React.Fragment>
+                    ))}
+                  </dl>
                 </div>
               )}
 

@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import CityDatalist from '../ui/CityDatalist';
+import { CITIES_DATALIST_ID } from '../../lib/cities';
 import { useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
@@ -314,12 +316,15 @@ const Checkout = (props) => {
                     <input
                       type="text"
                       name="city"
+                      list={CITIES_DATALIST_ID}
+                      autoComplete="address-level2"
                       value={formData.city}
                       onChange={handleInputChange}
                       placeholder={t.city}
                       required={formData.deliveryOption === 'home'}
                       className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
+                    <CityDatalist />
                     <input
                       type="text"
                       name="region"

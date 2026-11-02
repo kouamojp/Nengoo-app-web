@@ -62,6 +62,7 @@ api_router = APIRouter(prefix="/api")
 from auth_tokens import IdentityMiddleware, create_access_token, decode_access_token
 import login_limiter
 from category_tree import normalize_name, suggest_category_name
+from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
 from account_deletion import erase_buyer, erase_seller
 app.add_middleware(IdentityMiddleware)
 
@@ -1390,6 +1391,10 @@ async def get_products(
         query["category"] = {"$in": await category_family_ids(category)}
     if status_filter:
         query["status"] = status_filter
+        if status_filter == "approved":
+            # Pages publiques : une fiche sans photo ou sans prix n'est pas vendable
+            query["price"] = {"$gt": 0}
+            query["images"] = {"$elemMatch": {"$nin": ["", None]}}
     if search:
         # Texte libre : échappé pour ne pas être interprété comme une regex
         pattern = re.escape(search)
@@ -1749,6 +1754,9 @@ async def create_product(product_data: ProductCreate,
 
     await check_product_category(product_data.category)
     check_promo_price(product_data.price, product_data.promoPrice)
+    issues = product_issues(product_data.price, product_data.images, product_data.description)
+    if issues:
+        raise HTTPException(status_code=400, detail=" ".join(issues))
 
     product_dict = product_data.dict()
     product_dict["slug"] = await get_unique_slug(product_data.name)
@@ -1788,6 +1796,15 @@ async def update_product(product_id: str, product_data: ProductUpdate,
             await check_product_category(update_data["category"])
         check_promo_price(update_data.get("price", current.get("price")),
                           update_data.get("promoPrice", current.get("promoPrice")))
+
+    changed_fields = [f for f in ("price", "images", "description") if f in update_data]
+    if changed_fields:
+        current = await db.products.find_one({"id": product_id}, {f: 1 for f in changed_fields}) or {}
+        changed = tuple(f for f in changed_fields if update_data[f] != current.get(f))
+        issues = product_issues(update_data.get("price"), update_data.get("images"),
+                                update_data.get("description"), check=changed)
+        if issues:
+            raise HTTPException(status_code=400, detail=" ".join(issues))
 
     # If name is being updated, check for duplicates
     if "name" in update_data:
@@ -2146,6 +2163,9 @@ SELLER_PRIVATE_FIELDS = {"password", "reset_token", "reset_token_expiry"}
 
 @api_router.post("/sellers", response_model=Seller, response_model_exclude=SELLER_PRIVATE_FIELDS)
 async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends(get_current_admin_role)):
+    if not whatsapp_digits(seller_data.whatsapp):
+        raise HTTPException(status_code=400, detail="Numéro WhatsApp invalide : indiquez un numéro avec l'indicatif du pays, par exemple +237 6XX XX XX XX.")
+    seller_data.city = normalize_city(seller_data.city)
     if await db.sellers.find_one(whatsapp_lookup(seller_data.whatsapp)):
         raise HTTPException(status_code=400, detail="Un compte vendeur existe déjà avec ce numéro WhatsApp.")
     seller_data.whatsapp = normalize_whatsapp(seller_data.whatsapp)
@@ -2367,6 +2387,16 @@ async def update_seller(
     if "password" in update_data and update_data["password"]:
         update_data["password"] = hash_password(update_data["password"])
     
+    # Un vendeur ne valide pas lui-même son compte
+    if role not in ["super_admin", "admin"]:
+        update_data.pop("status", None)
+    if update_data.get("whatsapp") is not None:
+        if not whatsapp_digits(update_data["whatsapp"]):
+            raise HTTPException(status_code=400, detail="Numéro WhatsApp invalide : indiquez un numéro avec l'indicatif du pays, par exemple +237 6XX XX XX XX.")
+        update_data["whatsapp"] = normalize_whatsapp(update_data["whatsapp"])
+    if "city" in update_data:
+        update_data["city"] = normalize_city(update_data["city"])
+
     await db.sellers.update_one({"id": seller_id}, {"$set": update_data})
     updated_seller = await db.sellers.find_one({"id": seller_id})
     if not updated_seller:
@@ -2729,7 +2759,7 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             totalAmount=total_amount,
             shippingCost=shipping_cost,
             shippingAddress=checkout_data.address,
-            shippingCity=checkout_data.city,
+            shippingCity=normalize_city(checkout_data.city),
             shippingRegion=checkout_data.region,
             shippingPhone=checkout_data.phone,
             status="pending",
@@ -2894,9 +2924,15 @@ async def get_buyer_saved_info(buyer_id: str, x_user_id: str = Header(..., alias
         pickupPoints=list(pickup_points_map.values())
     )
 
+@api_router.get("/cities", response_model=List[str])
+async def list_cities():
+    """Villes proposées dans les formulaires (une autre ville reste possible)."""
+    return CITIES
+
 # --- Pickup Point Management ---
 @api_router.post("/pickup-points", response_model=PickupPoint, dependencies=[Depends(super_admin_required)])
 async def create_pickup_point(pickup_data: PickupPointCreate):
+    pickup_data.city = normalize_city(pickup_data.city)
     pickup_point = PickupPoint(**pickup_data.dict())
     await db.pickupPoints.insert_one(pickup_point.dict())
     return pickup_point
@@ -2910,6 +2946,8 @@ async def list_pickup_points():
 @api_router.put("/pickup-points/{pickup_point_id}", response_model=PickupPoint, dependencies=[Depends(super_admin_required)])
 async def update_pickup_point(pickup_point_id: str, pickup_data: PickupPointUpdate):
     update_data = pickup_data.dict(exclude_unset=True)
+    if update_data.get("city") is not None:
+        update_data["city"] = normalize_city(update_data["city"])
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
     

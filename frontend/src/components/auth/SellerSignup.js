@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2'; // Import SweetAlert2
 import { translations } from '../../lib/translations';
-import { mockUsers, cameroonCities } from '../../lib/mockData';
+import { mockUsers } from '../../lib/mockData';
+import { CITIES as cameroonCities } from '../../lib/cities';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import SocialLoginButtons from './SocialLoginButtons';
