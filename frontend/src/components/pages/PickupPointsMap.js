@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { whatsappUrl } from '../../lib/utils';
 import { Helmet } from 'react-helmet-async';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
@@ -133,7 +134,7 @@ export const PickupPointsMap = (props) => {
               <ul className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
                       {visiblePoints.map(point => {
                         const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${point.address}, ${formatCity(point.city)}, Cameroun`)}`;
-                        const whatsapp = phoneHref(point.managerWhatsApp).replace('+', '');
+                        const whatsapp = whatsappUrl(point.managerWhatsApp);
                         return (
                           <li key={point.id} className="flex flex-col bg-white rounded-xl border border-gray-200 p-5">
                             <h2 className="text-xl font-bold leading-tight">{point.name}</h2>
@@ -166,7 +167,7 @@ export const PickupPointsMap = (props) => {
                             <div className="mt-auto pt-5 flex flex-wrap gap-2">
                               {whatsapp && (
                                 <a
-                                  href={`https://wa.me/${whatsapp}`}
+                                  href={whatsapp}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="flex-1 min-w-[8rem] inline-flex items-center justify-center gap-2 h-10 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"

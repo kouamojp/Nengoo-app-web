@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { whatsappUrl } from '../../lib/utils';
 import { useParams, Link } from 'react-router-dom';
 import { StatusBadge, formatXAF } from './AdminUI';
 
@@ -128,7 +129,7 @@ const BuyerVerification = (props) => {
                             <dt className="text-gray-500">WhatsApp</dt>
                             <dd className="font-semibold">
                                 {buyer?.whatsapp ? (
-                                    <a href={`https://wa.me/${buyer.whatsapp.replace(/\D/g, '')}`} className="text-green-700 hover:underline underline-offset-4">
+                                    <a href={whatsappUrl(buyer.whatsapp) || undefined} className="text-green-700 hover:underline underline-offset-4">
                                         {buyer.whatsapp}
                                     </a>
                                 ) : 'Non renseigné'}

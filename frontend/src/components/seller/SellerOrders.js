@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { whatsappUrl } from '../../lib/utils';
 import SellerHeader from './SellerHeader';
 import { Modal, StatusBadge, StatusSelect } from '../admin/AdminUI';
 import { WhatsAppIcon } from '../ui/Icons';
@@ -17,15 +18,8 @@ const FILTERS = [
 const formatXAF = (value) =>
   `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
 
-// Lien wa.me au format international, que le numéro ait déjà l'indicatif 237 ou non
-const whatsappLink = (phone) => {
-  const digits = (phone || '').replace(/\D/g, '');
-  if (!digits) return null;
-  return `https://wa.me/${digits.startsWith('237') ? digits : `237${digits}`}`;
-};
-
 const WhatsAppButton = ({ phone, children }) => {
-  const href = whatsappLink(phone);
+  const href = whatsappUrl(phone);
   if (!href) return null;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className="adm-btn bg-green-700 hover:bg-green-800 text-white">
