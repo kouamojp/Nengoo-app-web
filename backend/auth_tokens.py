@@ -8,9 +8,14 @@ forger. Les routes lisent toujours ces en-têtes ; ce middleware les rend fiable
 - requête avec un JWT valide (Authorization: Bearer <jwt>) : les en-têtes
   d'identité envoyés doivent correspondre au jeton (sinon 403) et ceux qui
   manquent sont ajoutés à partir du jeton ;
-- requête sans JWT : les anciens en-têtes sont acceptés tant que
-  LEGACY_AUTH_HEADERS=true (transition). Une fois le site et l'app déployés,
-  passer LEGACY_AUTH_HEADERS=false : toute identité doit alors venir d'un JWT.
+- requête sans JWT : les anciens en-têtes vendeur/acheteur sont acceptés tant
+  que LEGACY_AUTH_HEADERS=true (transition). Une fois le site et l'app
+  déployés, passer LEGACY_AUTH_HEADERS=false : toute identité doit alors venir
+  d'un JWT.
+
+Les droits administrateur ne viennent QUE d'un jeton admin, même pendant la
+transition : X-Admin-Role et X-Admin-Id envoyés par le client sont toujours
+ignorés, puis remis à partir du jeton.
 """
 import json
 import logging
@@ -90,18 +95,13 @@ def _check_and_complete(headers: dict, claims: dict) -> Optional[str]:
 
     if typ == "admin":
         # Un admin peut agir pour un vendeur ou un acheteur (gestion), mais son
-        # rôle et son identifiant viennent du jeton.
-        if headers.get(b"x-admin-role", role.encode() if role else b"") != (role or "").encode():
-            return "Rôle administrateur incohérent avec la session"
-        if headers.get(b"x-admin-id", sub.encode()) != sub.encode():
-            return "Identifiant administrateur incohérent avec la session"
+        # rôle et son identifiant viennent du jeton (les pages envoient encore
+        # un rôle écrit en dur : il est remplacé, pas comparé).
         if role:
             headers[b"x-admin-role"] = role.encode()
         headers[b"x-admin-id"] = sub.encode()
         return None
 
-    if any(h in headers for h in _ADMIN_HEADERS):
-        return "Droits administrateur requis"
     own_id_header = b"x-seller-id" if typ == "seller" else b"x-buyer-id"
     other_id_header = b"x-buyer-id" if typ == "seller" else b"x-seller-id"
     if other_id_header in headers:
@@ -133,6 +133,9 @@ class IdentityMiddleware:
         headers = {}
         for name, value in scope.get("headers", []):
             headers[name.lower()] = value  # dernier gagnant, comme Starlette
+        # Jamais de droits admin déclarés par le client
+        for name in _ADMIN_HEADERS:
+            headers.pop(name, None)
 
         auth = headers.get(b"authorization", b"").decode("latin-1")
         token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
@@ -159,6 +162,8 @@ class IdentityMiddleware:
         uses_identity = bool(token) or any(h in headers for h in _IDENTITY_HEADERS)
         if uses_identity and not legacy_headers_allowed():
             return await _reject(send, 401, "Authentification requise", "auth_required")
+        scope = dict(scope)
+        scope["headers"] = list(headers.items())
         return await self.app(scope, receive, send)
 
 

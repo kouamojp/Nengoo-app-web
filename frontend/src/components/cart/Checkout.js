@@ -85,9 +85,8 @@ const Checkout = (props) => {
   useEffect(() => {
     const fetchPickupPoints = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/pickup-points`, {
-          headers: { 'X-Admin-Role': 'super_admin' } // TODO: Should this be public?
-        });
+        // Liste publique : aucun en-tête d'identité
+        const response = await fetch(`${API_BASE_URL}/pickup-points`);
         if (response.ok) {
           const data = await response.json();
           setPickupPoints(data);

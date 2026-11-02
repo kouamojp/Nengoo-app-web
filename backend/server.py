@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks, Query
+from fastapi import FastAPI, APIRouter, HTTPException, status, Header, Depends, BackgroundTasks, Query, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from pydantic import EmailStr
@@ -60,9 +60,12 @@ api_router = APIRouter(prefix="/api")
 # Identité par JWT (voir auth_tokens.py). Ajouté avant CORSMiddleware : les
 # middlewares s'empilent à l'envers, CORS enveloppe donc ses réponses d'erreur.
 from auth_tokens import IdentityMiddleware, create_access_token, decode_access_token
+import login_limiter
 from account_deletion import erase_buyer, erase_seller
 app.add_middleware(IdentityMiddleware)
 
+
+IS_PRODUCTION = os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
 
 origins = [
     "https://www.nengoo.com",
@@ -73,6 +76,9 @@ origins = [
     "capacitor://localhost",
     "https://localhost",
     "http://localhost",
+]
+# Serveurs de développement : jamais acceptés en production
+dev_origins = [
     "http://localhost:3000",
     "http://localhost:8080",
     "http://localhost:8000",
@@ -84,6 +90,8 @@ origins = [
     "http://localhost:8888",
     "http://localhost:9000",
 ]
+if not IS_PRODUCTION:
+    origins += dev_origins
 
 # Using an explicit list of origins is more secure than a wildcard,
 # especially when allow_credentials=True.
@@ -91,7 +99,8 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"(http://localhost:\d+|capacitor://.*)",  # localhost dev + Capacitor mobile
+    # Capacitor mobile partout ; localhost sur tout port hors production
+    allow_origin_regex=r"capacitor://.*" if IS_PRODUCTION else r"(http://localhost:\d+|capacitor://.*)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -831,9 +840,12 @@ async def get_whatsapp_clicks_analytics():
     return clicks
 
 @api_router.post("/auth/forgot-password", status_code=status.HTTP_200_OK)
-async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+async def forgot_password(request: ForgotPasswordRequest, background_tasks: BackgroundTasks, http_request: Request):
     if request.user_type not in ['buyer', 'seller']:
         raise HTTPException(status_code=400, detail="Invalid user type")
+    # Chaque demande compte : limite les envois d'e-mails par IP
+    login_limiter.check("forgot-password", http_request, None)
+    login_limiter.record_failure("forgot-password", http_request, None)
 
     collection = db.sellers if request.user_type == 'seller' else db.users
     query = {"email": request.email}
@@ -1221,8 +1233,9 @@ async def register_buyer(buyer_data: BuyerCreate):
     return BuyerAuthResponse(**new_buyer.dict(), accessToken=create_access_token(new_buyer.id, "buyer"))
 
 @api_router.post("/buyers/login", response_model=BuyerAuthResponse, response_model_exclude=BUYER_PRIVATE_FIELDS)
-async def buyer_login(login_data: BuyerLoginRequest):
+async def buyer_login(login_data: BuyerLoginRequest, request: Request):
     """Login for buyer accounts"""
+    login_limiter.check("buyer", request, login_data.whatsapp)
     # Normaliser le numéro WhatsApp (supprimer les espaces)
     normalized_whatsapp = normalize_whatsapp(login_data.whatsapp)
 
@@ -1233,6 +1246,7 @@ async def buyer_login(login_data: BuyerLoginRequest):
 
     if not buyer:
         logging.warning(f"[BUYER LOGIN] No buyer/password match (number known: {number_known})")
+        login_limiter.record_failure("buyer", request, login_data.whatsapp)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
 
     if buyer.get("status") != "active":
@@ -1240,6 +1254,7 @@ async def buyer_login(login_data: BuyerLoginRequest):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Votre compte est désactivé")
 
     logging.info(f"[BUYER LOGIN] Login successful for {login_data.whatsapp}")
+    login_limiter.record_success("buyer", request, login_data.whatsapp)
     return BuyerAuthResponse(**buyer, accessToken=create_access_token(buyer["id"], "buyer"))
 
 # --- Suppression de compte par son titulaire ---
@@ -1249,7 +1264,7 @@ class AccountDeletionRequest(BaseModel):
     password: Optional[str] = None
 
 @api_router.post("/account/delete")
-async def delete_own_account(req: AccountDeletionRequest, authorization: Optional[str] = Header(None)):
+async def delete_own_account(req: AccountDeletionRequest, request: Request, authorization: Optional[str] = Header(None)):
     """
     Supprime le compte de l'appelant (page /delete-account du site, écran
     « Supprimer mon compte » de l'app). Identité confirmée par numéro WhatsApp
@@ -1263,8 +1278,10 @@ async def delete_own_account(req: AccountDeletionRequest, authorization: Optiona
     extra_filter = {"type": "buyer"} if is_buyer else None
 
     if req.whatsapp and req.password:
+        login_limiter.check(req.userType, request, req.whatsapp)
         account, _ = await find_account_for_login(collection, req.whatsapp, req.password, extra_filter)
         if not account:
+            login_limiter.record_failure(req.userType, request, req.whatsapp)
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
     else:
         token = (authorization or "").strip()
@@ -2150,7 +2167,8 @@ class SellerOAuthLoginRequest(BaseModel):
     idToken: str
 
 @api_router.post("/sellers/login", response_model=SellerAuthResponse, response_model_exclude=SELLER_PRIVATE_FIELDS)
-async def seller_login(login_data: SellerLoginRequest):
+async def seller_login(login_data: SellerLoginRequest, request: Request):
+    login_limiter.check("seller", request, login_data.whatsapp)
     # Normaliser le numéro WhatsApp (supprimer les espaces)
     normalized_whatsapp = normalize_whatsapp(login_data.whatsapp)
 
@@ -2160,6 +2178,7 @@ async def seller_login(login_data: SellerLoginRequest):
 
     if not seller:
         logging.warning(f"[SELLER LOGIN] No seller/password match (number known: {number_known})")
+        login_limiter.record_failure("seller", request, login_data.whatsapp)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou mot de passe incorrect")
 
     # Anciens comptes créés sans identifiant : on en attribue un, stable
@@ -2175,6 +2194,7 @@ async def seller_login(login_data: SellerLoginRequest):
     seller = migrate_seller_data(seller)
 
     logging.info(f"[SELLER LOGIN] Login successful for {login_data.whatsapp}")
+    login_limiter.record_success("seller", request, login_data.whatsapp)
     return SellerAuthResponse(**seller, accessToken=create_access_token(seller["id"], "seller"))
 
 @api_router.post("/sellers/oauth-login", response_model=SellerAuthResponse, response_model_exclude=SELLER_PRIVATE_FIELDS)
@@ -3056,14 +3076,14 @@ class AdminLoginRequest(BaseModel):
 
 
 @api_router.post("/admins/login", response_model=AdminAuthResponse, response_model_exclude={"accessCode"})
-async def admin_login(login_data: AdminLoginRequest):
+async def admin_login(login_data: AdminLoginRequest, request: Request):
+    login_limiter.check("admin", request, login_data.whatsapp)
     admin = await db.admins.find_one({"whatsapp": login_data.whatsapp})
 
-    if not admin:
+    if not admin or not verify_password(login_data.accessCode, admin["accessCode"]):
+        login_limiter.record_failure("admin", request, login_data.whatsapp)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou code d'accès incorrect")
-
-    if not verify_password(login_data.accessCode, admin["accessCode"]):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Numéro WhatsApp ou code d'accès incorrect")
+    login_limiter.record_success("admin", request, login_data.whatsapp)
 
     if admin["status"] != "active":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Votre compte administrateur est suspendu")

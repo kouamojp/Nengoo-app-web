@@ -72,16 +72,30 @@ def test_seller_cannot_impersonate_another_seller():
 
 def test_seller_cannot_claim_admin_role():
     token = create_access_token("seller_1", "seller")
-    status, _, _ = call({**bearer(token), "X-Admin-Role": "super_admin"})
-    assert status == 403
+    status, headers, _ = call({**bearer(token), "X-Admin-Role": "super_admin"})
+    assert status == 200 and "x-admin-role" not in headers
+
+
+def test_forged_admin_headers_ignored_without_token():
+    # Faille constatée en production le 2026-11-02 : rôle forgé sans connexion
+    status, headers, _ = call({"X-Admin-Role": "super_admin", "X-Admin-Id": "admin_1"})
+    assert status == 200
+    assert "x-admin-role" not in headers and "x-admin-id" not in headers
+
+    os.environ["LEGACY_AUTH_HEADERS"] = "false"
+    # Un visiteur (paiement invité) qui envoie un rôle n'est pas déconnecté
+    status, headers, _ = call({"X-Admin-Role": "super_admin"})
+    assert status == 200 and "x-admin-role" not in headers
 
 
 def test_admin_role_comes_from_token():
     token = create_access_token("admin_1", "admin", "moderator")
     status, headers, _ = call(bearer(token))
     assert status == 200 and headers["x-admin-role"] == "moderator"
-    status, _, _ = call({**bearer(token), "X-Admin-Role": "super_admin"})
-    assert status == 403
+    # Rôle écrit en dur par une page : remplacé par celui du jeton
+    status, headers, _ = call({**bearer(token), "X-Admin-Role": "super_admin", "X-Admin-Id": "x"})
+    assert status == 200 and headers["x-admin-role"] == "moderator"
+    assert headers["x-admin-id"] == "admin_1"
 
 
 def test_admin_may_act_for_a_seller():

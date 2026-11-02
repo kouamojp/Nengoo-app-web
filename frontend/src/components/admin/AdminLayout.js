@@ -87,6 +87,16 @@ const AdminLayout = ({ user, setUser, active, onSelect, title, description, acti
   const [menuOpen, setMenuOpen] = useState(false);
   const counts = useAdminPendingCounts(user);
 
+  // Les droits admin ne viennent que du jeton de session : une session
+  // ouverte avant son introduction doit se reconnecter
+  useEffect(() => {
+    if (user?.type === 'admin' && !user.accessToken) {
+      setUser(null);
+      localStorage.removeItem('nengoo-user');
+      navigate('/admin/login');
+    }
+  }, [user, setUser, navigate]);
+
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
