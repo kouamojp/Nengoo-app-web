@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
-import { topLevelCategories } from '../../lib/categories';
+import { topLevelCategories, categoryName } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -13,7 +13,8 @@ const Footer = ({ language }) => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/categories`);
+        // Catégories qui ont des produits seulement
+        const response = await fetch(`${API_BASE_URL}/categories?hideEmpty=true`);
         if (!response.ok) {
           throw new Error('Failed to fetch categories');
         }
@@ -58,7 +59,7 @@ const Footer = ({ language }) => {
                       to={`/catalog/${encodeURIComponent(category.name)}`}
                       className={linkClass}
                     >
-                      {category.name}
+                      {categoryName(category, language)}
                     </Link>
                   </li>
                 ))}

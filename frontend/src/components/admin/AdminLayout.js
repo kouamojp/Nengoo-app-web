@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon,
+  HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon,
   LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon,
 } from '../ui/Icons';
 import { AdminFeedbackHost } from './adminFeedback';
@@ -67,6 +67,7 @@ const navGroups = (user, counts) => [
     label: 'Site',
     items: [
       { id: 'categories', label: 'Catégories', Icon: TagIcon },
+      { id: 'reclassify', label: 'Reclassement', Icon: FilterIcon },
       { id: 'pickupPoints', label: 'Points de retrait', Icon: PinIcon },
       ...(user.role === 'super_admin' ? [
         { id: 'homepage', label: 'Page d\'accueil', Icon: LayoutIcon },

@@ -7,7 +7,7 @@ import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
 import { FilterIcon } from '../ui/Icons';
-import { topLevelCategories, subcategoriesOf, categoryFamilyIds } from '../../lib/categories';
+import { topLevelCategories, subcategoriesOf, categoryFamilyIds, categoryName, findCategoryByName } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -130,8 +130,16 @@ const ProductCatalog = (props) => {
   };
 
   // L'URL porte le nom de la catégorie ; les produits référencent son id
-  const selectedCategoryObj = categories.find(cat => cat.name === selectedCategory);
+  // Nom approchant ou ancien nom d'une catégorie renommée : on redirige vers
+  // l'adresse actuelle (anciens liens et référencement conservés)
+  const selectedCategoryObj = selectedCategory === 'all' ? undefined : findCategoryByName(categories, selectedCategory);
   const selectedCategoryId = selectedCategoryObj?.id;
+  const selectedLabel = selectedCategoryObj ? categoryName(selectedCategoryObj, language) : selectedCategory;
+  useEffect(() => {
+    if (selectedCategoryObj && selectedCategoryObj.name !== selectedCategory) {
+      navigate(`/catalog/${encodeURIComponent(selectedCategoryObj.name)}`, { replace: true });
+    }
+  }, [selectedCategoryObj, selectedCategory, navigate]);
   // Une catégorie principale montre aussi les produits de ses sous-catégories
   const selectedIds = selectedCategoryId ? categoryFamilyIds(categories, selectedCategoryId) : [];
 
@@ -188,11 +196,11 @@ const ProductCatalog = (props) => {
   };
 
   const pageTitle = selectedCategory !== 'all'
-    ? `${selectedCategory} — Catalogue Nengoo`
+    ? `${selectedLabel} — Catalogue Nengoo`
     : 'Catalogue — Nengoo Marketplace Cameroun';
 
   const pageDescription = selectedCategory !== 'all'
-    ? `Découvrez tous les produits de la catégorie ${selectedCategory} sur Nengoo, la marketplace camerounaise de confiance.`
+    ? `Découvrez tous les produits de la catégorie ${selectedLabel} sur Nengoo, la marketplace camerounaise de confiance.`
     : 'Parcourez des milliers de produits locaux et internationaux sur Nengoo, votre marketplace camerounaise. Livraison au Cameroun.';
 
   const chipClass = (active) => `shrink-0 inline-flex items-center gap-1.5 h-9 !min-h-0 px-4 rounded-full text-sm font-semibold border transition-colors ${
@@ -245,11 +253,11 @@ const ProductCatalog = (props) => {
               to={`/catalog/${encodeURIComponent(activeParent.name)}`}
               className="inline-block mb-1 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4"
             >
-              {activeParent.name}
+              {categoryName(activeParent, language)}
             </Link>
           )}
           <h1 className="font-display text-4xl sm:text-5xl text-purple-950">
-            {selectedCategory === 'all' ? t.catalogTitle : selectedCategory}
+            {selectedCategory === 'all' ? t.catalogTitle : selectedLabel}
           </h1>
           {!loading && !loadError && !(selectedCategory !== 'all' && categoriesLoading) && (
             <p className="mt-2 text-gray-600">{t.productCount(filteredProducts.length)}</p>
@@ -269,7 +277,7 @@ const ProductCatalog = (props) => {
               aria-pressed={activeParent?.id === cat.id}
               className={chipClass(activeParent?.id === cat.id)}
             >
-              {cat.name}
+              {categoryName(cat, language)}
             </button>
           ))}
         </div>
@@ -281,8 +289,8 @@ const ProductCatalog = (props) => {
               <nav aria-label={t.categories}>
                 <h2 className="text-lg font-bold mb-3">{t.categories}</h2>
                 <ul className="space-y-0.5">
-                  {[{ id: 'all', name: 'all', label: t.allCategories, count: products.length }, ...categoryOptions.map(cat => ({ id: cat.id, name: cat.name, label: cat.name, count: familyCount(cat) }))].map(item => {
-                    const active = selectedCategory === item.name;
+                  {[{ id: 'all', name: 'all', label: t.allCategories, count: products.length }, ...categoryOptions.map(cat => ({ id: cat.id, name: cat.name, label: categoryName(cat, language), count: familyCount(cat) }))].map(item => {
+                    const active = item.id === 'all' ? selectedCategory === 'all' : selectedCategoryId === item.id;
                     const subs = activeParent?.id === item.id ? subcategoryOptions : [];
                     return (
                       <li key={item.id}>
@@ -300,7 +308,7 @@ const ProductCatalog = (props) => {
                         {subs.length > 0 && (
                           <ul className="mt-0.5 mb-1 ml-3 pl-2 border-l border-purple-200 space-y-0.5">
                             {subs.map(sub => {
-                              const subActive = selectedCategory === sub.name;
+                              const subActive = selectedCategoryId === sub.id;
                               return (
                                 <li key={sub.id}>
                                   <button
@@ -311,7 +319,7 @@ const ProductCatalog = (props) => {
                                       subActive ? 'bg-purple-100 text-purple-900 font-semibold' : 'text-gray-600 hover:bg-gray-100'
                                     }`}
                                   >
-                                    <span>{sub.name}</span>
+                                    <span>{categoryName(sub, language)}</span>
                                     <span className={`tabular-nums text-xs ${subActive ? 'text-purple-700' : 'text-gray-400'}`}>{countByCategory[sub.id] || 0}</span>
                                   </button>
                                 </li>
@@ -339,12 +347,12 @@ const ProductCatalog = (props) => {
             {/* Sous-catégories de la catégorie principale active */}
             {subcategoryOptions.length > 0 && (
               <div className="-mx-4 px-4 sm:mx-0 sm:px-0 mb-4 flex gap-2 overflow-x-auto hide-scrollbar" role="group" aria-label={t.subcategories}>
-                <button type="button" onClick={() => selectCategory(activeParent.name)} aria-pressed={selectedCategory === activeParent.name} className={chipClass(selectedCategory === activeParent.name)}>
-                  {t.allOf(activeParent.name)}
+                <button type="button" onClick={() => selectCategory(activeParent.name)} aria-pressed={selectedCategoryId === activeParent.id} className={chipClass(selectedCategoryId === activeParent.id)}>
+                  {t.allOf(categoryName(activeParent, language))}
                 </button>
                 {subcategoryOptions.map(sub => (
-                  <button key={sub.id} type="button" onClick={() => selectCategory(sub.name)} aria-pressed={selectedCategory === sub.name} className={chipClass(selectedCategory === sub.name)}>
-                    {sub.name}
+                  <button key={sub.id} type="button" onClick={() => selectCategory(sub.name)} aria-pressed={selectedCategoryId === sub.id} className={chipClass(selectedCategoryId === sub.id)}>
+                    {categoryName(sub, language)}
                   </button>
                 ))}
               </div>

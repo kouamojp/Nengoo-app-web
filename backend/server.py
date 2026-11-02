@@ -10,7 +10,7 @@ import logging
 import re
 from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Any
+from typing import Dict, List, Literal, Optional, Any
 import uuid
 from datetime import datetime, timedelta
 from enum import Enum
@@ -61,6 +61,7 @@ api_router = APIRouter(prefix="/api")
 # middlewares s'empilent à l'envers, CORS enveloppe donc ses réponses d'erreur.
 from auth_tokens import IdentityMiddleware, create_access_token, decode_access_token
 import login_limiter
+from category_tree import normalize_name, suggest_category_name
 from account_deletion import erase_buyer, erase_seller
 app.add_middleware(IdentityMiddleware)
 
@@ -334,6 +335,9 @@ def _normalize_colors(colors: Optional[List[str]]) -> List[str]:
             result.append(c)
     return result[:12]
 
+# État d'un produit : neuf, occasion, reconditionné
+ProductCondition = Literal["new", "used", "refurbished"]
+
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: f"prod_{str(uuid.uuid4())[:8]}")
     slug: Optional[str] = None
@@ -360,6 +364,10 @@ class Product(BaseModel):
     tags: List[str] = []
     # Couleurs disponibles, en hexadécimal (#RRGGBB)
     colors: List[str] = []
+    brand: Optional[str] = None
+    condition: Optional[ProductCondition] = None
+    # Caractéristiques libres : {"Taille": "M", "Matière": "Coton"}
+    specs: Dict[str, str] = {}
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
 
@@ -376,6 +384,9 @@ class ProductCreate(BaseModel):
     images: List[str]
     tags: Optional[List[str]] = []
     colors: Optional[List[str]] = []
+    brand: Optional[str] = None
+    condition: Optional[ProductCondition] = None
+    specs: Optional[Dict[str, str]] = {}
 
     @field_validator("colors")
     @classmethod
@@ -394,6 +405,9 @@ class ProductUpdate(BaseModel):
     status: Optional[str] = None
     featured: Optional[bool] = None
     colors: Optional[List[str]] = None
+    brand: Optional[str] = None
+    condition: Optional[ProductCondition] = None
+    specs: Optional[Dict[str, str]] = None
 
     @field_validator("colors")
     @classmethod
@@ -608,17 +622,33 @@ class Category(BaseModel):
     description: Optional[str] = None
     # Sous-catégorie : id de la catégorie principale (un seul niveau)
     parentId: Optional[str] = None
+    nameEn: Optional[str] = None
+    image: Optional[str] = None
+    # Ordre d'affichage (croissant), puis ordre alphabétique
+    order: int = 0
+    # Anciens noms : les liens /catalog/<ancien nom> continuent de marcher
+    formerNames: List[str] = []
 
 class CategoryCreate(BaseModel):
     name: str
     description: Optional[str] = None
     parentId: Optional[str] = None
+    nameEn: Optional[str] = None
+    image: Optional[str] = None
+    order: int = 0
 
 class CategoryUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     # null explicite : la sous-catégorie redevient une catégorie principale
     parentId: Optional[str] = None
+    nameEn: Optional[str] = None
+    image: Optional[str] = None
+    order: Optional[int] = None
+
+class ReclassifyRequest(BaseModel):
+    productIds: List[str]
+    categoryId: str
 
 class CategoryWithCount(Category):
     productCount: int
@@ -1717,6 +1747,9 @@ async def create_product(product_data: ProductCreate,
             detail=f"Vous avez déjà un produit nommé '{product_data.name}'. Veuillez utiliser un nom différent."
         )
 
+    await check_product_category(product_data.category)
+    check_promo_price(product_data.price, product_data.promoPrice)
+
     product_dict = product_data.dict()
     product_dict["slug"] = await get_unique_slug(product_data.name)
     product = Product(**product_dict)
@@ -1747,6 +1780,15 @@ async def update_product(product_id: str, product_data: ProductUpdate,
                 detail="Seul un modérateur peut changer le statut de ce produit.",
             )
     
+    if "category" in update_data or "price" in update_data or "promoPrice" in update_data:
+        current = await db.products.find_one({"id": product_id}, {"category": 1, "price": 1, "promoPrice": 1}) or {}
+        # Les formulaires renvoient le produit entier : on ne vérifie la
+        # catégorie que si elle change
+        if "category" in update_data and update_data["category"] != current.get("category"):
+            await check_product_category(update_data["category"])
+        check_promo_price(update_data.get("price", current.get("price")),
+                          update_data.get("promoPrice", current.get("promoPrice")))
+
     # If name is being updated, check for duplicates
     if "name" in update_data:
         # Get current product to find the sellerId
@@ -2893,6 +2935,37 @@ async def delete_pickup_point(pickup_point_id: str):
     return
 
 # --- Category Management ---
+async def check_product_category(category_id: Optional[str]) -> None:
+    """Un produit pointe toujours vers une catégorie existante."""
+    if not category_id or not await db.categories.find_one({"id": category_id}):
+        raise HTTPException(status_code=400, detail="Choisissez une catégorie existante.")
+
+
+def check_promo_price(price: Optional[float], promo_price: Optional[float]) -> None:
+    if promo_price and price and promo_price >= price:
+        raise HTTPException(status_code=400, detail="Le prix promo doit être inférieur au prix normal.")
+
+
+async def check_category_name_free(name: str, category_id: Optional[str] = None) -> None:
+    """Pas deux catégories au même nom, accents, majuscules et pluriel compris."""
+    wanted = normalize_name(name)
+    if not wanted:
+        raise HTTPException(status_code=400, detail="Le nom de la catégorie est obligatoire.")
+    for other in await db.categories.find({}, {"id": 1, "name": 1}).to_list(1000):
+        if other.get("id") != category_id and normalize_name(other.get("name")) == wanted:
+            raise HTTPException(status_code=400, detail=f"Une catégorie porte déjà ce nom : « {other['name'].strip()} ».")
+
+
+async def check_categories_empty(category_ids: List[str]) -> None:
+    """Une catégorie qui contient des produits ne peut pas être supprimée :
+    ses produits deviendraient invisibles."""
+    count = await db.products.count_documents({"category": {"$in": category_ids}})
+    if count:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cette catégorie contient {count} produit(s) : déplacez-les d'abord vers une autre catégorie.",
+        )
+
 async def check_category_parent(category_id: Optional[str], parent_id: Optional[str]) -> None:
     """Un seul niveau : le parent existe, est une catégorie principale, et une
     catégorie qui a déjà des sous-catégories ne peut pas devenir l'une d'elles."""
@@ -2916,7 +2989,9 @@ async def category_family_ids(category_id: str) -> List[str]:
 
 
 @api_router.get("/categories", response_model=List[CategoryWithCount])
-async def list_categories():
+async def list_categories(hideEmpty: bool = False):
+    """Catégories triées par ordre puis par nom. hideEmpty=true (site, app) :
+    masque celles qui n'ont aucun produit, sous-catégories comprises."""
     pipeline = [
         {
             "$lookup": {
@@ -2932,18 +3007,32 @@ async def list_categories():
                 "name": "$name",
                 "description": "$description",
                 "parentId": "$parentId",
+                "nameEn": "$nameEn",
+                "image": "$image",
+                "order": {"$ifNull": ["$order", 0]},
+                "formerNames": {"$ifNull": ["$formerNames", []]},
                 "productCount": { "$size": "$products" }
             }
-        }
+        },
+        {"$sort": {"order": 1, "name": 1}},
     ]
     categories_cursor = db.categories.aggregate(pipeline)
     categories_with_count = await categories_cursor.to_list(1000)
+    if hideEmpty:
+        family = {}
+        for c in categories_with_count:
+            key = c.get("parentId") or c.get("id")
+            family[key] = family.get(key, 0) + c["productCount"]
+        categories_with_count = [
+            c for c in categories_with_count
+            if (c["productCount"] if c.get("parentId") else family.get(c.get("id"), 0)) > 0
+        ]
     return categories_with_count
 
 @api_router.post("/categories", response_model=Category, dependencies=[Depends(moderator_or_higher_required)])
 async def create_category(category_data: CategoryCreate):
-    if await db.categories.find_one({"name": category_data.name}):
-        raise HTTPException(status_code=400, detail="Une catégorie porte déjà ce nom.")
+    category_data.name = category_data.name.strip()
+    await check_category_name_free(category_data.name)
     category_data.parentId = category_data.parentId or None
     await check_category_parent(None, category_data.parentId)
     category = Category(**category_data.dict())
@@ -2958,8 +3047,15 @@ async def update_category(category_id: str, category_data: CategoryUpdate):
     if "parentId" in update_data:
         update_data["parentId"] = update_data["parentId"] or None
         await check_category_parent(category_id, update_data["parentId"])
+    push = {}
+    if "name" in update_data:
+        update_data["name"] = update_data["name"].strip()
+        await check_category_name_free(update_data["name"], category_id)
+        current = await db.categories.find_one({"id": category_id}, {"name": 1})
+        if current and normalize_name(current.get("name")) != normalize_name(update_data["name"]):
+            push = {"$addToSet": {"formerNames": current["name"].strip()}}
 
-    await db.categories.update_one({"id": category_id}, {"$set": update_data})
+    await db.categories.update_one({"id": category_id}, {"$set": update_data, **push})
     updated_category = await db.categories.find_one({"id": category_id})
     if not updated_category:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -2974,6 +3070,7 @@ async def bulk_delete_categories(request: BulkDeleteRequest):
     orphan = await db.categories.find_one({"parentId": {"$in": request.ids}, "id": {"$nin": request.ids}})
     if orphan:
         raise HTTPException(status_code=400, detail=f"Supprimez ou déplacez d'abord la sous-catégorie « {orphan['name']} ».")
+    await check_categories_empty(request.ids)
     result = await db.categories.delete_many({"id": {"$in": request.ids}})
     
     if result.deleted_count == 0:
@@ -2989,10 +3086,55 @@ async def bulk_delete_categories(request: BulkDeleteRequest):
 async def delete_category(category_id: str):
     if await db.categories.find_one({"parentId": category_id}):
         raise HTTPException(status_code=400, detail="Cette catégorie a des sous-catégories : supprimez-les ou déplacez-les d'abord.")
+    await check_categories_empty([category_id])
     result = await db.categories.delete_one({"id": category_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")
     return
+
+# --- Reclassement des produits (admin) ---
+@api_router.get("/admin/products/unclassified", dependencies=[Depends(moderator_or_higher_required)])
+async def list_unclassified_products(includeOther: bool = True):
+    """Produits sans catégorie valide (et, par défaut, ceux rangés dans
+    « Autres »), avec une catégorie suggérée d'après leur nom."""
+    categories = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    by_name = {normalize_name(c["name"]): c for c in categories if c.get("id")}
+    other = by_name.get(normalize_name("Autres"))
+    query = {"category": {"$nin": [c["id"] for c in by_name.values()]}}
+    if includeOther and other:
+        query = {"$or": [query, {"category": other["id"]}]}
+    fields = {"_id": 0, "id": 1, "name": 1, "description": 1, "category": 1, "images": 1,
+              "sellerName": 1, "status": 1, "price": 1}
+    products = await db.products.find(query, fields).sort("createdAt", -1).to_list(5000)
+    result = []
+    for product in products:
+        suggested = by_name.get(normalize_name(suggest_category_name(product.get("name"), product.get("description"))))
+        result.append({
+            "id": product["id"],
+            "name": product.get("name"),
+            "image": next(iter(product.get("images") or []), None),
+            "sellerName": product.get("sellerName"),
+            "status": product.get("status"),
+            "price": product.get("price"),
+            "currentCategory": product.get("category"),
+            "inOther": bool(other) and product.get("category") == other["id"],
+            "suggestedCategoryId": suggested["id"] if suggested else None,
+            "suggestedCategoryName": suggested["name"] if suggested else None,
+        })
+    return result
+
+
+@api_router.post("/admin/products/reclassify", dependencies=[Depends(moderator_or_higher_required)])
+async def reclassify_products(request: ReclassifyRequest):
+    """Déplace des produits vers une catégorie existante."""
+    if not request.productIds:
+        raise HTTPException(status_code=400, detail="Aucun produit sélectionné.")
+    await check_product_category(request.categoryId)
+    result = await db.products.update_many(
+        {"id": {"$in": request.productIds}},
+        {"$set": {"category": request.categoryId, "updatedAt": datetime.utcnow()}},
+    )
+    return {"updated": result.modified_count}
 
 # --- Ads Management ---
 @api_router.get("/ads/active", response_model=List[Ad])

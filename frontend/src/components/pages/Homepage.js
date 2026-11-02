@@ -17,7 +17,7 @@ import 'swiper/css/effect-fade';
 import './HeroSwiper.css';
 import { PinIcon } from '../ui/Icons';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
-import { topLevelCategories, categoryFamilyIds } from '../../lib/categories';
+import { topLevelCategories, categoryFamilyIds, categoryName } from '../../lib/categories';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -35,6 +35,28 @@ const Homepage = (props) => {
 
   // Icônes des catégories
   const categoryIcons = {
+    'Téléphones et accessoires': '📱',
+    'Informatique': '💻',
+    'Électronique': '🔌',
+    'Mode femme': '👗',
+    'Mode homme': '👔',
+    'Mode enfant': '👕',
+    'Beauté et cosmétiques': '💄',
+    'Santé et bien-être': '🩺',
+    'Maison et décoration': '🛋️',
+    'Électroménager': '🍳',
+    'Alimentation et épicerie': '🛒',
+    'Produits du terroir camerounais': '🧺',
+    'Agriculture et élevage': '🌱',
+    'Construction et bricolage': '🧱',
+    'Automobile et pièces détachées': '🚗',
+    'Motos et transport': '🏍️',
+    'Bébé et maternité': '🍼',
+    'Sport et loisirs': '⚽',
+    'Livres, école et bureau': '📚',
+    'Artisanat et Made in Cameroon': '🪘',
+    'Équipements professionnels': '🧰',
+    // Anciens noms, tant que la migration n'est pas passée
     'Produits locaux': '🧺',
     'Constructions': '🧱',
     'Chaussures hommes': '👞',
@@ -380,10 +402,12 @@ const Homepage = (props) => {
                       to={`/catalog/${encodeURIComponent(cat.name)}`}
                       className="flex flex-col h-full p-3 rounded-xl bg-white border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-colors"
                     >
-                      <span className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-2xl" aria-hidden="true">
-                        {categoryIcons[cat.name] || '📦'}
+                      <span className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-2xl overflow-hidden" aria-hidden="true">
+                        {cat.image
+                          ? <img src={cat.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                          : categoryIcons[cat.name] || '📦'}
                       </span>
-                      <span className="mt-3 font-semibold text-sm leading-tight line-clamp-2">{cat.name}</span>
+                      <span className="mt-3 font-semibold text-sm leading-tight line-clamp-2">{categoryName(cat, language)}</span>
                       {typeof cat.productCount === 'number' && (
                         <span className="mt-auto pt-1 text-xs text-gray-500">{t.productCount(cat.productCount)}</span>
                       )}

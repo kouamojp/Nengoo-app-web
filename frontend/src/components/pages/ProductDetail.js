@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
+import { categoryName } from '../../lib/categories';
 import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
@@ -342,8 +343,8 @@ const ProductDetail = (props) => {
   const parentCategoryUrl = parentCategory ? `/catalog/${encodeURIComponent(parentCategory.name)}` : null;
   // Fil d'Ariane : Catalogue › [catégorie principale ›] catégorie › produit
   const categoryCrumbs = [
-    ...(parentCategory ? [{ name: parentCategory.name, url: parentCategoryUrl }] : []),
-    ...(category ? [{ name: category.name, url: categoryUrl }] : []),
+    ...(parentCategory ? [{ name: categoryName(parentCategory, language), url: parentCategoryUrl }] : []),
+    ...(category ? [{ name: categoryName(category, language), url: categoryUrl }] : []),
   ];
 
   const jsonLd = {
@@ -504,7 +505,7 @@ const ProductDetail = (props) => {
             <div>
               {category && (
                 <Link to={categoryUrl} className="text-sm font-semibold text-purple-700 hover:underline underline-offset-4">
-                  {category.name}
+                  {categoryName(category, language)}
                 </Link>
               )}
               <h1 className="mt-1 text-3xl sm:text-4xl font-extrabold">{name}</h1>
