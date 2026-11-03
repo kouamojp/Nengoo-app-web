@@ -150,3 +150,36 @@ def test_sms_texts(monkeypatch):
     assert sms.send_sms("690000001", text) is True
     assert sent["data"]["To"] == "+237690000001" and "AC123" in sent["url"]
     assert sms.send_sms("pas un numero", text) is False
+
+
+def test_orders_list_is_private(monkeypatch):
+    """GET /orders?buyer_id= ou ?seller_id= : seulement le titulaire ou l'équipe."""
+    class Cursor:
+        def sort(self, *a):
+            return self
+
+        async def to_list(self, n):
+            return []
+
+    class Orders:
+        def find(self, query):
+            return Cursor()
+
+    class Db:
+        orders = Orders()
+
+    monkeypatch.setattr(server, "db", Db())
+
+    async def scenario():
+        with pytest.raises(HTTPException) as err:
+            await server.list_orders(buyer_id="buyer_a", role=None, x_buyer_id=None, x_seller_id=None)
+        assert err.value.status_code == 403
+        with pytest.raises(HTTPException):
+            await server.list_orders(buyer_id="buyer_a", role=None, x_buyer_id="buyer_b", x_seller_id=None)
+        with pytest.raises(HTTPException):
+            await server.list_orders(seller_id="s1", role=None, x_buyer_id=None, x_seller_id="s2")
+        assert await server.list_orders(buyer_id="buyer_a", role=None, x_buyer_id="buyer_a", x_seller_id=None) == []
+        assert await server.list_orders(seller_id="s1", role=None, x_buyer_id=None, x_seller_id="s1") == []
+        assert await server.list_orders(buyer_id="buyer_a", role="support", x_buyer_id=None, x_seller_id=None) == []
+
+    asyncio.run(scenario())

@@ -36,9 +36,11 @@ def _plain(text: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn")
 
 
-def order_created_text(order_id: str, total: float, seller: str) -> str:
-    return _plain(f"Nengoo: commande {order_id} recue ({int(total)} FCFA, {seller.strip()}). "
-                  f"Le vendeur va vous contacter. Suivi: nengoo.com/suivi-commande")
+def order_created_text(order_id: str, total: float, seller: str, delivery_code: Optional[str] = None) -> str:
+    # Le code de remise est demandé par le livreur : il tient dans le même SMS
+    code = f" Code livraison: {delivery_code}." if delivery_code else ""
+    return _plain(f"Nengoo: commande {order_id} recue ({int(total)} FCFA, {seller.strip()}).{code} "
+                  f"Suivi: nengoo.com/suivi-commande")
 
 
 def order_status_text(order_id: str, status: str) -> Optional[str]:

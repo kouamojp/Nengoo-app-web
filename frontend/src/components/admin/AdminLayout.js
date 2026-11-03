@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon, SearchIcon,
+  HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon, SearchIcon, RouteIcon,
   LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon,
 } from '../ui/Icons';
 import { AdminFeedbackHost } from './adminFeedback';
@@ -60,6 +60,7 @@ const navGroups = (user, counts) => [
       { id: 'products', label: 'Produits', Icon: BoxIcon },
       { id: 'sellers', label: 'Vendeurs', Icon: StoreIcon, count: counts.sellers },
       { id: 'buyers', label: 'Acheteurs', Icon: UsersIcon },
+      { id: 'couriers', label: 'Livreurs', Icon: RouteIcon },
       { id: 'whatsappAnalytics', label: 'Contacts WhatsApp', Icon: ChartIcon },
     ],
   },

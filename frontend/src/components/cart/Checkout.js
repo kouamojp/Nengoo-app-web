@@ -58,43 +58,28 @@ const Checkout = (props) => {
     }
   }, [user]);
 
+  // Frais de livraison calculés par le serveur (vendeur, quartier, ville,
+  // tarif standard) : le même montant que celui de la commande
   useEffect(() => {
-    const fetchAndCalculateShipping = async () => {
-      if (formData.deliveryOption === 'pickup') {
-        setShippingCost(0);
-        return;
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/delivery/quote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            city: formData.city || null,
+            neighborhood: formData.neighborhood || null,
+            deliveryOption: formData.deliveryOption,
+            cartItems: cartItems.map(item => ({ id: item.id.toString(), quantity: item.quantity })),
+          }),
+        });
+        if (response.ok) setShippingCost((await response.json()).shipping);
+      } catch (e) {
+        console.error('Delivery quote failed', e);
       }
-
-      // 1. Get unique seller IDs from cart
-      const sellerIds = [...new Set(cartItems.map(item => item.sellerId))];
-
-      // 2. Fetch each seller and determine their shipping cost
-      const sellerShippingPromises = sellerIds.map(async (sellerId) => {
-        try {
-          const sellerRes = await fetch(`${API_BASE_URL}/sellers/${sellerId}`);
-          if (sellerRes.ok) {
-            const seller = await sellerRes.json();
-            // Use seller's price if it exists as a number and is greater than 0
-            if (typeof seller.deliveryPrice === 'number' && seller.deliveryPrice > 0) {
-              return seller.deliveryPrice;
-            }
-          }
-          return 0; // Fallback for this seller
-        } catch (e) {
-          console.error(`Could not fetch seller ${sellerId}`, e);
-          return 0; // Fallback on error
-        }
-      });
-
-      // 3. Sum up all shipping costs
-      const shippingCosts = await Promise.all(sellerShippingPromises);
-      const totalShipping = shippingCosts.reduce((acc, cost) => acc + cost, 0);
-
-      setShippingCost(totalShipping);
-    };
-
-    fetchAndCalculateShipping();
-  }, [cartItems, formData.deliveryOption, API_BASE_URL]);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [cartItems, formData.deliveryOption, formData.city, formData.neighborhood, API_BASE_URL]);
 
   useEffect(() => {
     const fetchPickupPoints = async () => {
@@ -196,6 +181,9 @@ const Checkout = (props) => {
                     <p className="text-xs text-gray-500">{t.orderNumber} · {order.sellerName}</p>
                     <p className="text-lg font-bold tabular-nums">{order.id}</p>
                     <p className="text-sm text-gray-600">{formatPrice(order.totalAmount)}</p>
+                    {order.deliveryCode && !order.pickupPointId && (
+                      <p className="mt-1 text-sm">{t.deliveryCode} : <strong className="tabular-nums tracking-widest">{order.deliveryCode}</strong></p>
+                    )}
                   </div>
                   <Link to={trackUrl(order)} className="text-sm font-semibold text-purple-700 hover:underline underline-offset-4">
                     {t.trackOrder}

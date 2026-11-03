@@ -66,6 +66,7 @@ from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digit
 from product_search import normalize_query, search_products, search_products_detailed
 from image_variants import aligned_variants, refresh_product_variants
 from sms import order_created_text, order_status_text, send_sms
+from delivery import load_settings as load_delivery_settings, new_courier_token, new_delivery_code, seller_fee
 from order_flow import RELEASES_STOCK, STATUSES as ORDER_STATUSES, check_transition, normalize_status, status_label
 from account_deletion import erase_buyer, erase_seller
 app.add_middleware(IdentityMiddleware)
@@ -512,6 +513,12 @@ class Order(BaseModel):
     statusHistory: List[dict] = []
     # Stock retiré à la commande (commandes depuis la phase 4) ; rendu si elle est annulée
     stockReserved: bool = False
+    # Livraison (phase 5) : livreur attribué, code donné au client et demandé
+    # au livreur à la remise, tentatives sans livraison
+    courierId: Optional[str] = None
+    courierName: Optional[str] = None
+    deliveryCode: Optional[str] = None
+    deliveryAttempts: List[dict] = []
     paymentStatus: str
     pickupPointId: Optional[str] = None # Changed to Optional
     pickupPointName: Optional[str] = None # Added
@@ -2588,8 +2595,18 @@ async def get_seller_products(seller_id: str):
 
 # --- Order Management ---
 @api_router.get("/orders", response_model=List[Order])
-async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] = None, role: str = Depends(get_current_admin_role)):
+async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] = None,
+                      role: str = Depends(get_current_admin_role),
+                      x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
+                      x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")):
     query = {}
+    is_staff = role in ["super_admin", "admin", "moderator", "support"]
+    # Un client ou un vendeur ne voit que ses propres commandes (identité tirée
+    # du jeton de session par le middleware) ; l'équipe voit tout
+    if buyer_id and not is_staff and x_buyer_id != buyer_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez voir que vos propres commandes.")
+    if seller_id and not buyer_id and not is_staff and x_seller_id != seller_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez voir que les commandes de votre boutique.")
 
     if buyer_id:
         query["buyerId"] = buyer_id
@@ -2827,7 +2844,243 @@ async def track_order(request: Request, orderId: str = Query(..., max_length=40)
         "city": order.get("shippingCity"),
         "pickup": bool(order.get("pickupPointId")),
         "orderedDate": order.get("orderedDate"),
+        # À donner au livreur à la remise du colis
+        "deliveryCode": order.get("deliveryCode"),
+        "courierName": order.get("courierName"),
     }
+
+
+# --- Livraison : zones, devis, livreurs ---
+class DeliveryArea(BaseModel):
+    name: str
+    fee: float = Field(ge=0)
+
+
+class DeliveryZone(BaseModel):
+    city: str
+    fee: float = Field(ge=0)
+    neighborhoods: List[DeliveryArea] = []
+
+
+class DeliveryZones(BaseModel):
+    zones: List[DeliveryZone] = []
+    # Livraison offerte à partir de ce sous-total par vendeur (vide : jamais)
+    freeAbove: Optional[float] = Field(None, ge=0)
+
+
+@api_router.get("/delivery/zones", response_model=DeliveryZones)
+async def get_delivery_zones():
+    settings = await load_delivery_settings(db)
+    return DeliveryZones(zones=settings["zones"], freeAbove=settings["freeAbove"])
+
+
+@api_router.put("/delivery/zones", response_model=DeliveryZones, dependencies=[Depends(super_admin_required)])
+async def update_delivery_zones(data: DeliveryZones):
+    seen = set()
+    for zone in data.zones:
+        zone.city = normalize_city(zone.city)
+        key = normalize_name(zone.city)
+        if not key or key in seen:
+            raise HTTPException(status_code=400, detail=f"Ville vide ou en double : « {zone.city} ».")
+        seen.add(key)
+        zone.neighborhoods = [a for a in zone.neighborhoods if a.name.strip()]
+        for area in zone.neighborhoods:
+            area.name = " ".join(area.name.split())
+    await db.settings.update_one({"_id": "delivery_zones"}, {"$set": data.dict()}, upsert=True)
+    return data
+
+
+class DeliveryQuoteRequest(BaseModel):
+    city: Optional[str] = None
+    neighborhood: Optional[str] = None
+    deliveryOption: str = "home"
+    cartItems: List[CheckoutProduct]
+
+
+@api_router.post("/delivery/quote")
+async def delivery_quote(request: DeliveryQuoteRequest):
+    """Frais de livraison par vendeur et total, avant de commander (même calcul que la commande)."""
+    settings = await load_delivery_settings(db)
+    ids = [i.id for i in request.cartItems]
+    products = {p["id"]: p for p in await db.products.find({"id": {"$in": ids}}).to_list(len(ids) or 1)}
+    by_seller = {}
+    for item in request.cartItems:
+        product = products.get(item.id)
+        if not product:
+            continue
+        price = product.get("promoPrice") if (product.get("promoPrice") or 0) > 0 else product.get("price") or 0
+        entry = by_seller.setdefault(product["sellerId"], {"sellerId": product["sellerId"],
+                                                           "sellerName": product.get("sellerName"), "subtotal": 0.0})
+        entry["subtotal"] += price * max(item.quantity, 0)
+    for seller_id, entry in by_seller.items():
+        seller = await db.sellers.find_one({"id": seller_id}) or {}
+        entry["shipping"] = seller_fee(seller, entry["subtotal"], settings, settings["standardFee"],
+                                       request.city, request.neighborhood, request.deliveryOption == "pickup")
+    sellers = list(by_seller.values())
+    subtotal = sum(e["subtotal"] for e in sellers)
+    shipping = sum(e["shipping"] for e in sellers)
+    return {"sellers": sellers, "subtotal": subtotal, "shipping": shipping, "total": subtotal + shipping,
+            "freeAbove": settings["freeAbove"]}
+
+
+class Courier(BaseModel):
+    id: str = Field(default_factory=lambda: f"courier_{str(uuid.uuid4())[:8]}")
+    name: str
+    phone: str
+    city: Optional[str] = None
+    active: bool = True
+    # Lien secret de sa page : /livreur/<token>
+    token: str = Field(default_factory=new_courier_token)
+    createdAt: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CourierInput(BaseModel):
+    name: str
+    phone: str
+    city: Optional[str] = None
+    active: bool = True
+
+
+@api_router.get("/couriers", response_model=List[Courier], dependencies=[Depends(support_or_higher_required)])
+async def list_couriers():
+    return [Courier(**c) for c in await db.couriers.find({}, {"_id": 0}).sort("name", 1).to_list(500)]
+
+
+@api_router.post("/couriers", response_model=Courier, dependencies=[Depends(admin_or_higher_required)])
+async def create_courier(data: CourierInput):
+    if not data.name.strip() or not whatsapp_digits(data.phone):
+        raise HTTPException(status_code=400, detail="Indiquez le nom et un numéro de téléphone valide du livreur.")
+    courier = Courier(name=data.name.strip(), phone=normalize_whatsapp(data.phone),
+                      city=normalize_city(data.city), active=data.active)
+    await db.couriers.insert_one(courier.dict())
+    return courier
+
+
+@api_router.put("/couriers/{courier_id}", response_model=Courier, dependencies=[Depends(admin_or_higher_required)])
+async def update_courier(courier_id: str, data: CourierInput, newLink: bool = False):
+    if not data.name.strip() or not whatsapp_digits(data.phone):
+        raise HTTPException(status_code=400, detail="Indiquez le nom et un numéro de téléphone valide du livreur.")
+    changes = {"name": data.name.strip(), "phone": normalize_whatsapp(data.phone),
+               "city": normalize_city(data.city), "active": data.active}
+    if newLink:
+        # Lien perdu ou livreur parti : l'ancien lien cesse de marcher
+        changes["token"] = new_courier_token()
+    await db.couriers.update_one({"id": courier_id}, {"$set": changes})
+    courier = await db.couriers.find_one({"id": courier_id}, {"_id": 0})
+    if not courier:
+        raise HTTPException(status_code=404, detail="Livreur introuvable.")
+    await db.orders.update_many({"courierId": courier_id}, {"$set": {"courierName": courier["name"]}})
+    return Courier(**courier)
+
+
+@api_router.delete("/couriers/{courier_id}", status_code=status.HTTP_204_NO_CONTENT,
+                   dependencies=[Depends(admin_or_higher_required)])
+async def delete_courier(courier_id: str):
+    open_orders = await db.orders.count_documents({"courierId": courier_id,
+                                                   "status": {"$nin": ["delivered", "cancelled", "refunded"]}})
+    if open_orders:
+        raise HTTPException(status_code=400, detail=f"Ce livreur a {open_orders} livraison(s) en cours : attribuez-les d'abord à un autre.")
+    await db.couriers.delete_one({"id": courier_id})
+
+
+class CourierAssignment(BaseModel):
+    courierId: Optional[str] = None
+
+
+@api_router.put("/orders/{order_id}/courier", dependencies=[Depends(support_or_higher_required)])
+async def assign_courier(order_id: str, data: CourierAssignment):
+    courier = None
+    if data.courierId:
+        courier = await db.couriers.find_one({"id": data.courierId, "active": True})
+        if not courier:
+            raise HTTPException(status_code=400, detail="Livreur introuvable ou désactivé.")
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    changes = {"courierId": courier["id"] if courier else None, "courierName": courier["name"] if courier else None,
+               "updatedAt": datetime.utcnow()}
+    if courier and not order.get("deliveryCode"):
+        changes["deliveryCode"] = new_delivery_code()  # anciennes commandes
+    await db.orders.update_one({"id": order_id}, {"$set": changes})
+    return {"courierId": changes["courierId"], "courierName": changes["courierName"]}
+
+
+def _courier_view(order: dict) -> dict:
+    """Ce que voit le livreur : de quoi livrer et encaisser, jamais le code de remise."""
+    return {
+        "id": order["id"],
+        "status": normalize_status(order.get("status")),
+        "statusLabel": status_label(order.get("status")),
+        "buyerName": order.get("buyerName"),
+        "phone": order.get("shippingPhone"),
+        "city": order.get("shippingCity"),
+        "neighborhood": order.get("shippingNeighborhood"),
+        "landmark": order.get("shippingLandmark"),
+        "address": order.get("shippingAddress") if isinstance(order.get("shippingAddress"), str) else None,
+        "sellerName": order.get("sellerName"),
+        "products": [{"name": p.get("name"), "quantity": p.get("quantity")} for p in order.get("products", [])],
+        # Paiement à la livraison : montant à encaisser
+        "amountToCollect": order.get("totalAmount") if order.get("paymentStatus") in (None, "unpaid", "pending") else 0,
+        "attempts": len(order.get("deliveryAttempts") or []),
+    }
+
+
+async def _courier_from_token(token: str) -> dict:
+    courier = await db.couriers.find_one({"token": token, "active": True})
+    if not courier:
+        raise HTTPException(status_code=404, detail="Lien de livreur invalide ou désactivé.")
+    return courier
+
+
+@api_router.get("/courier/{token}/orders")
+async def courier_orders(token: str):
+    """Page du livreur : ses livraisons en cours."""
+    courier = await _courier_from_token(token)
+    orders = await db.orders.find({"courierId": courier["id"],
+                                   "status": {"$nin": ["delivered", "cancelled", "refunded"]}}).sort("orderedDate", 1).to_list(200)
+    return {"courierName": courier["name"], "orders": [_courier_view(o) for o in orders]}
+
+
+class CourierAction(BaseModel):
+    action: str  # start | delivered | failed
+    code: Optional[str] = None
+    note: Optional[str] = None
+
+
+@api_router.post("/courier/{token}/orders/{order_id}")
+async def courier_update(token: str, order_id: str, data: CourierAction, request: Request,
+                         background_tasks: BackgroundTasks):
+    courier = await _courier_from_token(token)
+    order = await db.orders.find_one({"id": order_id, "courierId": courier["id"]})
+    if not order:
+        raise HTTPException(status_code=404, detail="Cette commande ne vous est pas attribuée.")
+    current = normalize_status(order.get("status"))
+    if current in ("delivered", "cancelled", "refunded"):
+        raise HTTPException(status_code=400, detail="Cette commande est déjà terminée.")
+    if data.action == "failed":
+        attempt = {"at": datetime.utcnow(), "note": (data.note or "").strip()[:300], "courierId": courier["id"]}
+        await db.orders.update_one({"id": order_id}, {"$push": {"deliveryAttempts": attempt},
+                                                      "$set": {"updatedAt": datetime.utcnow()}})
+        return _courier_view(await db.orders.find_one({"id": order_id}))
+    if data.action == "start":
+        new_status = "out_for_delivery"
+    elif data.action == "delivered":
+        # Preuve de remise : le code que seul le client connaît
+        login_limiter.check("delivery-code", request, order_id)
+        if (data.code or "").strip() != (order.get("deliveryCode") or ""):
+            login_limiter.record_failure("delivery-code", request, order_id)
+            raise HTTPException(status_code=400, detail="Code de livraison incorrect : demandez au client le code reçu à la commande.")
+        new_status = "delivered"
+    else:
+        raise HTTPException(status_code=400, detail="Action inconnue.")
+    # Mêmes effets qu'un changement de statut par l'admin (historique, SMS, stock)
+    await update_order(order_id, OrderUpdate(status=new_status), background_tasks, "admin", None)
+    # L'historique attribue l'étape au livreur, pas à l'admin
+    history = (await db.orders.find_one({"id": order_id}, {"statusHistory": 1})).get("statusHistory") or []
+    if history and history[-1].get("status") == new_status:
+        await db.orders.update_one({"id": order_id},
+                                   {"$set": {f"statusHistory.{len(history) - 1}.by": f"courier:{courier['name']}"}})
+    return _courier_view(await db.orders.find_one({"id": order_id}))
 
 
 @api_router.get("/order-statuses")
@@ -2870,9 +3123,8 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
     buyer_name = buyer["name"]
     buyer_email = buyer.get("email") or checkout_data.email
 
-    # Get the global shipping price as a fallback
-    shipping_setting = await db.settings.find_one({"_id": "shipping_price"})
-    global_shipping_price = shipping_setting['price'] if shipping_setting else 2500
+    # Tarifs de livraison : vendeur, quartier, ville, puis tarif standard
+    delivery_settings = await load_delivery_settings(db)
 
     # Un même produit ajouté deux fois au panier : quantités additionnées
     quantities = {}
@@ -2960,10 +3212,10 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             else:
                 raise HTTPException(status_code=404, detail=f"Seller {seller_id} not found.")
 
-        # Determine shipping cost
-        shipping_cost = seller.get("deliveryPrice") if seller.get("deliveryPrice") is not None else global_shipping_price
-
         products_total = sum(p.price * p.quantity for p in order_details["products"])
+        shipping_cost = seller_fee(seller, products_total, delivery_settings, delivery_settings["standardFee"],
+                                   checkout_data.city, checkout_data.neighborhood,
+                                   checkout_data.deliveryOption == "pickup")
         total_amount = products_total + shipping_cost
         
         new_order = Order(
@@ -2984,6 +3236,7 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             status="received",
             statusHistory=[{"status": "received", "at": datetime.utcnow(), "by": "buyer"}],
             stockReserved=True,
+            deliveryCode=new_delivery_code(),
             paymentStatus="pending" if checkout_data.paymentMethod != 'cashOnDelivery' else 'unpaid',
             pickupPointId=checkout_data.selectedPickupPoint if checkout_data.deliveryOption == 'pickup' else None,
             pickupStatus="pending_pickup" if checkout_data.deliveryOption == 'pickup' else "not_applicable",
@@ -3000,7 +3253,8 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
 
         # SMS de confirmation au client (en tâche de fond)
         background_tasks.add_task(send_sms, checkout_data.phone,
-                                  order_created_text(new_order.id, total_amount, order_details["sellerName"]))
+                                  order_created_text(new_order.id, total_amount, order_details["sellerName"],
+                                                     new_order.deliveryCode))
 
         # --- In-App Notifications ---
         # 1. To Buyer

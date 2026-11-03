@@ -34,6 +34,7 @@ const BuyerVerification = lazy(() => import('./components/admin/BuyerVerificatio
 const PickupPointsMap = lazy(() => import('./components/pages/PickupPointsMap'));
 const DeleteAccount = lazy(() => import('./components/pages/DeleteAccount'));
 const TrackOrder = lazy(() => import('./components/pages/TrackOrder'));
+const CourierPage = lazy(() => import('./components/pages/CourierPage'));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50" role="status" aria-label="Chargement">
@@ -185,6 +186,7 @@ function App() {
             <Route path="/delete-account" element={<DeleteAccount {...appProps} />} />
             <Route path="/suivi-commande" element={<TrackOrder {...appProps} />} />
             <Route path="/track-order" element={<TrackOrder {...appProps} />} />
+            <Route path="/livreur/:token" element={<CourierPage />} />
 
             {/* Authentication Routes */}
             <Route path="/login" element={<Login {...appProps} />} />

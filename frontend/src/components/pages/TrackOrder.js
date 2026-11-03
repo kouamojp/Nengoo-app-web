@@ -97,6 +97,12 @@ const TrackOrder = (props) => {
               </span>
             </div>
 
+            {order.deliveryCode && !order.pickup && !['delivered', 'cancelled', 'refunded'].includes(order.status) && (
+              <p className="mt-4 p-3 rounded-lg bg-purple-50 text-purple-950">
+                {t.deliveryCode} : <strong className="text-lg tabular-nums tracking-widest">{order.deliveryCode}</strong>
+                <span className="block text-sm text-purple-800">{t.deliveryCodeHint}{order.courierName ? ` (${order.courierName})` : ''}</span>
+              </p>
+            )}
             <ol className="mt-5 border-l-2 border-purple-200 ml-2 space-y-4">
               {order.history.map((step, i) => (
                 <li key={i} className="pl-4 relative">
