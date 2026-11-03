@@ -33,6 +33,7 @@ const PrivacyPolicyEditor = lazy(() => import('./components/admin/PrivacyPolicyE
 const BuyerVerification = lazy(() => import('./components/admin/BuyerVerification'));
 const PickupPointsMap = lazy(() => import('./components/pages/PickupPointsMap'));
 const DeleteAccount = lazy(() => import('./components/pages/DeleteAccount'));
+const TrackOrder = lazy(() => import('./components/pages/TrackOrder'));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50" role="status" aria-label="Chargement">
@@ -182,6 +183,8 @@ function App() {
             <Route path="/pickup-points" element={<PickupPointsMap {...appProps} />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy {...appProps} />} />
             <Route path="/delete-account" element={<DeleteAccount {...appProps} />} />
+            <Route path="/suivi-commande" element={<TrackOrder {...appProps} />} />
+            <Route path="/track-order" element={<TrackOrder {...appProps} />} />
 
             {/* Authentication Routes */}
             <Route path="/login" element={<Login {...appProps} />} />

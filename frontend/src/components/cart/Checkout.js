@@ -2,44 +2,56 @@
 import React, { useState, useEffect } from 'react';
 import CityDatalist from '../ui/CityDatalist';
 import { CITIES_DATALIST_ID } from '../../lib/cities';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+
+const inputClass = 'w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500';
+
+// Champ avec libellé visible (pas de libellé dans le placeholder)
+const Field = ({ label, hint, required, className = '', children }) => (
+  <label className={`block text-left ${className}`}>
+    <span className="block text-sm font-semibold text-gray-800 mb-1">
+      {label}{required && <span className="text-red-600" aria-hidden="true"> *</span>}
+    </span>
+    {children}
+    {hint && <span className="block text-xs text-gray-500 mt-1">{hint}</span>}
+  </label>
+);
 
 const Checkout = (props) => {
   const { language, cartItems, clearCart, user } = props;
   const navigate = useNavigate();
   const t = translations[language];
-  
+
+  // Commande sans compte : un nom et un téléphone suffisent
   const [formData, setFormData] = useState({
     firstName: '',
-    lastName: '',
     email: '',
     phone: '',
     address: '',
     city: '',
-    region: '',
-    postalCode: '',
-    paymentMethod: 'mtnMoney',
+    neighborhood: '',
+    landmark: '',
+    paymentMethod: 'cashOnDelivery',
     deliveryOption: 'home', // 'home' or 'pickup'
     selectedPickupPoint: ''
   });
   const [pickupPoints, setPickupPoints] = useState([]);
   const [shippingCost, setShippingCost] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  // Commandes créées : écran de confirmation avec leurs numéros
+  const [placedOrders, setPlacedOrders] = useState(null);
 
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
   useEffect(() => {
     if (user) {
-      const nameParts = user.name ? user.name.split(' ') : [];
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-
       setFormData(prevData => ({
         ...prevData,
-        firstName: firstName,
-        lastName: lastName,
+        firstName: user.name || '',
         email: user.email || '',
         phone: user.whatsapp || ''
       }));
@@ -101,7 +113,7 @@ const Checkout = (props) => {
     };
     fetchPickupPoints();
   }, [API_BASE_URL]);
-  
+
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -109,14 +121,13 @@ const Checkout = (props) => {
       minimumFractionDigits: 0,
     }).format(price);
   };
-  
+
   const subtotal = cartItems.reduce((sum, item) => {
     const priceToUse = (item.promoPrice && item.promoPrice > 0) ? item.promoPrice : item.price;
     return sum + (priceToUse * item.quantity);
   }, 0);
-  const tax = 0;
   const total = subtotal + shippingCost;
-  
+
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
@@ -126,6 +137,12 @@ const Checkout = (props) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (formData.deliveryOption === 'pickup' && !formData.selectedPickupPoint) {
+      setError('Choisissez un point de retrait.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
 
     // Map cartItems to the format expected by the backend
     const preparedCartItems = cartItems.map(item => ({
@@ -135,6 +152,7 @@ const Checkout = (props) => {
 
     const checkoutPayload = {
       ...formData,
+      email: formData.email.trim() || null,
       cartItems: preparedCartItems
     };
 
@@ -147,20 +165,59 @@ const Checkout = (props) => {
         body: JSON.stringify(checkoutPayload),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to place order');
+        throw new Error(data.detail || 'La commande a échoué. Réessayez.');
       }
 
-      alert('Commande passée avec succès! Vous recevrez une confirmation.');
+      setPlacedOrders(data);
       clearCart();
-      navigate('/');
+      window.scrollTo({ top: 0 });
     } catch (error) {
-      console.error('Error placing order:', error);
-      alert(`Erreur lors de la commande: ${error.message}`);
+      setError(error.message);
+    } finally {
+      setSubmitting(false);
     }
   };
-  
+
+  if (placedOrders) {
+    const trackUrl = (order) => `/suivi-commande?commande=${encodeURIComponent(order.id)}&tel=${encodeURIComponent(formData.phone)}`;
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header {...props} />
+        <main className="container mx-auto px-4 py-10 max-w-xl">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 text-left">
+            <h1 className="text-3xl font-bold text-purple-950">{t.orderPlaced}</h1>
+            <p className="mt-2 text-gray-700">{t.orderPlacedText(placedOrders.length)}</p>
+            <ul className="mt-6 divide-y divide-gray-200 border-y border-gray-200">
+              {placedOrders.map(order => (
+                <li key={order.id} className="py-4 flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-gray-500">{t.orderNumber} · {order.sellerName}</p>
+                    <p className="text-lg font-bold tabular-nums">{order.id}</p>
+                    <p className="text-sm text-gray-600">{formatPrice(order.totalAmount)}</p>
+                  </div>
+                  <Link to={trackUrl(order)} className="text-sm font-semibold text-purple-700 hover:underline underline-offset-4">
+                    {t.trackOrder}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-gray-700">{t.orderNextStep}</p>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="mt-6 w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+            >
+              {t.continueShopping}
+            </button>
+          </div>
+        </main>
+        <Footer language={language} />
+      </div>
+    );
+  }
+
   if (cartItems.length === 0) {
     navigate('/cart');
     return null;
@@ -169,68 +226,39 @@ const Checkout = (props) => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header {...props} />
-      
+
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">Finaliser la commande</h1>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Checkout Form */}
           <div className="lg:col-span-2 space-y-8">
             <form onSubmit={handleSubmit}>
-              {/* Billing Information */}
+              {/* Coordonnées */}
               <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                <h3 className="text-xl font-bold mb-6">{t.billingInfo}</h3>
+                <h3 className="text-xl font-bold mb-6 text-left">{t.yourDetails}</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    placeholder={t.firstName}
-                    required
-                    readOnly={!!user}
-                    className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    placeholder={t.lastName}
-                    required
-                    readOnly={!!user}
-                    className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    placeholder={t.email}
-                    required
-                    readOnly={!!user}
-                    className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder={t.phone}
-                    required
-                    readOnly={!!user}
-                    className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
+                  <Field label={t.fullName} required>
+                    <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange}
+                      autoComplete="name" required className={inputClass} />
+                  </Field>
+                  <Field label={t.phone} required hint={t.phoneHint}>
+                    <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange}
+                      autoComplete="tel" placeholder="+237 6XX XX XX XX" required readOnly={!!user?.whatsapp} className={inputClass} />
+                  </Field>
+                  <Field label={t.emailOptional} className="sm:col-span-2">
+                    <input type="email" name="email" value={formData.email} onChange={handleInputChange}
+                      autoComplete="email" className={inputClass} />
+                  </Field>
                 </div>
               </div>
-            
+
               {/* Shipping Information */}
               <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                <h3 className="text-xl font-bold mb-6">{t.shippingInfo}</h3>
-                
+                <h3 className="text-xl font-bold mb-6 text-left">{t.shippingInfo}</h3>
+
                 {/* Delivery Options */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-4">Option de Livraison</label>
                   <div className="space-y-3">
                     <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer text-left">
                       <input
@@ -249,7 +277,7 @@ const Checkout = (props) => {
                         </div>
                       </div>
                     </label>
-                    
+
                     <label className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer text-left">
                       <input
                         type="radio"
@@ -273,7 +301,7 @@ const Checkout = (props) => {
                 {/* Pickup Points Selection */}
                 {formData.deliveryOption === 'pickup' && (
                   <div className="mb-6">
-                    <label className="block text-sm font-medium mb-3">Choisir un Point de Retrait</label>
+                    <p className="block text-sm font-medium mb-3 text-left">Choisir un Point de Retrait</p>
                     <div className="space-y-3 max-h-64 overflow-y-auto">
                       {pickupPoints.map(point => (
                         <label key={point.id} className="flex items-start p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
@@ -301,83 +329,57 @@ const Checkout = (props) => {
                   </div>
                 )}
 
-                {/* Home Delivery Address Fields */}
+                {/* Adresse : ville, quartier et point de repère suffisent */}
                 {formData.deliveryOption === 'home' && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <input
-                      type="text"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder={t.address}
-                      required={formData.deliveryOption === 'home'}
-                      className="sm:col-span-2 border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                    <input
-                      type="text"
-                      name="city"
-                      list={CITIES_DATALIST_ID}
-                      autoComplete="address-level2"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                      placeholder={t.city}
-                      required={formData.deliveryOption === 'home'}
-                      className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                    <CityDatalist />
-                    <input
-                      type="text"
-                      name="region"
-                      value={formData.region}
-                      onChange={handleInputChange}
-                      placeholder={t.region}
-                      required={formData.deliveryOption === 'home'}
-                      className="border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
+                    <Field label={t.city} required>
+                      <input type="text" name="city" list={CITIES_DATALIST_ID} autoComplete="address-level2"
+                        value={formData.city} onChange={handleInputChange} required className={inputClass} />
+                      <CityDatalist />
+                    </Field>
+                    <Field label={t.neighborhood} required>
+                      <input type="text" name="neighborhood" value={formData.neighborhood} onChange={handleInputChange}
+                        autoComplete="address-level3" required className={inputClass} />
+                    </Field>
+                    <Field label={t.landmark} hint={t.landmarkHint} className="sm:col-span-2">
+                      <input type="text" name="landmark" value={formData.landmark} onChange={handleInputChange}
+                        className={inputClass} />
+                    </Field>
+                    <Field label={t.addressOptional} className="sm:col-span-2">
+                      <input type="text" name="address" value={formData.address} onChange={handleInputChange}
+                        autoComplete="street-address" className={inputClass} />
+                    </Field>
                   </div>
                 )}
               </div>
-            
+
               {/* Payment Method */}
               <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-                <h3 className="text-xl font-bold mb-6">{t.paymentMethod}</h3>
-                <div className="space-y-3">
-                  {[
-                    /* { key: 'mtnMoney', label: t.mtnMoney, icon: '📱' },
-                    { key: 'orangeMoney', label: t.orangeMoney, icon: '🍊' },
-                    { key: 'creditCard', label: t.creditCard, icon: '💳' }, */
-                    { key: 'cashOnDelivery', label: t.cashOnDelivery, icon: '💰' }
-                  ].map(method => (
-                    <label key={method.key} className="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value={method.key}
-                        checked={formData.paymentMethod === method.key}
-                        onChange={handleInputChange}
-                        className="mr-3"
-                      />
-                      <span className="text-xl mr-3">{method.icon}</span>
-                      <span className="font-medium">{method.label}</span>
-                    </label>
-                  ))}
+                <h3 className="text-xl font-bold mb-6 text-left">{t.paymentMethod}</h3>
+                <div className="flex items-center p-4 border rounded-lg">
+                  <span className="text-xl mr-3" aria-hidden="true">💰</span>
+                  <span className="font-medium">{t.cashOnDelivery}</span>
                 </div>
               </div>
 
+              {error && (
+                <p role="alert" className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-left">{error}</p>
+              )}
               <button
                 type="submit"
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                disabled={submitting}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
               >
-                {t.placeOrder}
+                {submitting ? '…' : `${t.placeOrder} · ${formatPrice(total)}`}
               </button>
             </form>
           </div>
-          
+
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-md p-6 sticky top-24">
               <h3 className="text-xl font-bold mb-6">Votre commande</h3>
-              
+
               {/* Items */}
               <div className="space-y-4 mb-6">
                 {cartItems.map(item => (
@@ -395,9 +397,9 @@ const Checkout = (props) => {
                   </div>
                 ))}
               </div>
-              
+
               <hr className="my-4" />
-              
+
               {/* Totals */}
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -424,12 +426,12 @@ const Checkout = (props) => {
                   <span>{formatPrice(total)}</span>
                 </div>
               </div>
-              
+
             </div>
           </div>
         </div>
       </div>
-      
+
       <Footer language={language} />
     </div>
   );

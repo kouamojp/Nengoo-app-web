@@ -65,6 +65,8 @@ from category_tree import normalize_name, suggest_category_name
 from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
 from product_search import normalize_query, search_products, search_products_detailed
 from image_variants import aligned_variants, refresh_product_variants
+from sms import order_created_text, order_status_text, send_sms
+from order_flow import RELEASES_STOCK, STATUSES as ORDER_STATUSES, check_transition, normalize_status, status_label
 from account_deletion import erase_buyer, erase_seller
 app.add_middleware(IdentityMiddleware)
 
@@ -302,14 +304,7 @@ async def order_owner_or_support_required(
         )
 
 def get_status_text_fr(status: str) -> str:
-    status_texts = {
-        "pending": "En attente",
-        "processing": "En cours",
-        "shipped": "Expédiée",
-        "delivered": "Livrée",
-        "cancelled": "Annulée"
-    }
-    return status_texts.get(status, status)
+    return status_label(status)
 
 # --- Hashing Utility ---
 def hash_password(password: str) -> str:
@@ -508,8 +503,15 @@ class Order(BaseModel):
     shippingCity: Optional[str] = None
     shippingRegion: Optional[str] = None
     shippingPhone: Optional[str] = None
+    # Adresse à la camerounaise : quartier et point de repère
+    shippingNeighborhood: Optional[str] = None
+    shippingLandmark: Optional[str] = None
     currency: str = "XAF"
     status: str
+    # [{"status", "at", "by"}] : historique affiché au client (suivi de commande)
+    statusHistory: List[dict] = []
+    # Stock retiré à la commande (commandes depuis la phase 4) ; rendu si elle est annulée
+    stockReserved: bool = False
     paymentStatus: str
     pickupPointId: Optional[str] = None # Changed to Optional
     pickupPointName: Optional[str] = None # Added
@@ -531,12 +533,15 @@ class CheckoutProduct(BaseModel):
 
 class CheckoutRequest(BaseModel):
     firstName: str
-    lastName: str
-    email: str
+    lastName: Optional[str] = ""
+    # Commande possible sans e-mail, avec le seul numéro de téléphone
+    email: Optional[str] = None
     phone: str
     address: Optional[str] = None
     city: Optional[str] = None
     region: Optional[str] = None
+    neighborhood: Optional[str] = None
+    landmark: Optional[str] = None
     paymentMethod: str
     deliveryOption: str
     selectedPickupPoint: Optional[str] = None
@@ -2632,6 +2637,7 @@ async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] =
             order_data["totalAmount"] = 0.0
         if "pickupStatus" not in order_data:
             order_data["pickupStatus"] = "pending"
+        order_data["status"] = normalize_status(order_data.get("status"))
 
         # Ensure products have both image and images fields
         for product in order_data.get("products", []):
@@ -2651,7 +2657,9 @@ async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] =
     return enriched_orders
 
 @api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(order_owner_or_support_required)])
-async def update_order(order_id: str, order_data: OrderUpdate, background_tasks: BackgroundTasks):
+async def update_order(order_id: str, order_data: OrderUpdate, background_tasks: BackgroundTasks,
+                       role: Optional[str] = Depends(get_current_admin_role),
+                       x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")):
     update_data = order_data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
@@ -2661,8 +2669,30 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
     if not order_before_update:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # Stock management
-    if 'status' in update_data and update_data['status'] != order_before_update.get('status'):
+    push = {}
+    if "status" in update_data:
+        update_data["status"] = normalize_status(update_data["status"])
+        previous = normalize_status(order_before_update.get("status"))
+        error = check_transition(previous, update_data["status"], role in ["super_admin", "admin"])
+        if error:
+            raise HTTPException(status_code=400, detail=error)
+        if update_data["status"] != previous:
+            push = {"$push": {"statusHistory": {
+                "status": update_data["status"], "at": datetime.utcnow(),
+                "by": "admin" if role else "seller" if x_seller_id else "system"}}}
+            if order_before_update.get("stockReserved"):
+                # Stock retiré à la commande : rendu à l'annulation, repris si on revient dessus
+                releases_now = update_data["status"] in RELEASES_STOCK
+                released_before = previous in RELEASES_STOCK
+                if releases_now != released_before:
+                    sign = 1 if releases_now else -1
+                    for item in order_before_update["products"]:
+                        await db.products.update_one({"id": item["productId"]},
+                                                     {"$inc": {"stock": sign * item["quantity"]}})
+
+    # Anciennes commandes : stock retiré seulement à la livraison
+    if (not order_before_update.get("stockReserved") and 'status' in update_data
+            and update_data['status'] != normalize_status(order_before_update.get('status'))):
         # If status changes to 'delivered', decrease stock
         if update_data['status'] == 'delivered':
             for product_in_order in order_before_update['products']:
@@ -2697,12 +2727,17 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
                     {"$inc": {"stock": product_in_order['quantity']}}
                 )
 
-    await db.orders.update_one({"id": order_id}, {"$set": update_data})
+    update_data["updatedAt"] = datetime.utcnow()
+    await db.orders.update_one({"id": order_id}, {"$set": update_data, **push})
     updated_order = await db.orders.find_one({"id": order_id})
-    
+
     # Check if status has changed and send notification
     if 'status' in update_data and order_before_update.get('status') != updated_order.get('status'):
         status_fr = get_status_text_fr(updated_order["status"])
+        # SMS au client pour les étapes importantes
+        sms_text = order_status_text(updated_order["id"], normalize_status(updated_order["status"]))
+        if sms_text and push:
+            background_tasks.add_task(send_sms, updated_order.get("shippingPhone"), sms_text)
         
         # In-app notification for buyer
         new_notification = Notification(
@@ -2766,18 +2801,62 @@ async def delete_order(order_id: str):
         raise HTTPException(status_code=404, detail="Order not found")
     return
 
+@api_router.get("/orders/track")
+async def track_order(request: Request, orderId: str = Query(..., max_length=40), phone: str = Query(..., max_length=30)):
+    """Suivi d'une commande sans compte : numéro de commande + téléphone utilisé."""
+    login_limiter.check("track", request, phone)
+    order = await db.orders.find_one({"id": orderId.strip()})
+    digits = whatsapp_digits(phone)
+    same_phone = order and digits and digits[-9:] == (whatsapp_digits(order.get("shippingPhone")) or "")[-9:]
+    if not same_phone:
+        login_limiter.record_failure("track", request, phone)
+        raise HTTPException(status_code=404, detail="Aucune commande ne correspond à ce numéro et à ce téléphone.")
+    status_now = normalize_status(order.get("status"))
+    history = order.get("statusHistory") or [{"status": status_now, "at": order.get("orderedDate")}]
+    return {
+        "id": order["id"],
+        "status": status_now,
+        "statusLabel": status_label(status_now),
+        "history": [{"status": normalize_status(h["status"]), "label": status_label(h["status"]), "at": h.get("at")}
+                    for h in history],
+        "sellerName": order.get("sellerName"),
+        "products": [{"name": p.get("name"), "quantity": p.get("quantity"), "price": p.get("price")}
+                     for p in order.get("products", [])],
+        "totalAmount": order.get("totalAmount"),
+        "shippingCost": order.get("shippingCost"),
+        "city": order.get("shippingCity"),
+        "pickup": bool(order.get("pickupPointId")),
+        "orderedDate": order.get("orderedDate"),
+    }
+
+
+@api_router.get("/order-statuses")
+async def list_order_statuses():
+    """États de commande et leurs libellés (listes déroulantes du site et de l'app)."""
+    return [{"value": k, "label": v} for k, v in ORDER_STATUSES.items()]
+
+
 @api_router.post("/checkout", response_model=List[Order])
 async def process_checkout(checkout_data: CheckoutRequest, background_tasks: BackgroundTasks):
-    buyer_whatsapp = checkout_data.phone
-    buyer = await db.users.find_one({"whatsapp": buyer_whatsapp, "type": "buyer"})
+    if not whatsapp_digits(checkout_data.phone):
+        raise HTTPException(status_code=400, detail="Numéro de téléphone invalide : indiquez-le avec l'indicatif du pays, par exemple +237 6XX XX XX XX.")
+    if not checkout_data.firstName.strip():
+        raise HTTPException(status_code=400, detail="Indiquez votre nom.")
+    if not checkout_data.cartItems:
+        raise HTTPException(status_code=400, detail="Votre panier est vide.")
+    if checkout_data.deliveryOption != "pickup" and not (checkout_data.city or "").strip():
+        raise HTTPException(status_code=400, detail="Indiquez la ville de livraison.")
+    buyer_whatsapp = normalize_whatsapp(checkout_data.phone)
+    # Client déjà connu : même numéro, quel que soit son format
+    buyer = await db.users.find_one({**whatsapp_lookup(checkout_data.phone), "type": "buyer"})
 
     if not buyer:
         buyer_id = f"buyer_{str(uuid.uuid4())[:8]}"
         new_buyer_data = {
             "id": buyer_id,
             "whatsapp": buyer_whatsapp,
-            "name": f"{checkout_data.firstName} {checkout_data.lastName}",
-            "email": checkout_data.email,
+            "name": f"{checkout_data.firstName} {checkout_data.lastName or ''}".strip(),
+            "email": checkout_data.email or "",
             "type": "buyer",
             "joinDate": datetime.utcnow(),
             "status": "active",
@@ -2789,16 +2868,43 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
     
     buyer_id = buyer["id"]
     buyer_name = buyer["name"]
-    buyer_email = buyer["email"]
+    buyer_email = buyer.get("email") or checkout_data.email
 
     # Get the global shipping price as a fallback
     shipping_setting = await db.settings.find_one({"_id": "shipping_price"})
     global_shipping_price = shipping_setting['price'] if shipping_setting else 2500
 
+    # Un même produit ajouté deux fois au panier : quantités additionnées
+    quantities = {}
+    for item in checkout_data.cartItems:
+        if not isinstance(item.quantity, int) or item.quantity < 1:
+            raise HTTPException(status_code=400, detail="Chaque quantité doit être un nombre entier d'au moins 1.")
+        quantities[item.id] = quantities.get(item.id, 0) + item.quantity
+    checkout_data.cartItems = [CheckoutProduct(id=pid, quantity=q) for pid, q in quantities.items()]
+
     # Fetch all products from cart to get seller info
     product_ids = [item.id for item in checkout_data.cartItems]
     products_from_db_cursor = db.products.find({"id": {"$in": product_ids}})
     products_from_db = {p["id"]: p for p in await products_from_db_cursor.to_list(len(product_ids))}
+    for item in checkout_data.cartItems:
+        product_info = products_from_db.get(item.id)
+        if not product_info or product_info.get("status") != "approved" or not (product_info.get("price") or 0) > 0:
+            name = product_info["name"].strip() if product_info else "Un produit"
+            raise HTTPException(status_code=400, detail=f"« {name} » n'est plus en vente : retirez-le de votre panier.")
+        if item.quantity > (product_info.get("stock") or 0):
+            raise HTTPException(status_code=400, detail=f"Stock insuffisant pour « {product_info['name'].strip()} » : {product_info.get('stock') or 0} disponible(s).")
+
+    # Stock retiré tout de suite, de façon atomique : deux clients ne peuvent pas
+    # acheter le même dernier article
+    reserved = []
+    for item in checkout_data.cartItems:
+        result = await db.products.update_one({"id": item.id, "stock": {"$gte": item.quantity}},
+                                              {"$inc": {"stock": -item.quantity}})
+        if result.modified_count != 1:
+            for pid, q in reserved:
+                await db.products.update_one({"id": pid}, {"$inc": {"stock": q}})
+            raise HTTPException(status_code=409, detail=f"« {products_from_db[item.id]['name'].strip()} » vient d'être acheté par un autre client : stock insuffisant.")
+        reserved.append((item.id, item.quantity))
 
     # Group cart items by seller
     seller_orders = {} # {seller_id: {sellerName: str, products: []}}
@@ -2873,7 +2979,11 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             shippingCity=normalize_city(checkout_data.city),
             shippingRegion=checkout_data.region,
             shippingPhone=checkout_data.phone,
-            status="pending",
+            shippingNeighborhood=(checkout_data.neighborhood or "").strip() or None,
+            shippingLandmark=(checkout_data.landmark or "").strip() or None,
+            status="received",
+            statusHistory=[{"status": "received", "at": datetime.utcnow(), "by": "buyer"}],
+            stockReserved=True,
             paymentStatus="pending" if checkout_data.paymentMethod != 'cashOnDelivery' else 'unpaid',
             pickupPointId=checkout_data.selectedPickupPoint if checkout_data.deliveryOption == 'pickup' else None,
             pickupStatus="pending_pickup" if checkout_data.deliveryOption == 'pickup' else "not_applicable",
@@ -2888,13 +2998,17 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             {"$inc": {"totalOrders": 1, "totalSpent": total_amount}}
         )
 
+        # SMS de confirmation au client (en tâche de fond)
+        background_tasks.add_task(send_sms, checkout_data.phone,
+                                  order_created_text(new_order.id, total_amount, order_details["sellerName"]))
+
         # --- In-App Notifications ---
         # 1. To Buyer
         await db.notifications.insert_one(Notification(
             recipient_id=buyer_id,
             recipient_type='buyer',
             type='order_created',
-            title="Commande confirmée",
+            title="Commande reçue",
             message=f"Votre commande #{new_order.id} a été reçue.",
             link="/profile/orders"
         ).dict())

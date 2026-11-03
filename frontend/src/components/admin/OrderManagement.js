@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
 import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow } from './AdminUI';
+import { ORDER_STATUSES, nextOrderStatuses } from '../../lib/orderStatuses';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -131,7 +132,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
         }).format(price);
     };
 
-    const STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+    const STATUSES = ORDER_STATUSES.map(s => s.value);
     const isSuperAdmin = user && user.role === 'super_admin';
 
     const filteredOrders = orders.filter(order => {
@@ -242,7 +243,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                             <StatusSelect
                                                 value={order.status}
                                                 onChange={(value) => handleUpdateOrderStatus(order.id, value)}
-                                                options={STATUSES}
+                                                options={nextOrderStatuses(order.status, { isAdmin: ['admin', 'super_admin'].includes(user?.role) })}
                                                 label={`Statut de la commande ${order.id}`}
                                             />
                                         </td>

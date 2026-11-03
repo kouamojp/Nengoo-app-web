@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { orderStatusLabel } from '../../lib/orderStatuses';
 
 // Retours de l'admin : notifications et confirmations dans l'interface, à la place de alert() et confirm().
 // Les écrans appellent notify() / confirmAction() ; l'hôte rendu par AdminLayout les affiche.
@@ -30,7 +31,7 @@ const STATUS_LABELS = {
   cancelled: 'Annulée',
 };
 
-export const statusLabel = (status) => STATUS_LABELS[status] || status;
+export const statusLabel = (status) => STATUS_LABELS[status] || orderStatusLabel(status);
 
 const TOAST_DURATION = { success: 4000, error: 8000 };
 

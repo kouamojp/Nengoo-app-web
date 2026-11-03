@@ -71,6 +71,9 @@ const Footer = ({ language }) => {
         <div className="border-t border-white/10 mt-10 pt-6 flex flex-col sm:flex-row gap-2 justify-between text-sm text-purple-300">
           <p>&copy; {new Date().getFullYear()} Nengoo. {t.rightsReserved}</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <Link to="/suivi-commande" className={linkClass}>
+              {t.trackOrder}
+            </Link>
             <Link to="/privacy-policy" className={linkClass}>
               {t.privacyPolicy}
             </Link>

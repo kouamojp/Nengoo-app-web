@@ -3,14 +3,17 @@ import { whatsappUrl } from '../../lib/utils';
 import SellerHeader from './SellerHeader';
 import { Modal, StatusBadge, StatusSelect } from '../admin/AdminUI';
 import { WhatsAppIcon } from '../ui/Icons';
+import { nextOrderStatuses } from '../../lib/orderStatuses';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const STATUSES = ['pending', 'shipped', 'delivered', 'cancelled'];
 const FILTERS = [
   { value: 'all', label: 'Toutes' },
-  { value: 'pending', label: 'À confirmer' },
+  { value: 'received', label: 'À confirmer' },
+  { value: 'confirmed', label: 'Confirmées' },
+  { value: 'preparing', label: 'En préparation' },
   { value: 'shipped', label: 'Expédiées' },
+  { value: 'out_for_delivery', label: 'En livraison' },
   { value: 'delivered', label: 'Livrées' },
   { value: 'cancelled', label: 'Annulées' },
 ];
@@ -116,13 +119,17 @@ const SellerOrders = (props) => {
         headers: { 'Content-Type': 'application/json', 'X-Seller-Id': user.id },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!response.ok) throw new Error('Failed to update order status');
+      if (!response.ok) {
+        // Ex. : étape sautée — le serveur explique les étapes possibles
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'La mise à jour du statut a échoué.');
+      }
       const updatedOrder = await response.json();
       setOrders(list => list.map(o => (o.id === orderId ? updatedOrder : o)));
       setError('');
     } catch (err) {
       console.error('Error updating order status:', err);
-      setError('Le statut n\'a pas pu être modifié. Réessayez.');
+      setError(err.message);
     }
   };
 
@@ -190,7 +197,7 @@ const SellerOrders = (props) => {
                 <StatusSelect
                   value={order.status}
                   onChange={(status) => updateOrderStatus(order.id, status)}
-                  options={STATUSES}
+                  options={nextOrderStatuses(order.status)}
                   label={`Statut de la commande de ${order.buyerName}`}
                 />
                 <button type="button" onClick={() => setSelectedOrder(order)} className="adm-btn adm-btn-secondary">

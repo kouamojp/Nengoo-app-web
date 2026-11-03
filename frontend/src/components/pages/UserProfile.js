@@ -6,6 +6,7 @@ import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import NotificationList from '../ui/NotificationList';
 import { translations } from '../../lib/translations';
+import { orderStatusLabel, orderStatusTone } from '../../lib/orderStatuses';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -359,26 +360,9 @@ const UserProfile = (props) => {
       }).format(price);
     };
   
-    const getStatusColor = (status) => {
-      switch (status) {
-        case 'delivered': return 'bg-green-100 text-green-800';
-        case 'shipped': return 'bg-blue-100 text-blue-800';
-        case 'processing': return 'bg-yellow-100 text-yellow-800';
-        case 'cancelled': return 'bg-red-100 text-red-800';
-        default: return 'bg-gray-100 text-gray-800';
-      }
-    };
-  
-    const getStatusText = (status) => {
-      const statusTexts = {
-        delivered: 'Livré',
-        shipped: 'En transit',
-        processing: 'En cours',
-        cancelled: 'Annulé',
-        pending: 'En attente'
-      };
-      return statusTexts[status] || status;
-    };
+    // Statuts de commande communs au site (lib/orderStatuses)
+    const getStatusColor = (status) => orderStatusTone(status);
+    const getStatusText = (status) => orderStatusLabel(status, language);
   
     if (!user) {
       return (
