@@ -6,6 +6,7 @@ import uuid
 import bcrypt
 
 from server import db, hash_password, verify_password, normalize_whatsapp, whatsapp_lookup, Buyer, BuyerAuthResponse, BUYER_PRIVATE_FIELDS
+from account_email import account_query, ensure_email_free, normalize_email
 from auth_tokens import create_access_token
 from firebase_admin_config import verify_firebase_token, is_firebase_initialized
 
@@ -36,6 +37,7 @@ class BuyerOAuthLoginRequest(BaseModel):
 async def create_buyer(buyer_data: BuyerCreate):
     if await db.users.find_one({**whatsapp_lookup(buyer_data.whatsapp), "type": "buyer"}):
         raise HTTPException(status_code=400, detail="Un compte avec ce numéro WhatsApp existe déjà")
+    buyer_data.email = await ensure_email_free(db.users, buyer_data.email, "buyer")
     buyer_data.whatsapp = normalize_whatsapp(buyer_data.whatsapp)
 
     hashed_password = hash_password(buyer_data.password)
@@ -109,7 +111,7 @@ async def buyer_oauth_login(oauth_data: BuyerOAuthLoginRequest):
             return _authenticated(Buyer(**buyer))
 
         # Check if buyer exists by email (linking existing account)
-        buyer = await db.users.find_one({"email": email, "type": "buyer"})
+        buyer = await db.users.find_one(account_query(email, "buyer"))
 
         if buyer:
             # Link OAuth to existing account
@@ -133,7 +135,7 @@ async def buyer_oauth_login(oauth_data: BuyerOAuthLoginRequest):
             'id': f"buyer_{str(uuid.uuid4())[:8]}",
             'whatsapp': '',  # Empty for OAuth users, can be filled later
             'name': name,
-            'email': email,
+            'email': normalize_email(email),
             'password': None,  # No password for OAuth users
             'type': 'buyer',
             'status': 'active',
