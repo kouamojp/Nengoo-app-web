@@ -61,6 +61,10 @@ api_router = APIRouter(prefix="/api")
 # middlewares s'empilent à l'envers, CORS enveloppe donc ses réponses d'erreur.
 from auth_tokens import IdentityMiddleware, create_access_token, decode_access_token
 import login_limiter
+import password_reset
+from account_email import EMAIL_TAKEN, account_query, email_taken, ensure_email_free, normalize_email
+from fastapi.responses import JSONResponse
+from pymongo.errors import DuplicateKeyError
 from category_tree import normalize_name, suggest_category_name
 from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
 from product_search import normalize_query, search_products, search_products_detailed
@@ -70,6 +74,13 @@ from delivery import load_settings as load_delivery_settings, new_courier_token,
 from order_flow import RELEASES_STOCK, STATUSES as ORDER_STATUSES, check_transition, normalize_status, status_label
 from account_deletion import erase_buyer, erase_seller
 app.add_middleware(IdentityMiddleware)
+
+@app.exception_handler(DuplicateKeyError)
+async def duplicate_key_handler(_request, error):
+    # Deux inscriptions simultanées : l'index unique tranche après les contrôles
+    if "email" in (error.details or {}).get("keyPattern", {}):
+        return JSONResponse(status_code=400, content={"detail": EMAIL_TAKEN})
+    raise error
 
 
 IS_PRODUCTION = os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
@@ -848,6 +859,12 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
     user_type: str
 
+class ResetPasswordCodeRequest(BaseModel):
+    email: str
+    user_type: str
+    code: str
+    new_password: str
+
 class WhatsAppClick(BaseModel):
     id: str = Field(default_factory=lambda: f"wac_{str(uuid.uuid4())[:8]}")
     productId: str
@@ -897,21 +914,23 @@ async def forgot_password(request: ForgotPasswordRequest, background_tasks: Back
     login_limiter.record_failure("forgot-password", http_request, None)
 
     collection = db.sellers if request.user_type == 'seller' else db.users
-    query = {"email": request.email}
-    if request.user_type == 'buyer':
-        query["type"] = "buyer"
-
-    user = await collection.find_one(query)
+    user = await collection.find_one(account_query(request.email, request.user_type))
     if not user:
         # Don't reveal if user exists
         return {"message": "If an account exists with this email, a password reset link has been sent."}
 
     reset_token = str(uuid.uuid4())
     expiry = datetime.utcnow() + timedelta(hours=1)
+    # Le lien sert au site, le code à l'app mobile
+    reset_code = password_reset.new_code()
 
     await collection.update_one(
         {"_id": user["_id"]},
-        {"$set": {"reset_token": reset_token, "reset_token_expiry": expiry}}
+        {"$set": {
+            "reset_token": reset_token,
+            "reset_token_expiry": expiry,
+            **password_reset.code_fields(reset_code),
+        }}
     )
 
     # Determine frontend URL (Assuming it's running on the same domain or configured)
@@ -927,7 +946,8 @@ async def forgot_password(request: ForgotPasswordRequest, background_tasks: Back
         recipients=[user["email"]],
         template_body={
             "name": user.get("name") or user.get("businessName"),
-            "reset_link": reset_link
+            "reset_link": reset_link,
+            "reset_code": reset_code
         },
         subtype="html"
     )
@@ -954,13 +974,30 @@ async def reset_password(request: ResetPasswordRequest):
 
     await collection.update_one(
         {"_id": user["_id"]},
-        {"$set": {
-            "password": hashed_password,
-            "reset_token": None,
-            "reset_token_expiry": None
-        }}
+        {"$set": {"password": hashed_password, **password_reset.CLEARED_FIELDS}}
     )
 
+    return {"message": "Password successfully reset"}
+
+@api_router.post("/auth/reset-password-code", status_code=status.HTTP_200_OK)
+async def reset_password_with_code(request: ResetPasswordCodeRequest, http_request: Request):
+    """Nouveau mot de passe depuis l'app mobile, avec le code reçu par e-mail."""
+    if request.user_type not in ['buyer', 'seller']:
+        raise HTTPException(status_code=400, detail="Invalid user type")
+    if len(request.new_password) < password_reset.MIN_PASSWORD_LENGTH:
+        raise HTTPException(status_code=400, detail="Le mot de passe est trop court.")
+    login_limiter.check("reset-code", http_request, None)
+
+    collection = db.sellers if request.user_type == 'seller' else db.users
+    account = await password_reset.account_for_code(collection, request.email, request.user_type, request.code)
+    if not account:
+        login_limiter.record_failure("reset-code", http_request, None)
+        raise HTTPException(status_code=400, detail="Code incorrect ou expiré.")
+
+    await collection.update_one(
+        {"_id": account["_id"]},
+        {"$set": {"password": hash_password(request.new_password), **password_reset.CLEARED_FIELDS}}
+    )
     return {"message": "Password successfully reset"}
 
 # --- Messaging Endpoints ---
@@ -1259,6 +1296,7 @@ async def register_buyer(buyer_data: BuyerCreate):
     existing_buyer = await db.users.find_one({**whatsapp_lookup(buyer_data.whatsapp), "type": "buyer"})
     if existing_buyer:
         raise HTTPException(status_code=400, detail="Un compte avec ce numéro WhatsApp existe déjà")
+    buyer_data.email = await ensure_email_free(db.users, buyer_data.email, "buyer")
     buyer_data.whatsapp = normalize_whatsapp(buyer_data.whatsapp)
 
     # Hash password
@@ -1381,6 +1419,8 @@ async def update_buyer(buyer_id: str, buyer_data: BuyerUpdate):
     if "password" in update_data and update_data["password"]:
         update_data["password"] = hash_password(update_data["password"])
     
+    if update_data.get("email"):
+        update_data["email"] = await ensure_email_free(db.users, update_data["email"], "buyer", buyer_id)
     await db.users.update_one({"id": buyer_id, "type": "buyer"}, {"$set": update_data})
     updated_buyer = await db.users.find_one({"id": buyer_id, "type": "buyer"})
     if not updated_buyer:
@@ -2291,6 +2331,7 @@ async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends
     seller_data.city = normalize_city(seller_data.city)
     if await db.sellers.find_one(whatsapp_lookup(seller_data.whatsapp)):
         raise HTTPException(status_code=400, detail="Un compte vendeur existe déjà avec ce numéro WhatsApp.")
+    seller_data.email = await ensure_email_free(db.sellers, seller_data.email, "seller")
     seller_data.whatsapp = normalize_whatsapp(seller_data.whatsapp)
 
     hashed_password = hash_password(seller_data.password)
@@ -2434,7 +2475,7 @@ async def seller_oauth_login(oauth_data: SellerOAuthLoginRequest):
             return SellerAuthResponse(**seller, accessToken=create_access_token(seller["id"], "seller"))
 
         # Check if seller exists by email
-        seller = await db.sellers.find_one({"email": email})
+        seller = await db.sellers.find_one(account_query(email, "seller"))
 
         if seller:
             # Check if approved
@@ -2513,6 +2554,8 @@ async def update_seller(
     # Un vendeur ne valide pas lui-même son compte
     if role not in ["super_admin", "admin"]:
         update_data.pop("status", None)
+    if update_data.get("email"):
+        update_data["email"] = await ensure_email_free(db.sellers, update_data["email"], "seller", seller_id)
     if update_data.get("whatsapp") is not None:
         if not whatsapp_digits(update_data["whatsapp"]):
             raise HTTPException(status_code=400, detail="Numéro WhatsApp invalide : indiquez un numéro avec l'indicatif du pays, par exemple +237 6XX XX XX XX.")
@@ -3105,11 +3148,15 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
 
     if not buyer:
         buyer_id = f"buyer_{str(uuid.uuid4())[:8]}"
+        # Facultatif à la commande : une adresse déjà prise n'est pas gardée sur ce compte
+        guest_email = normalize_email(checkout_data.email)
+        if await email_taken(db.users, guest_email, "buyer"):
+            guest_email = ""
         new_buyer_data = {
             "id": buyer_id,
             "whatsapp": buyer_whatsapp,
             "name": f"{checkout_data.firstName} {checkout_data.lastName or ''}".strip(),
-            "email": checkout_data.email or "",
+            "email": guest_email,
             "type": "buyer",
             "joinDate": datetime.utcnow(),
             "status": "active",
