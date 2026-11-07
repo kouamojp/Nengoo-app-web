@@ -143,7 +143,8 @@ export const translations = {
       error: "Je n'ai pas pu répondre. Vérifie ta connexion et réessaie.",
       soldBy: "Vendu par",
       trackOrder: "Suivre ma commande",
-      notice: "Réponses générées par IA, à vérifier sur la fiche. N'indique pas de données personnelles.",
+      notice: "Tes messages sont envoyés à un fournisseur d'IA : n'y mets pas de données personnelles. Vérifie les réponses sur la fiche.",
+      privacy: "Confidentialité",
     },
     
     // Product
@@ -466,7 +467,8 @@ pendingApproval: "En attente d'approbation",
       error: "I couldn't answer. Check your connection and try again.",
       soldBy: "Sold by",
       trackOrder: "Track my order",
-      notice: "AI-generated answers: check the listing. Don't share personal data.",
+      notice: "Your messages go to an AI provider: don't include personal data. Check answers on the listing.",
+      privacy: "Privacy",
     },
     
     // Product
