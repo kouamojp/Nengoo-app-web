@@ -106,9 +106,10 @@ Le serveur n'enregistre ni le texte des messages, ni l'adresse IP : uniquement d
 compteurs (fournisseur, jetons, coût, durée), conservés 180 jours. La conversation
 vit dans l'onglet du navigateur ou l'écran de l'app.
 
-Le texte des questions part chez le fournisseur choisi. DeepSeek et Moonshot (Kimi)
-sont des sociétés chinoises : à mentionner dans la politique de confidentialité
-(éditable dans l'admin) avec les autres sous-traitants utilisés.
+Le texte des questions part chez le fournisseur choisi, et DeepSeek et Moonshot (Kimi)
+sont des sociétés chinoises. La politique à publier est dans
+`docs/POLITIQUE_CONFIDENTIALITE.md` : si la liste des fournisseurs ou ces durées
+changent, la mettre à jour.
 
 ## Suivi
 

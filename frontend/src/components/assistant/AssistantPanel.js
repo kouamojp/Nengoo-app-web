@@ -245,7 +245,10 @@ const AssistantPanel = ({ open, language, productId, prompt, onClose }) => {
             {t.send}
           </button>
         </div>
-        <p className="px-4 pb-2 text-[0.7rem] text-gray-600">{t.notice}</p>
+        <p className="px-4 pb-2 text-[0.7rem] text-gray-600">
+          {t.notice}{' '}
+          <Link to="/privacy-policy" onClick={closeOnPhone} className="underline underline-offset-2">{t.privacy}</Link>
+        </p>
       </form>
     </section>
   );
