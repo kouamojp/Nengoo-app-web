@@ -186,6 +186,33 @@ export const ChartIcon = (props) => (
   </Icon>
 );
 
+export const SparkIcon = (props) => (
+  <Icon {...props}>
+    <path d="M12 3l1.9 5.6a3 3 0 0 0 1.9 1.9L21 12l-5.2 1.5a3 3 0 0 0-1.9 1.9L12 21l-1.9-5.6a3 3 0 0 0-1.9-1.9L3 12l5.2-1.5a3 3 0 0 0 1.9-1.9z" />
+  </Icon>
+);
+
+export const CheckIcon = (props) => (
+  <Icon {...props}>
+    <path d="M5 12.5l4.500 4.500L19 7.500" />
+  </Icon>
+);
+
+export const EyeIcon = (props) => (
+  <Icon {...props}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Icon>
+);
+
+export const EyeOffIcon = (props) => (
+  <Icon {...props}>
+    <path d="M4 4l16 16" />
+    <path d="M9.9 5.8A9 9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3 3.8M6.2 7.6A16.500 16.500 0 0 0 2.500 12S6 18.500 12 18.500a9.200 9.200 0 0 0 4.500-1.200" />
+    <path d="M10 10a3 3 0 0 0 4.100 4.200" />
+  </Icon>
+);
+
 export const MenuIcon = (props) => (
   <Icon {...props}>
     <path d="M4 7h16" />

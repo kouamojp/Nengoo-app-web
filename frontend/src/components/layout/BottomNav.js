@@ -30,7 +30,7 @@ const BottomNav = ({ cartItemCount, user }) => {
   ];
 
   // Do not show on certain pages
-  const hiddenPaths = ['/login', '/seller-signup', '/buyer-signup', '/admin'];
+  const hiddenPaths = ['/login', '/signup', '/forgot-password', '/reset-password', '/pending-approval', '/admin'];
   if (hiddenPaths.some(path => location.pathname.startsWith(path))) {
     return null;
   }

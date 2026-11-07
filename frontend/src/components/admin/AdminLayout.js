@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon, SearchIcon, RouteIcon,
-  LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon,
+  LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon, SparkIcon,
 } from '../ui/Icons';
 import { AdminFeedbackHost } from './adminFeedback';
 
@@ -70,6 +70,7 @@ const navGroups = (user, counts) => [
       { id: 'categories', label: 'Catégories', Icon: TagIcon },
       { id: 'reclassify', label: 'Reclassement', Icon: FilterIcon },
       { id: 'searchMisses', label: 'Recherches sans résultat', Icon: SearchIcon },
+      { id: 'assistant', label: 'Assistant IA', Icon: SparkIcon },
       { id: 'pickupPoints', label: 'Points de retrait', Icon: PinIcon },
       ...(user.role === 'super_admin' ? [
         { id: 'homepage', label: 'Page d\'accueil', Icon: LayoutIcon },
