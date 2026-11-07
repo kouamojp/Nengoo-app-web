@@ -5,7 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import NotificationList from '../ui/NotificationList';
 import { getUnreadNotificationsCount } from '../../lib/notifications';
-import { SearchIcon, CartIcon, UserIcon, BellIcon, StoreIcon, LogoutIcon } from '../ui/Icons';
+import { SearchIcon, CartIcon, UserIcon, BellIcon, StoreIcon, LogoutIcon, SparkIcon } from '../ui/Icons';
+import { openAssistant } from '../../lib/assistant';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -130,8 +131,21 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t.search}
                 aria-label={t.search}
-                className="w-full h-11 pl-4 pr-12 text-gray-900 placeholder:text-gray-500 bg-white !rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-yellow-300"
+                className="w-full h-11 pl-4 pr-[5.25rem] text-gray-900 placeholder:text-gray-500 bg-white !rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-yellow-300"
               />
+              {/* Le texte déjà saisi devient la première question */}
+              <button
+                type="button"
+                aria-label={t.assistant.cta}
+                title={t.assistant.cta}
+                onClick={() => {
+                  setShowSuggestions(false);
+                  openAssistant(searchQuery);
+                }}
+                className="absolute right-11 top-1/2 -translate-y-1/2 !min-h-0 !min-w-0 w-9 h-9 rounded-full text-purple-800 hover:bg-purple-100 flex items-center justify-center transition-colors"
+              >
+                <SparkIcon className="w-5 h-5" />
+              </button>
               <button
                 type="submit"
                 aria-label={t.search}

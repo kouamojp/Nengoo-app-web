@@ -1,147 +1,102 @@
-
 import React, { useState } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import Swal from 'sweetalert2';
-import Header from '../layout/Header';
-import Footer from '../layout/Footer';
+import { useSearchParams } from 'react-router-dom';
+import { translations } from '../../lib/translations';
+import {
+  accountTypeFrom, apiError, AuthLink, AuthShell, Field, FormError, PasswordInput, SubmitButton,
+} from './AuthLayout';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+const MIN_PASSWORD_LENGTH = 6; // comme le serveur (password_reset.py)
 
-const ResetPassword = (props) => {
-  const { language } = props;
+const ResetPassword = ({ language }) => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  
+  const t = translations[language].resetPage;
+  const common = translations[language].loginPage;
   const token = searchParams.get('token');
   const userType = searchParams.get('type');
-
+  const type = accountTypeFrom(userType);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
 
-  if (!token || !userType) {
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-            <div className="text-center">
-                <h1 className="text-2xl font-bold text-red-600 mb-4">Lien invalide</h1>
-                <p className="mb-4">Le lien de réinitialisation est incomplet ou invalide.</p>
-                <Link to="/" className="text-blue-600 hover:underline">Retour à l'accueil</Link>
-            </div>
-        </div>
-      );
-  }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     if (password !== confirmPassword) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Erreur',
-            text: 'Les mots de passe ne correspondent pas.',
-        });
-        return;
+      setError(t.mismatch);
+      return;
     }
-
-    setLoading(true);
-
+    setSending(true);
+    setError('');
     try {
       const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token,
-          new_password: password,
-          user_type: userType
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, new_password: password, user_type: userType }),
       });
-
-      const data = await response.json();
-
       if (response.ok) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Succès',
-          text: 'Votre mot de passe a été réinitialisé avec succès.',
-          confirmButtonColor: '#3085d6',
-        }).then(() => {
-            navigate(userType === 'buyer' ? '/login/buyer' : '/login/seller');
-        });
+        setDone(true);
       } else {
-         throw new Error(data.detail || 'Une erreur est survenue');
+        setError(apiError(await response.json().catch(() => null), t.failed));
       }
-    } catch (error) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Erreur',
-        text: error.message,
-      });
+    } catch {
+      setError(common.offline);
     } finally {
-      setLoading(false);
+      setSending(false);
     }
   };
 
+  const passwordProps = {
+    autoComplete: 'new-password',
+    minLength: MIN_PASSWORD_LENGTH,
+    required: true,
+    showLabel: common.showPassword,
+    hideLabel: common.hidePassword,
+  };
+
+  if (!token || !userType) {
+    return (
+      <AuthShell title={t.invalidTitle} homeLabel={common.home} intro={t.invalidText}>
+        <p className="text-sm"><AuthLink to="/forgot-password" strong>{t.newLink}</AuthLink></p>
+      </AuthShell>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header {...props} />
-      
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-md mx-auto">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center mb-8">
-              <div className="text-5xl mb-4">🔑</div>
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                Nouveau mot de passe
-              </h1>
-              <p className="text-gray-600">
-                Créez votre nouveau mot de passe
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              
-              <div>
-                <label className="block text-sm font-medium mb-2">Nouveau mot de passe</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="********"
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">Confirmer le mot de passe</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="********"
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full text-white py-3 px-6 rounded-lg font-semibold hover:shadow-lg transition-shadow ${
-                    userType === 'buyer' ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-gradient-to-r from-purple-500 to-purple-600'
-                } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                {loading ? 'Réinitialiser...' : 'Réinitialiser le mot de passe'}
-              </button>
-            </form>
-          </div>
+    <AuthShell title={t.title} homeLabel={common.home} intro={t.intro}>
+      {done ? (
+        <div role="status" className="space-y-5">
+          <h2 className="text-2xl font-bold text-gray-900">{t.doneTitle}</h2>
+          <p className="text-base text-gray-700">{t.doneText}</p>
+          <p className="text-sm"><AuthLink to={`/login/${type}`} strong>{common.submit}</AuthLink></p>
         </div>
-      </div>
-      
-      <Footer language={language} />
-    </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-5" aria-busy={sending}>
+          <Field id="reset-password" label={t.password} hint={t.passwordHint}>
+            <PasswordInput
+              {...passwordProps}
+              id="reset-password"
+              name="new-password"
+              aria-describedby="reset-password-hint"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </Field>
+          <Field id="reset-confirm" label={t.confirm}>
+            <PasswordInput
+              {...passwordProps}
+              id="reset-confirm"
+              name="confirm-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+            />
+          </Field>
+          <FormError>{error}</FormError>
+          <SubmitButton sending={sending} sendingLabel={t.sending}>{t.submit}</SubmitButton>
+        </form>
+      )}
+    </AuthShell>
   );
 };
 

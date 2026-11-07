@@ -9,6 +9,7 @@ import OrderManagement from './OrderManagement';
 import CategoryManagement from './CategoryManagement';
 import ProductReclassification from './ProductReclassification';
 import SearchMisses from './SearchMisses';
+import AssistantStats from './AssistantStats';
 import CourierManagement from './CourierManagement';
 import ShippingSettingsManagement from './ShippingSettingsManagement';
 import HomepageManagement from './HomepageManagement';
@@ -18,7 +19,7 @@ import AdminLayout, { useAdminPendingCounts } from './AdminLayout';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SECTIONS = ['dashboard', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'couriers', 'pickupPoints', 'homepage', 'about', 'shipping'];
+const SECTIONS = ['dashboard', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'homepage', 'about', 'shipping'];
 
 const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
     style: 'currency',
@@ -218,6 +219,7 @@ const AdminDashboard = (props) => {
         </div>
         {activeSection === 'reclassify' && <ProductReclassification />}
         {activeSection === 'searchMisses' && <SearchMisses />}
+        {activeSection === 'assistant' && <AssistantStats />}
         {activeSection === 'couriers' && <CourierManagement />}
         {user.role === 'super_admin' && (
             <>

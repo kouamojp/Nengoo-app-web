@@ -15,13 +15,13 @@ import SellerShop from './components/pages/SellerShop';
 import NotificationsPage from './components/pages/NotificationsPage';
 import PrivacyPolicy from './components/pages/PrivacyPolicy';
 import BottomNav from './components/layout/BottomNav';
+import AssistantWidget from './components/assistant/AssistantWidget';
 
 // Chargés à la demande : la plupart des visiteurs n'ouvrent jamais l'espace
 // vendeur ou admin, et la connexion embarque Firebase (lourd)
 const SellerDashboard = lazy(() => import('./components/seller/SellerDashboard'));
 const Login = lazy(() => import('./components/auth/Login'));
-const BuyerSignup = lazy(() => import('./components/auth/BuyerSignup'));
-const SellerSignup = lazy(() => import('./components/auth/SellerSignup'));
+const Signup = lazy(() => import('./components/auth/Signup'));
 const PendingApproval = lazy(() => import('./components/auth/PendingApproval'));
 const ForgotPassword = lazy(() => import('./components/auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('./components/auth/ResetPassword'));
@@ -189,11 +189,8 @@ function App() {
             <Route path="/livreur/:token" element={<CourierPage />} />
 
             {/* Authentication Routes */}
-            <Route path="/login" element={<Login {...appProps} />} />
-            <Route path="/signup/buyer" element={<BuyerSignup {...appProps} />} />
-            <Route path="/signup/seller" element={<SellerSignup {...appProps} />} />
-            <Route path="/login/buyer" element={<BuyerSignup {...appProps} isLoginDefault={true} />} />
-            <Route path="/login/seller" element={<SellerSignup {...appProps} isLoginDefault={true} />} />
+            <Route path="/login/:accountType?" element={<Login {...appProps} />} />
+            <Route path="/signup/:accountType?" element={<Signup {...appProps} />} />
             <Route path="/forgot-password" element={<ForgotPassword {...appProps} />} />
             <Route path="/reset-password" element={<ResetPassword {...appProps} />} />
             <Route path="/pending-approval" element={<PendingApproval {...appProps} />} />
@@ -219,6 +216,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </Suspense>
+          <AssistantWidget language={language} />
           <BottomNav cartItemCount={cartItemCount} user={user} />
         </Router>
         {toast.show && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}

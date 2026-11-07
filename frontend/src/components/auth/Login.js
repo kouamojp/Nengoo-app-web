@@ -1,67 +1,107 @@
-
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { translations } from '../../lib/translations';
-import Header from '../layout/Header';
-import Footer from '../layout/Footer';
+import {
+  AccountTypeChoice, accountTypeFrom, apiError, AuthLink, AuthShell, Field, fieldClass, FormError,
+  PasswordInput, rememberType, SubmitButton,
+} from './AuthLayout';
 
-const Login = (props) => {
-  const { language, setUser } = props;
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+const Login = ({ language, setUser }) => {
   const navigate = useNavigate();
-  const t = translations[language];
+  const { accountType } = useParams();
+  const t = translations[language].loginPage;
+  const type = accountTypeFrom(accountType);
+  const [whatsapp, setWhatsapp] = useState('');
+  const [password, setPassword] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+
+  const chooseType = (next) => {
+    rememberType(next);
+    setError('');
+    navigate(`/login/${next}`, { replace: true });
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSending(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/${type === 'seller' ? 'sellers' : 'buyers'}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsapp, password }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(apiError(data, t.failed));
+        setSending(false);
+        return;
+      }
+      rememberType(type);
+      setUser(data);
+      navigate(type === 'seller' ? '/seller' : '/');
+    } catch {
+      setError(t.offline);
+      setSending(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header {...props} />
-      
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-md mx-auto">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center mb-8">
-              <div className="text-6xl mb-4">🛍️</div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">Bienvenue sur Nengoo</h1>
-              <p className="text-gray-600">Choisissez votre type de compte</p>
-            </div>
+    <AuthShell
+      title={t.title}
+      homeLabel={t.home}
+      intro={t[`${type}Intro`]}
+      choice={<AccountTypeChoice value={type} onChange={chooseType} legend={t.accountType} labels={t} />}
+    >
+      <form onSubmit={handleSubmit} className="space-y-5" aria-busy={sending}>
+        <Field id="login-whatsapp" label={t.whatsapp}>
+          <input
+            id="login-whatsapp"
+            type="tel"
+            name="username"
+            autoComplete="username"
+            inputMode="tel"
+            value={whatsapp}
+            onChange={(event) => setWhatsapp(event.target.value)}
+            placeholder="+237 6XX XXX XXX"
+            required
+            className={fieldClass}
+          />
+        </Field>
 
-            <div className="space-y-4">
-              <Link
-                to="/login/buyer"
-                className="w-full text-left bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-lg font-semibold block hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-center justify-center space-x-3">
-                  <span className="text-2xl">👤</span>
-                  <div>
-                    <div className="font-bold">{t.loginAsBuyer}</div>
-                    <div className="text-sm opacity-90">Accéder à votre compte acheteur</div>
-                  </div>
-                </div>
-              </Link>
+        <Field
+          id="login-password"
+          label={t.password}
+          aside={(
+            <Link to={`/forgot-password?type=${type}`} className="text-sm font-medium text-purple-800 underline underline-offset-2">
+              {t.forgot}
+            </Link>
+          )}
+        >
+          <PasswordInput
+            id="login-password"
+            name="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+            showLabel={t.showPassword}
+            hideLabel={t.hidePassword}
+          />
+        </Field>
 
-              <Link
-                to="/login/seller"
-                className="w-full text-left bg-gradient-to-r from-purple-500 to-purple-600 text-white py-4 px-6 rounded-lg font-semibold block hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-center justify-center space-x-3">
-                  <span className="text-2xl">🏪</span>
-                  <div>
-                    <div className="font-bold">{t.loginAsSeller}</div>
-                    <div className="text-sm opacity-90">Accéder à votre compte vendeur</div>
-                  </div>
-                </div>
-              </Link>
-            </div>
+        <FormError>{error}</FormError>
+        <SubmitButton sending={sending} sendingLabel={t.signingIn}>{t.submit}</SubmitButton>
 
-            <div className="text-center mt-8">
-              <Link to="/" className="text-purple-600 hover:text-purple-700 text-sm">
-                {t.backToHome}
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <Footer language={language} />
-    </div>
+        <p className="text-sm text-gray-700">
+          {t.noAccount} <AuthLink to={`/signup/${type}`} strong>{t[`${type}Signup`]}</AuthLink>
+        </p>
+        <p className="text-sm"><AuthLink to="/">{t.home}</AuthLink></p>
+      </form>
+    </AuthShell>
   );
 };
 
