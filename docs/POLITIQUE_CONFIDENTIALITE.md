@@ -64,7 +64,7 @@ Nengoo ne collecte ni n'enregistre aucun numéro de carte bancaire.
 L'assistant est facultatif : la recherche et le catalogue fonctionnent sans lui. Il répond à vos questions à l'aide d'un service d'intelligence artificielle externe (voir section 4). Quand vous lui écrivez :
 
 - **Vos messages** et les derniers échanges de la conversation, ainsi que la référence de la fiche produit ouverte, sont envoyés au fournisseur d'IA. Les numéros de téléphone et les adresses e-mail sont masqués automatiquement avant l'envoi, mais ce filtre n'est pas infaillible : n'écrivez ni votre nom, ni votre adresse, ni aucune autre information personnelle.
-- **Nengoo n'enregistre pas le texte de vos messages.** La conversation reste dans votre navigateur tant que l'onglet est ouvert, ou à l'écran tant que vous ne quittez pas l'assistant dans l'application.
+- **Nengoo n'enregistre pas le texte de vos messages.** Sur le site, la conversation reste dans votre navigateur tant que l'onglet est ouvert. Dans l'application, elle est enregistrée sur votre téléphone jusqu'à ce que vous touchiez « Nouvelle discussion » ou désinstalliez l'application.
 - **Nous enregistrons des statistiques sans votre identité :** type de demande, fournisseur utilisé, volume traité, coût, durée, langue et nombre de produits affichés, avec un identifiant de conversation aléatoire.
 - **Les mots-clés d'une recherche sans résultat** sont enregistrés sans votre identité, pour savoir quels produits manquent au catalogue.
 - **La réponse à une question isolée** peut être réutilisée pendant une heure pour répondre à la même question, sans lien avec votre identité.
@@ -74,7 +74,7 @@ Les réponses sont générées automatiquement et peuvent contenir des erreurs :
 
 ### Ce que l'application mobile garde sur votre téléphone
 
-L'application enregistre sur l'appareil votre jeton de connexion et votre profil, pour que vous restiez connecté, ainsi qu'une copie des images déjà affichées pour accélérer le chargement. Ces données sont effacées quand vous vous déconnectez ou désinstallez l'application.
+L'application enregistre sur l'appareil votre jeton de connexion et votre profil, pour que vous restiez connecté, ainsi qu'une copie des images déjà affichées pour accélérer le chargement. Ces données sont effacées quand vous vous déconnectez ou désinstallez l'application. La conversation avec l'assistant, elle, reste sur le téléphone après une déconnexion, jusqu'à ce que vous touchiez « Nouvelle discussion » ou désinstalliez l'application.
 
 L'application n'accède ni à votre position, ni à vos contacts, ni à votre micro. Elle n'ouvre votre galerie photo que lorsque vous, vendeur, choisissez une image à ajouter à un produit ou à votre boutique.
 

@@ -104,7 +104,8 @@ dessous reste la référence, et l'interface le rappelle.
 Les numéros de téléphone et e-mails sont masqués avant tout envoi à un fournisseur.
 Le serveur n'enregistre ni le texte des messages, ni l'adresse IP : uniquement des
 compteurs (fournisseur, jetons, coût, durée), conservés 180 jours. La conversation
-vit dans l'onglet du navigateur ou l'écran de l'app.
+vit dans l'onglet du navigateur ; dans l'app, elle est gardée sur le téléphone jusqu'à
+« Nouvelle discussion ».
 
 Le texte des questions part chez le fournisseur choisi, et DeepSeek et Moonshot (Kimi)
 sont des sociétés chinoises. La politique à publier est dans
