@@ -22,6 +22,7 @@ from assistant_tools import Catalog, paid_price  # noqa: E402
 KEYS = ["AI_PROVIDER", "AI_FALLBACK_PROVIDERS", "AI_DAILY_BUDGET_USD", "KIMI_MODEL"]
 KEYS += [f"AI_PROVIDER_{n.upper()}" for n in ai_providers.NEEDS]
 KEYS += [f"{n.upper()}_API_KEY" for n in ai_providers.PROVIDERS]
+KEYS += [f"{n.upper()}_VISION" for n in ai_providers.PROVIDERS]
 
 
 @pytest.fixture(autouse=True)
@@ -177,7 +178,8 @@ def run(scenario):
     asyncio.run(main())
 
 
-def ask(db, question="Je cherche un téléphone Android", history=None, language="fr", page_product=None, misses=None):
+def ask(db, question="Je cherche un téléphone Android", history=None, language="fr", page_product=None, misses=None,
+        image=None):
     async def categories():
         return {"c1": "Téléphones"}
 
@@ -185,8 +187,8 @@ def ask(db, question="Je cherche un téléphone Android", history=None, language
         if misses is not None:
             misses.append(query)
 
-    messages = (history or []) + [{"role": "user", "content": question}]
-    return core.answer(db, Catalog(db, categories, miss), messages, language, "conv-12345", page_product)
+    messages = (history or []) + [{"role": "user", "content": question, "hasImage": bool(image)}]
+    return core.answer(db, Catalog(db, categories, miss), messages, language, "conv-12345", page_product, image)
 
 
 def use(monkeypatch, *steps, key="DEEPSEEK_API_KEY"):
@@ -387,6 +389,103 @@ def test_history_mentions_shown_products_and_masks_numbers():
     assert "690703689" not in messages[1]["content"]
     assert "p1, p2]" in messages[2]["content"] and "ignore" not in messages[2]["content"]
     assert "tecno-spark" in messages[0]["content"] and "comparaison" in messages[0]["content"]
+
+
+# --- Recherche par photo ---
+
+def _photo(fmt="PNG", size=(2400, 1200), mode="RGBA", exif=False):
+    import base64
+    import io
+    from PIL import Image
+    picture = Image.new(mode, size, (200, 30, 30, 128) if mode == "RGBA" else (200, 30, 30))
+    buffer = io.BytesIO()
+    options = {}
+    if exif:
+        data = Image.Exif()
+        data[0x010F] = "MarqueTelephone"  # Make
+        options["exif"] = data
+    picture.save(buffer, fmt, **options)
+    return f"data:image/{fmt.lower()};base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
+def test_photo_is_reencoded_small_and_without_metadata():
+    import base64
+    import io
+    from PIL import Image
+    prepared = core.prepare_image(_photo())
+    assert prepared.startswith("data:image/jpeg;base64,")
+    picture = Image.open(io.BytesIO(base64.b64decode(prepared.split(",", 1)[1])))
+    assert picture.format == "JPEG" and max(picture.size) == core.IMAGE_MAX_SIDE and picture.size == (1024, 512)
+
+    with_exif = core.prepare_image(_photo("JPEG", (800, 600), "RGB", exif=True))
+    assert b"MarqueTelephone" not in base64.b64decode(with_exif.split(",", 1)[1])
+
+
+@pytest.mark.parametrize("bad", [
+    "", "bonjour", "data:text/html;base64,PGI+", "data:image/png;base64,pas du base64 !",
+    "data:image/png;base64," + __import__("base64").b64encode(b"<svg></svg>").decode(),
+])
+def test_unreadable_photo_is_refused(bad):
+    with pytest.raises(ValueError):
+        core.prepare_image(bad)
+
+
+def test_photo_goes_only_to_models_that_read_images(monkeypatch):
+    for key in ("DEEPSEEK_API_KEY", "KIMI_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.setenv(key, "k")
+    monkeypatch.setenv("AI_PROVIDER", "deepseek")
+    monkeypatch.setenv("AI_FALLBACK_PROVIDERS", "kimi,gemini")
+    assert names("search") == ["deepseek", "kimi", "gemini"]
+    assert names("image") == ["kimi", "gemini"]
+    monkeypatch.setenv("KIMI_VISION", "false")
+    monkeypatch.setenv("DEEPSEEK_VISION", "true")
+    assert names("image") == ["deepseek", "gemini"]
+
+
+def test_photo_is_sent_once_with_the_last_message():
+    photo = "data:image/jpeg;base64,AAAA"
+    messages = core._chat_messages([
+        {"role": "user", "content": "", "hasImage": True},
+        {"role": "assistant", "content": "Voici des sacs rouges."},
+        {"role": "user", "content": "moins cher 690703689", "hasImage": True},
+    ], "fr", "image", None, photo)
+    assert "photo" in messages[1]["content"] and isinstance(messages[1]["content"], str)
+    last = messages[3]["content"]
+    assert last[1] == {"type": "image_url", "image_url": {"url": photo}}
+    assert "690703689" not in last[0]["text"] and "photo" in messages[0]["content"]
+    # Photo seule : une demande par défaut accompagne l'image
+    alone = core._chat_messages([{"role": "user", "content": "", "hasImage": True}], "fr", "image", None, photo)
+    assert alone[1]["content"][0]["text"] == core.IMAGE_REQUEST
+
+
+@needs_mongo
+def test_photo_search_uses_a_vision_model_and_is_not_cached(monkeypatch):
+    model = use(monkeypatch, tool_call("search_products", query="téléphone android"),
+                text("Voici des téléphones similaires à celui de ta photo.\n<<produits:p1>>"),
+                key="GEMINI_API_KEY")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "k")  # ne lit pas les images : jamais appelé
+
+    async def scenario(db):
+        reply = await ask(db, "", image="data:image/jpeg;base64,AAAA")
+        assert reply.provider == "gemini" and [c["id"] for c in reply.products] == ["p1"]
+        assert model.calls[0][1][-1]["content"][1]["type"] == "image_url"
+        assert "photo" in model.calls[0][1][0]["content"]
+        assert await db.ai_cache.count_documents({}) == 0
+        usage = await db.ai_usage.find_one({})
+        assert usage["need"] == "image" and "image" not in str(usage.get("text", ""))
+    run(scenario)
+
+
+@needs_mongo
+def test_photo_without_vision_model_falls_back_to_the_text(monkeypatch):
+    model = use(monkeypatch)  # DeepSeek seulement
+
+    async def scenario(db):
+        alone = await ask(db, "", image="data:image/jpeg;base64,AAAA")
+        assert alone.mode == "catalog" and "photos" in alone.text and alone.products == [] and model.calls == []
+        with_text = await ask(db, "téléphone android", image="data:image/jpeg;base64,AAAA")
+        assert "photos" in with_text.text and "p1" in [c["id"] for c in with_text.products]
+    run(scenario)
 
 
 # --- Limites et API ---

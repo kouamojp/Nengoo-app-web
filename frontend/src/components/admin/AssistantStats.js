@@ -10,7 +10,7 @@ const PERIODS = [
     { days: 90, label: '3 mois' },
 ];
 
-const NEED_LABELS = { search: 'Recherche', advice: 'Conseil', compare: 'Comparaison', support: 'Questions pratiques' };
+const NEED_LABELS = { search: 'Recherche', advice: 'Conseil', compare: 'Comparaison', support: 'Questions pratiques', image: 'Recherche par photo' };
 
 const usd = (value) => `${(value || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} $`;
 const percent = (part, total) => (total ? `${Math.round((part / total) * 100)} %` : '0 %');

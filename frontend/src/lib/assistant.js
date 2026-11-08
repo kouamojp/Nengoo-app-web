@@ -23,7 +23,7 @@ export const newConversationId = () => (
 );
 
 /** Envoie la conversation ; lève une Error dont le message est affichable, ou null. */
-export const sendToAssistant = async ({ messages, language, conversationId, productId }) => {
+export const sendToAssistant = async ({ messages, language, conversationId, productId, image }) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -32,14 +32,16 @@ export const sendToAssistant = async ({ messages, language, conversationId, prod
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        messages: messages.slice(-HISTORY_SENT).map(({ role, content, products }) => ({
+        messages: messages.slice(-HISTORY_SENT).map(({ role, content, products, image: photo }) => ({
           role,
-          content: content.slice(0, 2000),
+          content: (content || '').slice(0, 2000),
           productIds: (products || []).map(p => p.id),
+          hasImage: Boolean(photo),
         })),
         language,
         conversationId,
         productId: productId || undefined,
+        image: image || undefined,
       }),
     });
     const data = await response.json().catch(() => null);
@@ -53,3 +55,49 @@ export const sendToAssistant = async ({ messages, language, conversationId, prod
     clearTimeout(timer);
   }
 };
+
+// Photo pour la recherche par image : réduite dans le navigateur avant l'envoi
+// (réseau mobile), le serveur la vérifie et la réencode de toute façon.
+const PHOTO_MAX_SIDE = 1024;
+const THUMB_MAX_SIDE = 240;
+
+const drawScaled = (picture, maxSide, quality) => {
+  const scale = Math.min(1, maxSide / Math.max(picture.naturalWidth, picture.naturalHeight));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(picture.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(picture.naturalHeight * scale));
+  const context = canvas.getContext('2d');
+  // Fond blanc : un PNG transparent ne devient pas noir en JPEG
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(picture, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality);
+};
+
+/** { photo, thumbnail } en data URL JPEG ; rejette si le fichier n'est pas une image lisible. */
+export const preparePhoto = (file) => new Promise((resolve, reject) => {
+  if (!file || !file.type.startsWith('image/')) {
+    reject(new Error('not an image'));
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const picture = new Image();
+  picture.onload = () => {
+    try {
+      resolve({
+        photo: drawScaled(picture, PHOTO_MAX_SIDE, 0.85),
+        // Seule la miniature est gardée dans la conversation (stockage de l'onglet limité)
+        thumbnail: drawScaled(picture, THUMB_MAX_SIDE, 0.7),
+      });
+    } catch (error) {
+      reject(error);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+  picture.onerror = () => {
+    URL.revokeObjectURL(url);
+    reject(new Error('unreadable image'));
+  };
+  picture.src = url;
+});

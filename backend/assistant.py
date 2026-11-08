@@ -13,7 +13,10 @@ Sans clé, budget du jour épuisé ou fournisseurs en panne, l'assistant reste
 utile : il répond directement depuis le catalogue, sans IA.
 """
 import asyncio
+import base64
+import binascii
 import hashlib
+import io
 import logging
 import os
 import re
@@ -23,6 +26,8 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Tuple
+
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 import ai_providers
 from ai_providers import Provider, ProviderError
@@ -38,6 +43,10 @@ MAX_TOOL_CALLS_PER_ROUND = 4
 HISTORY_MESSAGES = 8
 CACHE_TTL = timedelta(hours=1)
 USAGE_RETENTION_SECONDS = 180 * 24 * 3600
+# Photo envoyée au modèle : assez grande pour lire une marque, assez légère pour un réseau mobile
+IMAGE_MAX_SIDE = 1024
+IMAGE_MAX_BYTES = 8 * 1024 * 1024
+IMAGE_MAX_PIXELS = 40_000_000
 
 SYSTEM_PROMPT = """Tu es l'Assistant Nengoo, le conseiller d'achat de la marketplace Nengoo au Cameroun.
 Tu aides le client à trouver un produit réellement en vente sur Nengoo.
@@ -67,7 +76,14 @@ NEED_HINTS = {
     "advice": "\nBesoin détecté : conseil. Déduis les caractéristiques utiles à l'usage décrit, puis cherche les produits qui y répondent en lisant leurs fiches.",
     "compare": "\nBesoin détecté : comparaison. Lis les fiches avec get_product_details et compare uniquement ce qu'elles contiennent, en donnant ton choix et sa raison.",
     "support": "\nBesoin détecté : question pratique sur la livraison, le paiement ou le suivi.",
+    "image": ("\nLe client a joint une photo à son dernier message. Repère le type de produit, la marque et le modèle "
+              "s'ils sont lisibles, la couleur et les caractéristiques visibles, puis cherche avec search_products "
+              "en mots-clés courts (essaie un terme plus général si rien ne sort). L'article de la photo n'est pas "
+              "forcément vendu sur Nengoo : présente les offres trouvées comme similaires, sans dire que c'est le même. "
+              "Ne décris pas les personnes visibles. Si la photo ne montre aucun produit, dis-le en une phrase."),
 }
+
+IMAGE_REQUEST = "Trouve sur Nengoo des produits comme celui de la photo."
 
 TEXTS = {
     "fr": {
@@ -80,6 +96,8 @@ TEXTS = {
         "delivery": "La livraison à {city} est à {fee} FCFA. Un vendeur peut appliquer son propre tarif : le montant exact s'affiche avant de confirmer la commande.",
         "budget": " pour {amount} FCFA maximum",
         "city": " à {city}",
+        "no_vision": "Je ne peux pas analyser les photos pour le moment.",
+        "describe": " Décris le produit en quelques mots (type, marque, couleur) et je le cherche pour toi.",
     },
     "en": {
         "found": "Here is what I found on Nengoo{where}. Compare prices and sellers on each listing.",
@@ -91,6 +109,8 @@ TEXTS = {
         "delivery": "Delivery to {city} costs {fee} FCFA. A seller may apply their own rate: the exact amount appears before you confirm the order.",
         "budget": " up to {amount} FCFA",
         "city": " in {city}",
+        "no_vision": "I can't analyse photos right now.",
+        "describe": " Describe the product in a few words (type, brand, colour) and I'll look for it.",
     },
 }
 
@@ -167,6 +187,37 @@ def redact(text: str) -> str:
     return _PHONE_RE.sub("[numéro masqué]", _EMAIL_RE.sub("[e-mail masqué]", text))
 
 
+def prepare_image(data_url: str) -> str:
+    """Photo du client, vérifiée puis réencodée en JPEG d'au plus IMAGE_MAX_SIDE pixels.
+    Le réencodage retire les métadonnées (position GPS, appareil) avant l'envoi au
+    fournisseur. Lève ValueError si ce n'est pas une image lisible."""
+    header, _, encoded = (data_url or "").partition(",")
+    if not re.fullmatch(r"data:image/[\w.+-]+;base64", header):
+        raise ValueError("format inattendu")
+    try:
+        raw = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError("base64 invalide") from None
+    if not raw or len(raw) > IMAGE_MAX_BYTES:
+        raise ValueError("taille invalide")
+    try:
+        with Image.open(io.BytesIO(raw)) as source:
+            if source.format not in ("JPEG", "PNG", "WEBP") or source.width * source.height > IMAGE_MAX_PIXELS:
+                raise ValueError("image refusée")
+            # Photo de téléphone : l'orientation est dans les métadonnées qu'on retire
+            picture = ImageOps.exif_transpose(source)
+            if picture.mode != "RGB":
+                rgba = picture.convert("RGBA")
+                picture = Image.new("RGB", rgba.size, "white")
+                picture.paste(rgba, mask=rgba.getchannel("A"))
+            picture.thumbnail((IMAGE_MAX_SIDE, IMAGE_MAX_SIDE))
+            output = io.BytesIO()
+            picture.save(output, "JPEG", quality=85, optimize=True)
+    except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+        raise ValueError("image illisible") from None
+    return "data:image/jpeg;base64," + base64.b64encode(output.getvalue()).decode()
+
+
 def amounts_in(text: str) -> Set[int]:
     """Nombres d'un texte : « 80 000 », « 80.000 », « 80k », « 80 mille »."""
     # Les chiffres isolés aussi : « iphone 12 80000 » ne fait pas un seul nombre
@@ -224,19 +275,31 @@ def _select_cards(text: str, catalog: Catalog) -> Tuple[str, List[dict]]:
     return text, cards[:MAX_RESULTS]
 
 
-def _chat_messages(history: List[dict], language: str, need: str, page_product: Optional[str]) -> List[dict]:
+def _chat_messages(history: List[dict], language: str, need: str, page_product: Optional[str],
+                   image: Optional[str] = None) -> List[dict]:
     label = "français" if language == "fr" else "anglais"
     system = SYSTEM_PROMPT.format(language=label, hint=NEED_HINTS[need])
     if page_product:
         system += f"\nLe client regarde la fiche du produit « {page_product} » : appelle get_product_details si sa question le concerne."
     messages = [{"role": "system", "content": system}]
-    for item in history[-HISTORY_MESSAGES:]:
+    recent = history[-HISTORY_MESSAGES:]
+    for position, item in enumerate(recent):
         content = redact(item["content"])
+        is_last = position == len(recent) - 1
+        if item.get("hasImage") and not (is_last and image):
+            # La photo n'est envoyée qu'une fois : le modèle garde ce qu'il en a dit
+            content = (content + "\n" if content else "") + "[Le client avait joint une photo à ce message]"
         if item.get("productIds"):
             # Permet de répondre à « compare les deux premiers »
             ids = ", ".join(i for i in item["productIds"] if re.fullmatch(r"[\w-]{1,120}", i))
             content += f"\n[Fiches affichées, dans l'ordre : {ids}]"
-        messages.append({"role": item["role"], "content": content})
+        if is_last and image:
+            messages.append({"role": "user", "content": [
+                {"type": "text", "text": content or IMAGE_REQUEST},
+                {"type": "image_url", "image_url": {"url": image}},
+            ]})
+        else:
+            messages.append({"role": item["role"], "content": content})
     return messages
 
 
@@ -302,6 +365,13 @@ async def _catalog_answer(catalog: Catalog, question: str, language: str, need: 
     """Réponse sans IA : le message est découpé puis cherché tel quel dans le catalogue."""
     texts = TEXTS[language]
     query, budget, city = parse_request(question)
+    if need == "image":
+        # Sans modèle qui lit les images, seul le texte qui accompagne la photo sert
+        if not query and budget is None and city is None:
+            return Reply(text=texts["no_vision"] + texts["describe"], mode="catalog")
+        reply = await _catalog_answer(catalog, question, language, "search")
+        reply.text = f"{texts['no_vision']} {reply.text}"
+        return reply
     if need == "support":
         if not city:
             return Reply(text=texts["support"], mode="catalog")
@@ -411,16 +481,18 @@ async def _best_effort(action, what: str):
 
 
 async def answer(db, catalog: Catalog, history: List[dict], language: str,
-                 conversation_id: Optional[str] = None, page_product: Optional[str] = None) -> Reply:
-    """Répond au dernier message de `history` (messages {role, content, productIds?})."""
+                 conversation_id: Optional[str] = None, page_product: Optional[str] = None,
+                 image: Optional[str] = None) -> Reply:
+    """Répond au dernier message de `history` (messages {role, content, productIds?, hasImage?}).
+    `image` : photo jointe à ce dernier message, déjà passée par prepare_image."""
     started = time.monotonic()
     await _best_effort(_ensure_indexes(db), "création des index")
     question = history[-1]["content"]
-    need = classify_need(question)
+    need = "image" if image else classify_need(question)
     action = "track_order" if _TRACK_RE.search(_plain(question)) else None
 
     # Seule une question isolée est réutilisable : la suite d'une conversation dépend du contexte
-    cacheable = len(history) == 1 and not page_product
+    cacheable = len(history) == 1 and not page_product and not image
     key = _cache_key(question, language)
     reply = await _best_effort(_from_cache(db, key), "lecture du cache") if cacheable else None
 
@@ -430,7 +502,7 @@ async def answer(db, catalog: Catalog, history: List[dict], language: str,
             logger.warning("Assistant : budget du jour atteint, réponses sans IA")
             chain = []
         deadline = started + _setting("AI_TOTAL_TIMEOUT_SECONDS", 40)
-        messages = _chat_messages(history, language, need, page_product)
+        messages = _chat_messages(history, language, need, page_product, image)
         for position, provider in enumerate(chain):
             try:
                 reply = await _run_model(provider, messages, catalog, deadline)

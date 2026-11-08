@@ -51,6 +51,7 @@ Chaque message est classé sans appel à l'IA, donc sans coût :
 | `advice` | « Un ordinateur pour faire Excel » | `AI_PROVIDER_ADVICE` |
 | `compare` | « Compare ces deux modèles » | `AI_PROVIDER_COMPARE` |
 | `support` | « Combien coûte la livraison à Douala ? » | `AI_PROVIDER_SUPPORT` |
+| `image` | une photo jointe au message | `AI_PROVIDER_IMAGE` |
 
 Ordre d'essai : fournisseur du besoin, `AI_PROVIDER`, `AI_FALLBACK_PROVIDERS`, puis
 réponse sans IA. Un fournisseur sans clé est ignoré. Sans aucune de ces variables,
@@ -71,6 +72,29 @@ Tout se surcharge sans toucher au code, avec `<NOM>_MODEL`, `<NOM>_BASE_URL`,
 `<NOM>_PRICE_INPUT` et `<NOM>_PRICE_OUTPUT` (ex. `KIMI_MODEL=kimi-k3.1-pro`). Pour
 ajouter un fournisseur compatible avec `/chat/completions`, ajouter une ligne à
 `PROVIDERS`.
+
+## Recherche par photo
+
+Le bouton appareil photo, à gauche du champ de saisie, permet de joindre une image,
+seule ou avec une précision (« moins de 20 000 FCFA à Douala »). Le modèle y repère le
+type de produit, la marque si elle est lisible et la couleur, puis cherche dans le
+catalogue comme pour un message écrit. Il présente les offres comme similaires : rien
+ne garantit que l'article exact de la photo est en vente.
+
+- Le navigateur réduit la photo à 1024 px avant l'envoi. Le serveur la vérifie (JPEG,
+  PNG ou WebP, 8 Mo au plus), puis la réencode en JPEG, ce qui retire les métadonnées
+  (position GPS, appareil). Elle n'est jamais enregistrée.
+- Seuls les fournisseurs qui lisent les images sont essayés : par défaut `openai`,
+  `gemini` et `kimi`, pas `deepseek`. Après un changement de modèle, le corriger avec
+  `<NOM>_VISION=true` ou `false`.
+- La photo n'accompagne que son message : aux tours suivants, le modèle s'appuie sur
+  ce qu'il en a dit. Les réponses à une photo ne sont pas mises en cache.
+- Sans fournisseur qui lit les images (ou budget du jour épuisé), l'assistant le dit
+  et cherche avec le texte joint, ou demande de décrire le produit.
+- L'API reçoit la photo dans le champ `image` (data URL) de `POST /api/assistant/chat` ;
+  les messages précédents portent `hasImage`. Le site et l'application l'utilisent tous
+  les deux. Dans l'app, seules les miniatures des 6 dernières photos restent sur le
+  téléphone ; la photo elle-même n'est jamais enregistrée.
 
 ## Autres réglages
 
@@ -102,12 +126,13 @@ dessous reste la référence, et l'interface le rappelle.
 ## Confidentialité
 
 Les numéros de téléphone et e-mails sont masqués avant tout envoi à un fournisseur.
-Le serveur n'enregistre ni le texte des messages, ni l'adresse IP : uniquement des
+Les photos sont réencodées sans métadonnées. Le serveur n'enregistre ni le texte des
+messages, ni les photos, ni l'adresse IP : uniquement des
 compteurs (fournisseur, jetons, coût, durée), conservés 180 jours. La conversation
 vit dans l'onglet du navigateur ; dans l'app, elle est gardée sur le téléphone jusqu'à
 « Nouvelle discussion ».
 
-Le texte des questions part chez le fournisseur choisi, et DeepSeek et Moonshot (Kimi)
+Le texte des questions, et les photos jointes, partent chez le fournisseur choisi, et DeepSeek et Moonshot (Kimi)
 sont des sociétés chinoises. La politique à publier est dans
 `docs/POLITIQUE_CONFIDENTIALITE.md` : si la liste des fournisseurs ou ces durées
 changent, la mettre à jour.

@@ -2,7 +2,7 @@
 
 Texte complet, basé sur la version en ligne du 31 octobre 2026, avec les ajouts liés
 à l'Assistant Nengoo et les corrections sur le paiement, la connexion Google, la
-livraison, les SMS et le code de réinitialisation. La politique vit en base : la publier via Admin →
+livraison, les SMS, le code de réinitialisation et la recherche par photo. La politique vit en base : la publier via Admin →
 Confidentialité (compte super admin), au déploiement de l'assistant.
 
 Titre : Politique de confidentialité
@@ -64,7 +64,8 @@ Nengoo ne collecte ni n'enregistre aucun numéro de carte bancaire.
 L'assistant est facultatif : la recherche et le catalogue fonctionnent sans lui. Il répond à vos questions à l'aide d'un service d'intelligence artificielle externe (voir section 4). Quand vous lui écrivez :
 
 - **Vos messages** et les derniers échanges de la conversation, ainsi que la référence de la fiche produit ouverte, sont envoyés au fournisseur d'IA. Les numéros de téléphone et les adresses e-mail sont masqués automatiquement avant l'envoi, mais ce filtre n'est pas infaillible : n'écrivez ni votre nom, ni votre adresse, ni aucune autre information personnelle.
-- **Nengoo n'enregistre pas le texte de vos messages.** Sur le site, la conversation reste dans votre navigateur tant que l'onglet est ouvert. Dans l'application, elle est enregistrée sur votre téléphone jusqu'à ce que vous touchiez « Nouvelle discussion » ou désinstalliez l'application.
+- **Les photos** que vous joignez pour chercher un produit sont envoyées au fournisseur d'IA avec votre message, après suppression de leurs métadonnées (position, modèle de l'appareil). Évitez les photos où apparaissent des personnes, des documents ou votre domicile.
+- **Nengoo n'enregistre ni le texte de vos messages, ni vos photos.** Sur le site, la conversation reste dans votre navigateur tant que l'onglet est ouvert. Dans l'application, elle est enregistrée sur votre téléphone jusqu'à ce que vous touchiez « Nouvelle discussion » ou désinstalliez l'application.
 - **Nous enregistrons des statistiques sans votre identité :** type de demande, fournisseur utilisé, volume traité, coût, durée, langue et nombre de produits affichés, avec un identifiant de conversation aléatoire.
 - **Les mots-clés d'une recherche sans résultat** sont enregistrés sans votre identité, pour savoir quels produits manquent au catalogue.
 - **La réponse à une question isolée** peut être réutilisée pendant une heure pour répondre à la même question, sans lien avec votre identité.
@@ -119,7 +120,7 @@ Certains de ces prestataires stockent les données hors du Cameroun. Pour l'héb
 - **Commandes :** conservées 10 ans, durée imposée pour les pièces comptables par le droit OHADA. Après suppression du compte, le nom, le numéro et l'adresse de l'acheteur en sont retirés.
 - **Lien de réinitialisation du mot de passe :** valable une heure seulement. Le code envoyé avec ce lien, utilisé dans l'application, est valable 15 minutes.
 - **Journaux du serveur :** au maximum 12 mois.
-- **Assistant :** le texte de vos messages n'est pas conservé par Nengoo. Une réponse réutilisable est gardée une heure et les statistiques sans identité 180 jours. La durée de conservation chez le fournisseur d'IA dépend de ses propres conditions.
+- **Assistant :** le texte de vos messages et vos photos ne sont pas conservés par Nengoo. Une réponse réutilisable est gardée une heure et les statistiques sans identité 180 jours. La durée de conservation chez le fournisseur d'IA dépend de ses propres conditions.
 
 ## 6. Sécurité
 

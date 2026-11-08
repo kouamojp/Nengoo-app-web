@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
-import { newConversationId, sendToAssistant } from '../../lib/assistant';
-import { SparkIcon } from '../ui/Icons';
+import { newConversationId, preparePhoto, sendToAssistant } from '../../lib/assistant';
+import { CameraIcon, SparkIcon } from '../ui/Icons';
 
 const STORAGE_KEY = 'nengoo-assistant';
 const MAX_LENGTH = 500;
@@ -64,7 +64,12 @@ const AssistantPanel = ({ open, language, productId, prompt, onClose }) => {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  // Photo choisie, pas encore envoyée : { photo, thumbnail }
+  const [attachment, setAttachment] = useState(null);
   const listRef = useRef(null);
+  const fileRef = useRef(null);
+  // Photo du dernier envoi, gardée pour « Réessayer » (seule la miniature est dans la conversation)
+  const lastPhotoRef = useRef(null);
   const inputRef = useRef(null);
   const closeRef = useRef(null);
   const pendingRef = useRef(false);
@@ -86,18 +91,22 @@ const AssistantPanel = ({ open, language, productId, prompt, onClose }) => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
   }, [session.messages, sending, open]);
 
-  const send = useCallback(async (text, previous) => {
+  const send = useCallback(async (text, previous, photo = null) => {
     const content = text.trim().slice(0, MAX_LENGTH);
-    if (!content || pendingRef.current) return;
+    if ((!content && !photo) || pendingRef.current) return;
     pendingRef.current = true;
-    const messages = [...previous, { role: 'user', content }];
+    lastPhotoRef.current = photo;
+    const userMessage = { role: 'user', content };
+    if (photo) userMessage.image = photo.thumbnail;
+    const messages = [...previous, userMessage];
     setSession(s => ({ ...s, messages }));
     setInput('');
+    setAttachment(null);
     setError('');
     setSending(true);
     try {
       const data = await sendToAssistant({
-        messages, language, conversationId: session.conversationId, productId,
+        messages, language, conversationId: session.conversationId, productId, image: photo?.photo,
       });
       setSession(s => ({
         ...s,
@@ -124,7 +133,21 @@ const AssistantPanel = ({ open, language, productId, prompt, onClose }) => {
 
   const restart = () => {
     setSession({ conversationId: newConversationId(), messages: [] });
+    setAttachment(null);
     setError('');
+  };
+
+  const choosePhoto = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      setAttachment(await preparePhoto(file));
+      setError('');
+      inputRef.current?.focus();
+    } catch {
+      setError(t.photoError);
+    }
   };
 
   // Plein écran sur téléphone : la fiche ouverte remplacerait la conversation
@@ -181,9 +204,16 @@ const AssistantPanel = ({ open, language, productId, prompt, onClose }) => {
 
         {session.messages.map((message, index) => (
           message.role === 'user' ? (
-            <p key={index} className="ml-auto w-fit max-w-[85%] text-sm whitespace-pre-line break-words bg-purple-800 text-white rounded-2xl rounded-tr-md px-3 py-2">
-              {message.content}
-            </p>
+            <div key={index} className="ml-auto w-fit max-w-[85%] flex flex-col items-end gap-1">
+              {message.image && (
+                <img src={message.image} alt={t.photoSent} className="max-w-[10rem] max-h-40 rounded-2xl rounded-tr-md object-cover border border-purple-200" />
+              )}
+              {message.content && (
+                <p className="text-sm whitespace-pre-line break-words bg-purple-800 text-white rounded-2xl rounded-tr-md px-3 py-2">
+                  {message.content}
+                </p>
+              )}
+            </div>
           ) : (
             <div key={index} className="space-y-2">
               <p className="w-fit max-w-[92%] text-sm whitespace-pre-line break-words text-gray-800 bg-white border border-gray-200 rounded-2xl rounded-tl-md px-3 py-2">
@@ -212,7 +242,7 @@ const AssistantPanel = ({ open, language, productId, prompt, onClose }) => {
             {canRetry && (
               <button
                 type="button"
-                onClick={() => send(lastUser.content, session.messages.slice(0, -1))}
+                onClick={() => send(lastUser.content, session.messages.slice(0, -1), lastUser.image ? lastPhotoRef.current : null)}
                 className="!min-h-0 ml-2 font-semibold underline"
               >
                 {t.retry}
@@ -224,22 +254,47 @@ const AssistantPanel = ({ open, language, productId, prompt, onClose }) => {
 
       <form
         className="safe-bottom shrink-0 border-t border-gray-200 bg-white"
-        onSubmit={(event) => { event.preventDefault(); send(input, session.messages); }}
+        onSubmit={(event) => { event.preventDefault(); send(input, session.messages, attachment); }}
       >
+        {attachment && (
+          <div className="flex items-center gap-2 px-3 pt-2">
+            <img src={attachment.thumbnail} alt={t.photoAttached} className="w-14 h-14 rounded-lg object-cover border border-gray-200" />
+            <span className="flex-1 min-w-0 text-xs text-gray-600">{t.photoHint}</span>
+            <button
+              type="button"
+              onClick={() => setAttachment(null)}
+              aria-label={t.photoRemove}
+              className="!min-h-0 !min-w-0 w-8 h-8 rounded-full text-lg leading-none text-gray-600 hover:bg-gray-100"
+            >
+              ×
+            </button>
+          </div>
+        )}
         <div className="flex items-center gap-2 p-2">
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={choosePhoto} />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={sending}
+            aria-label={t.photoAdd}
+            title={t.photoAdd}
+            className="!min-h-0 !min-w-0 w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-purple-800 bg-purple-50 hover:bg-purple-100 disabled:text-gray-400 disabled:bg-gray-100 transition-colors"
+          >
+            <CameraIcon className="w-5 h-5" />
+          </button>
           <input
             ref={inputRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             maxLength={MAX_LENGTH}
-            placeholder={t.placeholder}
+            placeholder={attachment ? t.photoPlaceholder : t.placeholder}
             aria-label={t.placeholder}
             enterKeyHint="send"
             className="flex-1 min-w-0 h-11 px-4 text-base md:text-sm text-gray-900 placeholder:text-gray-500 bg-gray-100 !rounded-full border-0 focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
           <button
             type="submit"
-            disabled={sending || !input.trim()}
+            disabled={sending || (!input.trim() && !attachment)}
             className="!min-h-0 h-11 px-4 rounded-full bg-purple-800 hover:bg-purple-900 disabled:bg-gray-300 disabled:text-gray-600 text-white text-sm font-semibold transition-colors"
           >
             {t.send}
