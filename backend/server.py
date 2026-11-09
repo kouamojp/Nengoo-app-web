@@ -62,6 +62,7 @@ api_router = APIRouter(prefix="/api")
 from auth_tokens import IdentityMiddleware, create_access_token, decode_access_token
 import login_limiter
 import password_reset
+from push import notify
 from account_email import EMAIL_TAKEN, account_query, email_taken, ensure_email_free, normalize_email
 from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
@@ -1072,7 +1073,7 @@ async def create_message(message_data: MessageCreate, background_tasks: Backgrou
         message=message_data.message[:50] + "..." if len(message_data.message) > 50 else message_data.message,
         link=notif_link
     )
-    await db.notifications.insert_one(new_notification.dict())
+    await notify(db, new_notification.dict(), background_tasks)
 
     # Send email notification to seller
     if receiver_type == 'seller':
@@ -2827,7 +2828,7 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
             message=f"Le statut de votre commande est maintenant : {status_fr}",
             link=f"/profile/orders"
         )
-        await db.notifications.insert_one(new_notification.dict())
+        await notify(db, new_notification.dict(), background_tasks)
 
         buyer = await db.users.find_one({"id": updated_order["buyerId"], "type": "buyer"})
         if buyer and buyer.get("email"):
@@ -3324,24 +3325,24 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
 
         # --- In-App Notifications ---
         # 1. To Buyer
-        await db.notifications.insert_one(Notification(
+        await notify(db, Notification(
             recipient_id=buyer_id,
             recipient_type='buyer',
             type='order_created',
             title="Commande reçue",
             message=f"Votre commande #{new_order.id} a été reçue.",
             link="/profile/orders"
-        ).dict())
+        ).dict(), background_tasks)
 
         # 2. To Seller
-        await db.notifications.insert_one(Notification(
+        await notify(db, Notification(
             recipient_id=seller_id,
             recipient_type='seller',
             type='order_created',
             title="Nouvelle commande !",
             message=f"Nouvelle commande #{new_order.id} de {total_amount} {new_order.currency}",
             link="/seller/dashboard/orders"
-        ).dict())
+        ).dict(), background_tasks)
 
         # --- Send Email Notifications ---
         # 1. To Buyer
@@ -4086,9 +4087,11 @@ async def update_about_page_settings(
 from routers.buyers import router as buyers_router
 from routers.assistant import router as assistant_router
 from routers.support import router as support_router
+from routers.push import router as push_router
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
 api_router.include_router(support_router)
+api_router.include_router(push_router)
 
 
 # --- OG / Social Preview SSR ---

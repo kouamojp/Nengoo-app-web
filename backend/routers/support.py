@@ -26,6 +26,7 @@ from fastapi_mail import MessageSchema
 from pydantic import BaseModel, Field, field_validator
 from pymongo import ReturnDocument
 
+from push import notify
 from server import SITE_URL, db, fm, support_or_higher_required
 
 logger = logging.getLogger(__name__)
@@ -231,7 +232,7 @@ async def _post(thread: dict, sender_type: str, sender_id: str, sender_name: str
         await _alert(background_tasks, thread, message)
     if from_admin:
         # Cloche du site et de l'app : le compte voit qu'on lui a écrit
-        await db.notifications.insert_one({
+        await notify(db, {
             "id": f"notif_{uuid.uuid4().hex[:8]}",
             "recipient_id": thread["userId"],
             "recipient_type": thread["userType"],
@@ -241,7 +242,7 @@ async def _post(thread: dict, sender_type: str, sender_id: str, sender_name: str
             "link": USER_LINKS[thread["userType"]],
             "read": False,
             "created_at": now,
-        })
+        }, background_tasks)
     return message
 
 
