@@ -4,8 +4,9 @@ import { translations } from '../../lib/translations';
 import { CITIES } from '../../lib/cities';
 import {
   AccountTypeChoice, accountTypeFrom, apiError, AuthLink, AuthShell, Field, fieldClass, FormError,
-  PasswordInput, rememberType, SubmitButton,
+  PasswordInput, PhoneInput, rememberType, SubmitButton,
 } from './AuthLayout';
+import { isValidPhone, PHONE_COUNTRIES, toInternational } from '../../lib/phoneCountries';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const MIN_PASSWORD_LENGTH = 6; // comme le serveur (password_reset.py)
@@ -26,6 +27,7 @@ const Signup = ({ language, setUser }) => {
   const type = accountTypeFrom(accountType);
   const seller = type === 'seller';
   const [form, setForm] = useState(EMPTY_FORM);
+  const [country, setCountry] = useState(PHONE_COUNTRIES[0]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
@@ -46,10 +48,15 @@ const Signup = ({ language, setUser }) => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    // Le numéro devient l'identifiant du compte : il doit être complet pour le pays choisi
+    if (!isValidPhone(country, form.whatsapp)) {
+      setError(t.invalidPhone);
+      return;
+    }
     setSending(true);
     setError('');
     const { name, whatsapp, email, password, ...shop } = form;
-    const account = { name, whatsapp, email, password };
+    const account = { name, whatsapp: toInternational(country, whatsapp), email, password };
     try {
       const response = await fetch(`${API_BASE_URL}/${seller ? 'sellers' : 'buyers/signup'}`, {
         method: 'POST',
@@ -81,7 +88,14 @@ const Signup = ({ language, setUser }) => {
         <input {...bind('name')} type="text" autoComplete="name" className={fieldClass} />
       </Field>
       <Field id="signup-whatsapp" label={common.whatsapp}>
-        <input {...bind('whatsapp')} type="tel" inputMode="tel" autoComplete="tel" placeholder="+237 6XX XXX XXX" className={fieldClass} />
+        <PhoneInput
+          {...bind('whatsapp')}
+          autoComplete="tel-national"
+          country={country}
+          onCountryChange={setCountry}
+          countryLabel={common.countryCode}
+          countryNames={common.countries}
+        />
       </Field>
       <Field id="signup-email" label={t.email}>
         <input {...bind('email')} type="email" autoComplete="email" className={fieldClass} />

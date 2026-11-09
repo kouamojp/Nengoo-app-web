@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import {
-  AccountTypeChoice, accountTypeFrom, apiError, AuthLink, AuthShell, Field, fieldClass, FormError,
-  PasswordInput, rememberType, SubmitButton,
+  AccountTypeChoice, accountTypeFrom, apiError, AuthLink, AuthShell, Field, FormError,
+  PasswordInput, PhoneInput, rememberType, SubmitButton,
 } from './AuthLayout';
+import { PHONE_COUNTRIES, toInternational } from '../../lib/phoneCountries';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -14,6 +15,7 @@ const Login = ({ language, setUser }) => {
   const t = translations[language].loginPage;
   const type = accountTypeFrom(accountType);
   const [whatsapp, setWhatsapp] = useState('');
+  const [country, setCountry] = useState(PHONE_COUNTRIES[0]);
   const [password, setPassword] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -32,7 +34,7 @@ const Login = ({ language, setUser }) => {
       const response = await fetch(`${API_BASE_URL}/${type === 'seller' ? 'sellers' : 'buyers'}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ whatsapp, password }),
+        body: JSON.stringify({ whatsapp: toInternational(country, whatsapp), password }),
       });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
@@ -58,17 +60,17 @@ const Login = ({ language, setUser }) => {
     >
       <form onSubmit={handleSubmit} className="space-y-5" aria-busy={sending}>
         <Field id="login-whatsapp" label={t.whatsapp}>
-          <input
+          <PhoneInput
             id="login-whatsapp"
-            type="tel"
             name="username"
             autoComplete="username"
-            inputMode="tel"
             value={whatsapp}
             onChange={(event) => setWhatsapp(event.target.value)}
-            placeholder="+237 6XX XXX XXX"
             required
-            className={fieldClass}
+            country={country}
+            onCountryChange={setCountry}
+            countryLabel={t.countryCode}
+            countryNames={t.countries}
           />
         </Field>
 

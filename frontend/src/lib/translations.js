@@ -42,6 +42,8 @@ export const translations = {
       buyerIntro: "Retrouvez vos commandes, vos favoris et le suivi de vos livraisons.",
       sellerIntro: "Gérez votre boutique, vos produits et vos commandes.",
       whatsapp: "Numéro WhatsApp",
+      countryCode: "Indicatif du pays",
+      countries: { CM: "Cameroun", CA: "Canada", RU: "Russie" },
       password: "Mot de passe",
       forgot: "Mot de passe oublié ?",
       showPassword: "Afficher le mot de passe",
@@ -58,6 +60,7 @@ export const translations = {
 
     signupPage: {
       title: "Créer un compte Nengoo",
+      invalidPhone: "Numéro incomplet : vérifiez le nombre de chiffres pour le pays choisi.",
       buyerIntro: "Commandez en quelques minutes et suivez vos livraisons.",
       sellerIntro: "Notre équipe vérifie chaque demande avant d'ouvrir la boutique.",
       yourAccount: "Votre compte",
@@ -373,6 +376,8 @@ pendingApproval: "En attente d'approbation",
       buyerIntro: "Find your orders, your favourites and your delivery tracking.",
       sellerIntro: "Manage your shop, your products and your orders.",
       whatsapp: "WhatsApp number",
+      countryCode: "Country code",
+      countries: { CM: "Cameroon", CA: "Canada", RU: "Russia" },
       password: "Password",
       forgot: "Forgot your password?",
       showPassword: "Show password",
@@ -389,6 +394,7 @@ pendingApproval: "En attente d'approbation",
 
     signupPage: {
       title: "Create a Nengoo account",
+      invalidPhone: "Incomplete number: check the number of digits for the selected country.",
       buyerIntro: "Order in minutes and track your deliveries.",
       sellerIntro: "Our team reviews every request before opening the shop.",
       yourAccount: "Your account",

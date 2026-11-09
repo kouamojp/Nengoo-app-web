@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EyeIcon, EyeOffIcon } from '../ui/Icons';
+import { PHONE_COUNTRIES, phoneCountry } from '../../lib/phoneCountries';
 
 // Cadre commun des écrans de compte : colonne violette, formulaire sur blanc.
 
@@ -117,7 +118,36 @@ export const Field = ({ id, label, aside, hint, className = '', children }) => (
   </div>
 );
 
-export const PasswordInput = ({ showLabel, hideLabel, ...input }) => {
+// Numéro WhatsApp précédé du choix de l'indicatif : fermé, le select montre
+// l'indicatif seul ; ouvert, le pays en clair (comme l'app mobile).
+export const PhoneInput = ({ country, onCountryChange, countryLabel, countryNames, ...input }) => (
+  <div className="flex gap-2">
+    <div className="relative shrink-0">
+      <select
+        value={country.iso}
+        onChange={(event) => onCountryChange(phoneCountry(event.target.value))}
+        aria-label={countryLabel}
+        className={`${fieldClass} w-[6.5rem] appearance-none pl-3 pr-8 font-semibold text-transparent`}
+      >
+        {PHONE_COUNTRIES.map(c => (
+          <option key={c.iso} value={c.iso} className="text-gray-900">
+            {countryNames[c.iso]}  +{c.dialCode}
+          </option>
+        ))}
+      </select>
+      {/* Libellé visible du select fermé, posé par-dessus le texte masqué */}
+      <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-base font-semibold text-gray-900">
+        +{country.dialCode}
+      </span>
+      <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-600">
+        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+      </svg>
+    </div>
+    <input {...input} type="tel" inputMode="tel" placeholder={country.hint} className={`${fieldClass} min-w-0 flex-1`} />
+  </div>
+);
+
+export const PasswordInput =({ showLabel, hideLabel, ...input }) => {
   const [shown, setShown] = useState(false);
   return (
     <div className="relative">
