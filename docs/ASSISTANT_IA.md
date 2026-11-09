@@ -69,7 +69,12 @@ officielle n'a pas pu être consultée. Ils ne servent qu'à estimer les coûts 
 revoir dans `ai_providers.py` ou avec les variables ci-dessous.
 
 Tout se surcharge sans toucher au code, avec `<NOM>_MODEL`, `<NOM>_BASE_URL`,
-`<NOM>_PRICE_INPUT` et `<NOM>_PRICE_OUTPUT` (ex. `KIMI_MODEL=kimi-k3.1-pro`). Pour
+`<NOM>_PRICE_INPUT` et `<NOM>_PRICE_OUTPUT` (ex. `KIMI_MODEL=kimi-k3.1-pro`).
+`<NOM>_REASONING_EFFORT` fixe l'effort de réflexion (`low`, `high`, `max` chez Kimi).
+Les modèles Kimi k3 réfléchissent en `max` par défaut : un appel avec photo prend
+alors environ 14 s, contre environ 6 s en `low`, et l'assistant dépasse ses délais
+(`AI_TIMEOUT_SECONDS`, 20 s par appel, `AI_TOTAL_TIMEOUT_SECONDS`, 40 s au total) en
+répondant sans IA. Mettre `KIMI_REASONING_EFFORT=low` en production. Pour
 ajouter un fournisseur compatible avec `/chat/completions`, ajouter une ligne à
 `PROVIDERS`.
 

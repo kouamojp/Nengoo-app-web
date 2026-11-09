@@ -12,7 +12,9 @@ Variables d'environnement (voir docs/ASSISTANT_IA.md) :
 - <NOM>_API_KEY : clé du fournisseur (sans clé, il est ignoré) ;
 - <NOM>_MODEL, <NOM>_BASE_URL, <NOM>_PRICE_INPUT, <NOM>_PRICE_OUTPUT : réglages
   facultatifs ; les prix sont en dollars pour un million de jetons ;
-- <NOM>_VISION : true ou false, le modèle lit-il les photos (recherche par image).
+- <NOM>_VISION : true ou false, le modèle lit-il les photos (recherche par image) ;
+- <NOM>_REASONING_EFFORT : effort de réflexion envoyé au modèle (ex. low). Kimi k3
+  réfléchit en effort max par défaut, trop lent pour les délais de l'assistant.
 """
 import logging
 import os
@@ -83,6 +85,11 @@ def model_of(provider: Provider) -> str:
     return _env(f"{provider.name.upper()}_MODEL") or provider.model
 
 
+def reasoning_effort(provider: Provider) -> str:
+    """Effort de réflexion demandé ; vide, le modèle garde le sien."""
+    return _env(f"{provider.name.upper()}_REASONING_EFFORT").lower()
+
+
 def reads_images(provider: Provider) -> bool:
     """Le modèle accepte-t-il une photo ? <NOM>_VISION l'emporte (changement de modèle)."""
     setting = _env(f"{provider.name.upper()}_VISION").lower()
@@ -122,6 +129,9 @@ def complete(provider: Provider, messages: List[dict], tools: Optional[List[dict
              force_text: bool, max_tokens: int, timeout: float) -> Completion:
     """Un appel au modèle (bloquant : à lancer dans un thread)."""
     payload = {"model": model_of(provider), "messages": messages, provider.token_param: max_tokens}
+    effort = reasoning_effort(provider)
+    if effort:
+        payload["reasoning_effort"] = effort
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "none" if force_text else "auto"

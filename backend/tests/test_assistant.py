@@ -23,6 +23,7 @@ KEYS = ["AI_PROVIDER", "AI_FALLBACK_PROVIDERS", "AI_DAILY_BUDGET_USD", "KIMI_MOD
 KEYS += [f"AI_PROVIDER_{n.upper()}" for n in ai_providers.NEEDS]
 KEYS += [f"{n.upper()}_API_KEY" for n in ai_providers.PROVIDERS]
 KEYS += [f"{n.upper()}_VISION" for n in ai_providers.PROVIDERS]
+KEYS += [f"{n.upper()}_REASONING_EFFORT" for n in ai_providers.PROVIDERS]
 
 
 @pytest.fixture(autouse=True)
@@ -528,6 +529,36 @@ def test_provider_http_call(monkeypatch):
     assert sent["body"]["max_completion_tokens"] == 500 and "max_tokens" not in sent["body"]
     assert sent["body"]["tool_choice"] == "none" and sent["headers"]["Authorization"] == "Bearer secret"
     assert result.message == {"role": "assistant", "content": "ok"} and result.input_tokens == 12
+    assert "reasoning_effort" not in sent["body"]
+
+
+def test_reasoning_effort_is_sent_only_when_set(monkeypatch):
+    sent = []
+
+    class Response:
+        status_code = 200
+        text = ""
+
+        @staticmethod
+        def json():
+            return {"choices": [{"message": {"role": "assistant", "content": "ok"}}]}
+
+    def post(url, json, headers, timeout):
+        sent.append(json)
+        return Response
+
+    monkeypatch.setenv("KIMI_API_KEY", "k")
+    monkeypatch.setattr(ai_providers.requests, "post", post)
+    kimi = ai_providers.PROVIDERS["kimi"]
+    ai_providers.complete(kimi, [], None, force_text=False, max_tokens=1, timeout=1)
+    monkeypatch.setenv("KIMI_REASONING_EFFORT", " Low ")
+    ai_providers.complete(kimi, [], None, force_text=False, max_tokens=1, timeout=1)
+    # Réglage propre à chaque fournisseur : celui de Kimi ne touche pas OpenAI
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    ai_providers.complete(ai_providers.PROVIDERS["openai"], [], None, force_text=False, max_tokens=1, timeout=1)
+    assert "reasoning_effort" not in sent[0]
+    assert sent[1]["reasoning_effort"] == "low"
+    assert "reasoning_effort" not in sent[2]
 
 
 def test_provider_error_never_quotes_the_key(monkeypatch):
