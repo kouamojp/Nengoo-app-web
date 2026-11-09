@@ -7,6 +7,7 @@ import SellerOrders from './SellerOrders';
 import SellerAnalytics from './SellerAnalytics';
 import SellerMessages from './SellerMessages';
 import SellerProfile from './SellerProfile';
+import SellerSupport from './SellerSupport';
 import { StatusBadge } from '../admin/AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
@@ -126,6 +127,7 @@ const SECTIONS = {
   orders: SellerOrders,
   analytics: SellerAnalytics,
   messages: SellerMessages,
+  support: SellerSupport,
   profile: SellerProfile,
 };
 

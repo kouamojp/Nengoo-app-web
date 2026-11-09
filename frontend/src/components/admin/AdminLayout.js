@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon, SearchIcon, RouteIcon,
-  LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon, SparkIcon,
+  LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon, SparkIcon, ChatIcon,
 } from '../ui/Icons';
+import { useSupportUnread } from '../../lib/support';
 import { AdminFeedbackHost } from './adminFeedback';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
@@ -51,7 +52,10 @@ export const useAdminPendingCounts = (user) => {
 
 const navGroups = (user, counts) => [
   {
-    items: [{ id: 'dashboard', label: 'Vue d\'ensemble', Icon: HomeIcon }],
+    items: [
+      { id: 'dashboard', label: 'Vue d\'ensemble', Icon: HomeIcon },
+      { id: 'support', label: 'Messagerie', Icon: ChatIcon, count: counts.support, countLabel: 'non lues' },
+    ],
   },
   {
     label: 'Ventes',
@@ -89,7 +93,9 @@ const navGroups = (user, counts) => [
 const AdminLayout = ({ user, setUser, active, onSelect, title, description, actions, children }) => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const counts = useAdminPendingCounts(user);
+  const pending = useAdminPendingCounts(user);
+  const support = useSupportUnread(user, 30000);
+  const counts = { ...pending, support };
 
   // Les droits admin ne viennent que du jeton de session : une session
   // ouverte avant son introduction doit se reconnecter
@@ -152,7 +158,7 @@ const AdminLayout = ({ user, setUser, active, onSelect, title, description, acti
                       <item.Icon className="w-5 h-5 shrink-0" strokeWidth={isActive ? 2.2 : 1.8} />
                       <span className="flex-1 truncate">{item.label}</span>
                       {item.count > 0 && (
-                        <span className="price min-w-[1.5rem] h-6 px-1.5 rounded-full bg-yellow-300 text-purple-950 text-xs flex items-center justify-center" aria-label={`${item.count} en attente`}>
+                        <span className="price min-w-[1.5rem] h-6 px-1.5 rounded-full bg-yellow-300 text-purple-950 text-xs flex items-center justify-center" aria-label={`${item.count} ${item.countLabel || 'en attente'}`}>
                           {item.count}
                         </span>
                       )}
@@ -199,7 +205,7 @@ const AdminLayout = ({ user, setUser, active, onSelect, title, description, acti
           className="relative !min-h-0 !min-w-0 w-10 h-10 rounded-lg flex items-center justify-center hover:bg-white/10"
         >
           <MenuIcon />
-          {counts.sellers + counts.orders > 0 && (
+          {counts.sellers + counts.orders + counts.support > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-yellow-300" aria-hidden="true" />
           )}
         </button>

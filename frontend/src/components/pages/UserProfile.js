@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import NotificationList from '../ui/NotificationList';
 import { translations } from '../../lib/translations';
 import { orderStatusLabel, orderStatusTone } from '../../lib/orderStatuses';
+import UserSupportThread from '../support/UserSupportThread';
+import { useSupportUnread } from '../../lib/support';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -238,6 +240,13 @@ const UserProfile = (props) => {
     const { language, user, cartItems, setUser } = props;
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('profile');
+    // Onglet demandé dans l'URL (lien d'une notification : /profile?tab=support)
+    const [searchParams] = useSearchParams();
+    const requestedTab = searchParams.get('tab');
+    useEffect(() => {
+      if (requestedTab) setActiveTab(requestedTab);
+    }, [requestedTab]);
+    const supportUnread = useSupportUnread(user);
     const [editMode, setEditMode] = useState(false);
     const [profileData, setProfileData] = useState({
       name: user?.name || '',
@@ -447,6 +456,21 @@ const UserProfile = (props) => {
                   </button>
 
                   <button
+                    onClick={() => handleNavigate('support')}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                      activeTab === 'support' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    <span className="text-xl">🛟</span>
+                    <span className="font-medium flex-1 text-left">Équipe Nengoo</span>
+                    {supportUnread > 0 && (
+                      <span className="min-w-[1.5rem] h-6 px-1.5 rounded-full bg-purple-700 text-white text-xs font-bold flex items-center justify-center" aria-label={`${supportUnread} non lu${supportUnread > 1 ? 's' : ''}`}>
+                        {supportUnread}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
                     onClick={() => handleNavigate('notifications')}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
                       activeTab === 'notifications' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
@@ -566,6 +590,16 @@ const UserProfile = (props) => {
 
               <div id="messages-section" className={`${activeTab === 'messages' ? '' : 'hidden'}`}>
                 <BuyerMessages user={user} language={language} />
+              </div>
+
+              <div id="support-section" className={`${activeTab === 'support' ? '' : 'hidden'}`}>
+                <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                  <div className="p-6 border-b border-gray-100">
+                    <h2 className="text-2xl font-bold">Équipe Nengoo</h2>
+                    <p className="mt-1 text-gray-600">Une question sur une commande, une livraison ou votre compte ? Écrivez-nous, nous vous répondons ici.</p>
+                  </div>
+                  {activeTab === 'support' && <UserSupportThread user={user} className="h-[32rem]" />}
+                </div>
               </div>
 
               {/* Notifications Tab */}

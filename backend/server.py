@@ -4085,8 +4085,10 @@ async def update_about_page_settings(
 # --- Router Inclusion ---
 from routers.buyers import router as buyers_router
 from routers.assistant import router as assistant_router
+from routers.support import router as support_router
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
+api_router.include_router(support_router)
 
 
 # --- OG / Social Preview SSR ---

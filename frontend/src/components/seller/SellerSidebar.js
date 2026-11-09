@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   HomeIcon, BoxIcon, CartIcon, ChartIcon, BellIcon, StoreIcon,
-  LogoutIcon, MenuIcon, ExternalIcon,
+  LogoutIcon, MenuIcon, ExternalIcon, ChatIcon,
 } from '../ui/Icons';
+import { useSupportUnread } from '../../lib/support';
 
 // Sections de l'espace vendeur ; chacune a sa propre URL (lien direct, retour arrière)
 export const SELLER_SECTIONS = [
@@ -11,7 +12,8 @@ export const SELLER_SECTIONS = [
   { id: 'orders', label: 'Commandes', path: '/seller/orders', Icon: CartIcon },
   { id: 'products', label: 'Produits', path: '/seller/products', Icon: BoxIcon },
   { id: 'analytics', label: 'Statistiques', path: '/seller/analytics', Icon: ChartIcon },
-  { id: 'messages', label: 'Messages', path: '/seller/messages', Icon: BellIcon },
+  { id: 'messages', label: 'Messages clients', path: '/seller/messages', Icon: BellIcon },
+  { id: 'support', label: 'Équipe Nengoo', path: '/seller/support', Icon: ChatIcon },
   { id: 'profile', label: 'Boutique et livraison', path: '/seller/profile', Icon: StoreIcon },
 ];
 
@@ -34,6 +36,7 @@ const Avatar = ({ user }) => {
 const SellerSidebar = ({ user, setUser, active, pendingOrders = 0, children }) => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const supportUnread = useSupportUnread(user);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';
@@ -69,7 +72,7 @@ const SellerSidebar = ({ user, setUser, active, pendingOrders = 0, children }) =
         <ul className="space-y-0.5">
           {SELLER_SECTIONS.map(item => {
             const isActive = active === item.id;
-            const count = item.id === 'orders' ? pendingOrders : 0;
+            const count = item.id === 'orders' ? pendingOrders : item.id === 'support' ? supportUnread : 0;
             return (
               <li key={item.id}>
                 <Link
@@ -83,7 +86,7 @@ const SellerSidebar = ({ user, setUser, active, pendingOrders = 0, children }) =
                   <item.Icon className="w-5 h-5 shrink-0" strokeWidth={isActive ? 2.2 : 1.8} />
                   <span className="flex-1 truncate">{item.label}</span>
                   {count > 0 && (
-                    <span className="price min-w-[1.5rem] h-6 px-1.5 rounded-full bg-yellow-300 text-purple-950 text-xs flex items-center justify-center" aria-label={`${count} à confirmer`}>
+                    <span className="price min-w-[1.5rem] h-6 px-1.5 rounded-full bg-yellow-300 text-purple-950 text-xs flex items-center justify-center" aria-label={item.id === 'support' ? `${count} message${count > 1 ? 's' : ''} non lu${count > 1 ? 's' : ''}` : `${count} à confirmer`}>
                       {count}
                     </span>
                   )}
@@ -125,7 +128,7 @@ const SellerSidebar = ({ user, setUser, active, pendingOrders = 0, children }) =
           className="relative !min-h-0 !min-w-0 w-10 h-10 rounded-lg flex items-center justify-center hover:bg-white/10"
         >
           <MenuIcon />
-          {pendingOrders > 0 && (
+          {pendingOrders + supportUnread > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-yellow-300" aria-hidden="true" />
           )}
         </button>

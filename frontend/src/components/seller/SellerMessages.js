@@ -94,7 +94,7 @@ const SellerMessages = (props) => {
   return (
     <div>
       <SellerHeader
-        title="Messages"
+        title="Messages clients"
         description={unreadCount > 0
           ? `${unreadCount} conversation${unreadCount > 1 ? 's' : ''} non lue${unreadCount > 1 ? 's' : ''}`
           : 'Les questions de vos clients sur vos produits.'}

@@ -38,6 +38,13 @@ export const UserIcon = (props) => (
   </Icon>
 );
 
+export const ChatIcon = (props) => (
+  <Icon {...props}>
+    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v9a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z" />
+    <path d="M8 9h8M8 12h5" />
+  </Icon>
+);
+
 export const BellIcon = (props) => (
   <Icon {...props}>
     <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15z" />

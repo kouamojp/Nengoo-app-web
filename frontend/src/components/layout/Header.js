@@ -47,7 +47,12 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
 
       // Poll every minute
       const interval = setInterval(fetchUnreadCount, 60000);
-      return () => clearInterval(interval);
+      // Lire la conversation avec l'équipe marque aussi ses notifications comme lues
+      window.addEventListener('nengoo:support-read', fetchUnreadCount);
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('nengoo:support-read', fetchUnreadCount);
+      };
     }
   }, [user]);
 

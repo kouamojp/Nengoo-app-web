@@ -184,6 +184,10 @@ SMTP_USER=<...>
 SMTP_PASSWORD=<...>
 EMAIL_FROM=<...>
 EMAIL_FROM_NAME=Nengoo
+# Facultatif : qui reçoit l'e-mail « nouveau message » de la messagerie
+# (adresses séparées par des virgules). Absent : les admins actifs
+# super_admin, admin et support qui ont un e-mail.
+SUPPORT_ALERT_EMAILS=
 
 # Frontend
 FRONTEND_URL=https://www.nengoo.com

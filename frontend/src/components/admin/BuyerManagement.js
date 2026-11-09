@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
 import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field } from './AdminUI';
 
@@ -295,6 +296,7 @@ const BuyerManagement = (props) => {
                                             <>
                                                 <button onClick={() => handleEditClick(buyer)} className="adm-link !min-h-0">Modifier</button>
                                                 <button onClick={() => openPasswordModal(buyer)} className="adm-link !min-h-0 ml-4">Mot de passe</button>
+                                                <Link to={`/admin/dashboard?section=support&to=buyer:${encodeURIComponent(buyer.id)}`} className="adm-link ml-4">Écrire</Link>
                                             </>
                                         )}
                                     </td>

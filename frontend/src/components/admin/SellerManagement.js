@@ -430,6 +430,7 @@ const SellerManagement = (props) => {
                                     <Link to={`/admin/seller-products/${seller.id}`} className="adm-link">Produits</Link>
                                     {/* Suivi de toutes les commandes du vendeur */}
                                     <Link to={`/admin/dashboard?section=orders&vendeur=${encodeURIComponent(seller.id)}`} className="adm-link ml-4">Commandes</Link>
+                                    <Link to={`/admin/dashboard?section=support&to=seller:${encodeURIComponent(seller.id)}`} className="adm-link ml-4">Écrire</Link>
                                     <button onClick={() => handleEditClick(seller)} className="adm-link !min-h-0 ml-4">Modifier</button>
                                     <button onClick={() => handleDeleteSeller(seller.id)} className="adm-link-danger !min-h-0 ml-4">Supprimer</button>
                                 </td>
