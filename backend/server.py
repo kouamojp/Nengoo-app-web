@@ -1248,6 +1248,25 @@ class ShippingSettings(BaseModel):
 
 class HomepageSettings(BaseModel):
     heroImages: List[str] = Field(default=[], description="Liste des URLs des images du carrousel hero de la page d'accueil")
+    # Séparé de heroImages pour que les clients qui lisent une liste de chaînes
+    # (app Flutter) continuent de fonctionner. Même ordre, "" = image non cliquable.
+    heroLinks: List[str] = Field(default=[], description="Lien de chaque image du carrousel, dans le même ordre que heroImages")
+
+    @field_validator("heroLinks")
+    @classmethod
+    def validate_hero_links(cls, links, info):
+        cleaned = []
+        for link in links:
+            link = (link or "").strip()
+            # Chemin interne ou http(s) uniquement : bloque javascript:, data:, //hote…
+            if link and not (
+                (link.startswith("/") and not link.startswith("//"))
+                or re.match(r"^https?://", link, re.IGNORECASE)
+            ):
+                raise ValueError(f"Lien invalide : {link}. Utilisez /chemin ou https://…")
+            cleaned.append(link)
+        count = len(info.data.get("heroImages") or [])
+        return (cleaned + [""] * count)[:count]
 
 # --- API Endpoints for Settings ---
 @api_router.get("/settings/shipping", response_model=ShippingSettings)

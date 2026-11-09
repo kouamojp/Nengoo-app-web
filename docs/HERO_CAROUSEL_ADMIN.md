@@ -12,7 +12,14 @@ Le carrousel hero de la page d'accueil permet d'afficher plusieurs images qui d�
 ```python
 class HomepageSettings(BaseModel):
     heroImages: List[str] = Field(default=[], description="Liste des URLs des images du carrousel hero")
+    heroLinks: List[str] = Field(default=[], description="Lien de chaque image, même ordre que heroImages")
 ```
+
+`heroLinks[i]` est le lien ouvert au clic sur `heroImages[i]` (`""` = image non cliquable).
+Seuls les chemins internes (`/catalog`) et les URL `http(s)://` sont acceptés ; le serveur
+aligne la liste sur la longueur de `heroImages`. Les liens vers nengoo.com restent dans
+l'application (navigation React Router), les autres s'ouvrent dans un nouvel onglet.
+`heroImages` reste une liste de chaînes pour ne pas casser les clients existants (app Flutter).
 
 #### Endpoints API
 

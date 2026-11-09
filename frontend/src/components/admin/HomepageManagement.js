@@ -5,9 +5,28 @@ import { SectionHeader, Field } from './AdminUI';
 
 const API_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
+const LINK_ERROR = "Erreur : lien invalide. Indiquez une page du site (/catalog) ou une adresse complète (https://…).";
+
+// Même règle que le serveur : chemin interne ou http(s), rien d'autre
+const isValidLink = (raw) => {
+    const link = (raw || '').trim();
+    return !link || (link.startsWith('/') && !link.startsWith('//')) || /^https?:\/\/\S+$/i.test(link);
+};
+
+const swap = (list, a, b) => {
+    const copy = [...list];
+    [copy[a], copy[b]] = [copy[b], copy[a]];
+    return copy;
+};
+
 const HomepageManagement = (props) => {
     const { user } = props; // Utiliser l'utilisateur depuis les props
     const [heroImages, setHeroImages] = useState([]);
+    // Même ordre que heroImages ; "" = image non cliquable
+    const [heroLinks, setHeroLinks] = useState([]);
+    // Saisie en cours dans chaque carte, enregistrée au clic sur « Enregistrer »
+    const [linkDrafts, setLinkDrafts] = useState([]);
+    const [newLink, setNewLink] = useState('');
     const [newImage, setNewImage] = useState(null);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -20,7 +39,11 @@ const HomepageManagement = (props) => {
         const fetchHomepageSettings = async () => {
             try {
                 const response = await axios.get(`${API_URL}/settings/homepage`);
-                setHeroImages(response.data.heroImages || []);
+                const images = response.data.heroImages || [];
+                const links = images.map((_, i) => (response.data.heroLinks || [])[i] || '');
+                setHeroImages(images);
+                setHeroLinks(links);
+                setLinkDrafts(links);
             } catch (error) {
                 console.error("Erreur lors de la récupération des paramètres de la page d'accueil:", error);
                 setLoadFailed(true);
@@ -38,6 +61,10 @@ const HomepageManagement = (props) => {
     const handleUploadImage = async () => {
         if (!newImage) {
             setMessage("Veuillez sélectionner une image à téléverser.");
+            return;
+        }
+        if (!isValidLink(newLink)) {
+            setMessage(LINK_ERROR);
             return;
         }
         if (!adminRole) {
@@ -69,10 +96,10 @@ const HomepageManagement = (props) => {
             });
 
             // 3. Add the new image to the list
-            const updatedImages = [...heroImages, publicUrl];
-            await updateHeroImages(updatedImages);
+            await updateHeroImages([...heroImages, publicUrl], [...heroLinks, newLink.trim()]);
 
             setNewImage(null); // Reset file input
+            setNewLink('');
             const fileInput = document.getElementById('heroImageUpload');
             if(fileInput) fileInput.value = ''; // Clear file input visually
             setMessage("L'image a été ajoutée avec succès au carrousel !");
@@ -85,17 +112,20 @@ const HomepageManagement = (props) => {
         }
     };
 
-    const updateHeroImages = async (images) => {
+    const updateHeroImages = async (images, links) => {
         try {
             setLoading(true);
             await axios.put(`${API_URL}/settings/homepage`,
             {
                 heroImages: images,
+                heroLinks: links,
             },
             {
                 headers: { 'X-Admin-Role': adminRole }
             });
             setHeroImages(images);
+            setHeroLinks(links);
+            setLinkDrafts(links);
         } catch (error) {
             console.error("Erreur lors de la mise à jour des images:", error);
             throw error;
@@ -107,8 +137,10 @@ const HomepageManagement = (props) => {
     const handleDeleteImage = async (index) => {
         if (await confirmAction({ title: 'Retirer cette image ?', message: "Elle ne s'affichera plus dans le carrousel de la page d'accueil.", confirmLabel: 'Retirer' })) {
             try {
-                const updatedImages = heroImages.filter((_, i) => i !== index);
-                await updateHeroImages(updatedImages);
+                await updateHeroImages(
+                    heroImages.filter((_, i) => i !== index),
+                    heroLinks.filter((_, i) => i !== index)
+                );
                 setMessage('Image supprimée avec succès !');
             } catch (error) {
                 setMessage('Erreur lors de la suppression de l\'image.');
@@ -118,10 +150,8 @@ const HomepageManagement = (props) => {
 
     const handleMoveUp = async (index) => {
         if (index === 0) return;
-        const updatedImages = [...heroImages];
-        [updatedImages[index - 1], updatedImages[index]] = [updatedImages[index], updatedImages[index - 1]];
         try {
-            await updateHeroImages(updatedImages);
+            await updateHeroImages(swap(heroImages, index - 1, index), swap(heroLinks, index - 1, index));
             setMessage('Ordre des images mis à jour !');
         } catch (error) {
             setMessage('Erreur lors de la réorganisation.');
@@ -130,13 +160,25 @@ const HomepageManagement = (props) => {
 
     const handleMoveDown = async (index) => {
         if (index === heroImages.length - 1) return;
-        const updatedImages = [...heroImages];
-        [updatedImages[index], updatedImages[index + 1]] = [updatedImages[index + 1], updatedImages[index]];
         try {
-            await updateHeroImages(updatedImages);
+            await updateHeroImages(swap(heroImages, index, index + 1), swap(heroLinks, index, index + 1));
             setMessage('Ordre des images mis à jour !');
         } catch (error) {
             setMessage('Erreur lors de la réorganisation.');
+        }
+    };
+
+    const handleSaveLink = async (index) => {
+        const link = (linkDrafts[index] || '').trim();
+        if (!isValidLink(link)) {
+            setMessage(LINK_ERROR);
+            return;
+        }
+        try {
+            await updateHeroImages(heroImages, heroLinks.map((l, i) => (i === index ? link : l)));
+            setMessage(link ? `Lien de l'image ${index + 1} enregistré !` : `L'image ${index + 1} n'est plus cliquable.`);
+        } catch (error) {
+            setMessage("Erreur lors de l'enregistrement du lien.");
         }
     };
 
@@ -177,6 +219,31 @@ const HomepageManagement = (props) => {
                                         <span className="price absolute top-2 left-2 w-8 h-8 rounded-full bg-purple-950 text-white text-sm flex items-center justify-center">
                                             {index + 1}
                                         </span>
+                                    </div>
+                                    <div className="px-2 pt-2">
+                                        <label htmlFor={`hero-link-${index}`} className="block text-xs font-semibold text-gray-700 mb-1">
+                                            Lien au clic
+                                        </label>
+                                        <div className="flex gap-1">
+                                            <input
+                                                id={`hero-link-${index}`}
+                                                type="text"
+                                                inputMode="url"
+                                                placeholder="Aucun lien"
+                                                value={linkDrafts[index] || ''}
+                                                onChange={(e) => setLinkDrafts(linkDrafts.map((l, i) => (i === index ? e.target.value : l)))}
+                                                disabled={loading}
+                                                className="min-w-0 flex-1 h-9 px-2 rounded-lg border border-gray-300 text-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSaveLink(index)}
+                                                disabled={loading || (linkDrafts[index] || '').trim() === (heroLinks[index] || '')}
+                                                className="adm-btn adm-btn-secondary !px-3"
+                                            >
+                                                Enregistrer
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-1 p-2">
                                         <button
@@ -228,6 +295,22 @@ const HomepageManagement = (props) => {
                                 className="block w-full text-sm text-gray-600 file:mr-3 file:h-10 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-100 file:text-purple-800 hover:file:bg-purple-200 disabled:opacity-50"
                             />
                         </Field>
+                        <div className="mt-4">
+                            <Field
+                                label="Lien au clic (facultatif)"
+                                hint="Une page du site, par exemple /catalog, ou une adresse complète https://…"
+                            >
+                                <input
+                                    type="text"
+                                    inputMode="url"
+                                    value={newLink}
+                                    onChange={(e) => setNewLink(e.target.value)}
+                                    disabled={uploading || loadFailed}
+                                    placeholder="/catalog"
+                                    className="block w-full h-10 px-3 rounded-lg border border-gray-300 text-sm"
+                                />
+                            </Field>
+                        </div>
                         <button
                             type="button"
                             onClick={handleUploadImage}

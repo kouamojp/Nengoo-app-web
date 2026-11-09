@@ -22,6 +22,24 @@ import { listImage } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
+// Lien d'une image du carrousel : navigation SPA pour nos propres pages
+// (/chemin ou URL complète vers notre domaine), nouvel onglet sinon.
+const resolveHeroLink = (raw) => {
+  const value = (raw || '').trim();
+  if (!value) return null;
+  if (value.startsWith('/') && !value.startsWith('//')) return { internal: true, href: value };
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (url.host === window.location.host || url.host.replace(/^www\./, '') === 'nengoo.com') {
+      return { internal: true, href: url.pathname + url.search + url.hash };
+    }
+    return { internal: false, href: url.href };
+  } catch {
+    return null;
+  }
+};
+
 const Homepage = (props) => {
   const { language, addToCart } = props;
   const t = translations[language];
@@ -33,6 +51,7 @@ const Homepage = (props) => {
   const [email, setEmail] = useState('');
   const [newsletterFeedback, setNewsletterFeedback] = useState({ message: '', isError: false });
   const [heroImages, setHeroImages] = useState([]);
+  const [heroLinks, setHeroLinks] = useState([]);
 
   // Icônes des catégories
   const categoryIcons = {
@@ -96,6 +115,7 @@ const Homepage = (props) => {
         }
         const data = await response.json();
         setHeroImages(data.heroImages || []);
+        setHeroLinks(data.heroLinks || []);
       } catch (error) {
         console.error("Erreur lors de la récupération des images hero:", error);
         // Fallback to default images if the fetch fails
@@ -296,15 +316,25 @@ const Homepage = (props) => {
                   loop={heroImages.length > 1}
                   className="hero-swiper relative rounded-2xl shadow-[0_24px_60px_-20px_rgba(59,7,100,0.7)] w-full aspect-[4/3]"
                 >
-                  {heroImages.map((imageUrl, index) => (
-                    <SwiperSlide key={index}>
+                  {heroImages.map((imageUrl, index) => {
+                    const img = (
                       <img
                         src={imageUrl}
                         alt={`Nengoo, visuel ${index + 1}`}
                         className="w-full h-full object-cover"
                       />
-                    </SwiperSlide>
-                  ))}
+                    );
+                    const link = resolveHeroLink(heroLinks[index]);
+                    return (
+                      <SwiperSlide key={index}>
+                        {!link ? img : link.internal ? (
+                          <Link to={link.href} className="block w-full h-full">{img}</Link>
+                        ) : (
+                          <a href={link.href} target="_blank" rel="noopener noreferrer" className="block w-full h-full">{img}</a>
+                        )}
+                      </SwiperSlide>
+                    );
+                  })}
                 </Swiper>
               ) : (
                 <img
