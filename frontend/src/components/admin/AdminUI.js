@@ -74,6 +74,33 @@ export const StatusBadge = ({ status }) => (
   </span>
 );
 
+// Tri par date d'ajout : les plus récents d'abord (par défaut) ou les plus anciens
+const toTime = (value) => {
+  if (!value) return 0;
+  // Dates du serveur sans fuseau : UTC
+  const text = String(value);
+  const time = new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(text) || !text.includes('T') ? text : `${text}Z`).getTime();
+  return Number.isNaN(time) ? 0 : time;
+};
+
+export const sortByDate = (items, order, getDate) =>
+  [...items].sort((a, b) => {
+    const diff = toTime(getDate(a)) - toTime(getDate(b));
+    return order === 'oldest' ? diff : -diff;
+  });
+
+export const DateSortSelect = ({ value, onChange }) => (
+  <select
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    aria-label="Trier par date"
+    className="adm-input w-auto"
+  >
+    <option value="newest">Plus récents d'abord</option>
+    <option value="oldest">Plus anciens d'abord</option>
+  </select>
+);
+
 // Liste déroulante de statut, colorée selon la valeur
 export const StatusSelect = ({ value, onChange, options, label = 'Statut' }) => (
   <select

@@ -88,6 +88,8 @@ function App() {
   }, [cartItems]);
 
   const addToCart = (product, quantity = 1) => {
+    // Un service se réserve auprès du vendeur (WhatsApp), pas par le panier
+    if (product?.kind === 'service') return;
     setCartItems(prev => {
       const existingItem = prev.find(item => item.id === product.id);
       let newCart;

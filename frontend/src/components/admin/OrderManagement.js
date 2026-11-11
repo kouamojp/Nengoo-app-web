@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
-import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow } from './AdminUI';
+import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, DateSortSelect, sortByDate } from './AdminUI';
 import { ORDER_STATUSES, nextOrderStatuses, normalizeOrderStatus, orderStatusLabel } from '../../lib/orderStatuses';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
@@ -11,6 +11,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
     const [loading, setLoading] = useState(false); // For update and delete operations
     const [expandedOrderId, setExpandedOrderId] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [dateOrder, setDateOrder] = useState('newest');
     const [selectedOrders, setSelectedOrders] = useState([]);
     const [statusFilter, setStatusFilter] = useState('all');
     // Suivi par vendeur : filtre dans l'URL (?section=orders&vendeur=<id>), lien depuis la fiche vendeur
@@ -170,7 +171,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
     const STATUSES = ORDER_STATUSES.map(s => s.value);
     const isSuperAdmin = user && user.role === 'super_admin';
 
-    const filteredOrders = orders.filter(order => {
+    const filteredOrders = sortByDate(orders, dateOrder, (o) => o.createdAt || o.orderedDate).filter(order => {
         const query = searchQuery.toLowerCase();
         const productNames = order.products ? order.products.map(p => (p.name || '').toLowerCase()).join(' ') : '';
         const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
@@ -287,6 +288,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
             {view === 'orders' && (<>
             <Toolbar>
                 <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Rechercher par n°, acheteur, vendeur ou produit" />
+                <DateSortSelect value={dateOrder} onChange={setDateOrder} />
                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Filtrer par statut" className="adm-input w-auto">
                     <option value="all">Tous les statuts</option>
                     {STATUSES.map(s => (

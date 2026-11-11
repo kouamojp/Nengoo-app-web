@@ -42,7 +42,8 @@ const SearchResults = (props) => {
             name: { [language]: p.name },
             description: { [language]: p.description },
             image: listImage(p) || 'https://via.placeholder.com/300',
-            inStock: p.stock > 0,
+            inStock: p.kind === 'service' || p.stock > 0,
+            sellerWhatsApp: p.sellerWhatsapp,
             reviews: p.reviewsCount || 0,
             rating: p.rating || 0,
           }));

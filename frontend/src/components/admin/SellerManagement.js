@@ -5,7 +5,7 @@ import { RichTextEditor } from '../ui/RichText';
 import { CITIES_DATALIST_ID } from '../../lib/cities';
 import { Link } from 'react-router-dom';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
-import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field, formatXAF } from './AdminUI';
+import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field, formatXAF, DateSortSelect, sortByDate } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -15,6 +15,7 @@ const SellerManagement = (props) => {
     const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
+    const [dateOrder, setDateOrder] = useState('newest');
     const [selectedSellers, setSelectedSellers] = useState([]);
     const [statusFilter, setStatusFilter] = useState('all');
 
@@ -251,7 +252,7 @@ const SellerManagement = (props) => {
 
     const pendingCount = sellers.filter(s => s.status === 'pending').length;
 
-    const filteredSellers = sellers.filter(seller => {
+    const filteredSellers = sortByDate(sellers, dateOrder, (s) => s.createdAt).filter(seller => {
         const query = searchQuery.toLowerCase();
         const matchesStatus = statusFilter === 'all' || seller.status === statusFilter;
         return matchesStatus && (
@@ -332,6 +333,7 @@ const SellerManagement = (props) => {
 
             <Toolbar>
                 <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Rechercher par boutique, nom, contact ou ville" />
+                <DateSortSelect value={dateOrder} onChange={setDateOrder} />
                 <div className="flex gap-1 p-1 rounded-full bg-gray-100 max-w-full overflow-x-auto hide-scrollbar" role="group" aria-label="Filtrer par statut">
                     {[
                         { value: 'all', label: 'Tous' },

@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import { categoryName } from '../../lib/categories';
-import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
+import { contactSellerOnWhatsApp } from '../../lib/utils';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
@@ -68,7 +68,7 @@ const adaptProduct = (p, language) => ({
   description: { [language]: p.description },
   image: listImage(p) || process.env.PUBLIC_URL + '/images/logo-nengoo.png',
   images: p.images || [],
-  inStock: p.stock > 0,
+  inStock: p.kind === 'service' || p.stock > 0,
   reviews: p.reviewsCount || 0,
   rating: p.rating || 0,
 });
@@ -232,28 +232,14 @@ const ProductDetail = (props) => {
     }
   };
 
-  const handleWhatsAppClick = async () => {
-    // Record the click without blocking WhatsApp if the API fails or is slow
-    try {
-        fetch(`${API_BASE_URL}/analytics/whatsapp-click`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                productId: product.id,
-                productName: product.name[language],
-                sellerId: seller.id,
-                sellerName: seller.businessName
-            }),
-        }).catch(err => console.error("Error recording WhatsApp click:", err));
-    } catch (error) {
-        console.error("Error recording WhatsApp click:", error);
-    }
-
-    // Open WhatsApp
-    openWhatsApp(seller.whatsapp, generateProductWhatsAppMessage(product, language));
-  };
+  const handleWhatsAppClick = () =>
+    contactSellerOnWhatsApp({
+      product,
+      whatsapp: seller.whatsapp,
+      sellerId: seller.id,
+      sellerName: seller.businessName,
+      language,
+    });
 
   const handleSubmitReview = async (e) => {
     e.preventDefault();
@@ -329,6 +315,7 @@ const ProductDetail = (props) => {
   const images = product.images.length > 0 ? product.images : [process.env.PUBLIC_URL + '/images/logo-nengoo.png'];
   const lightboxSlides = images.map(img => ({ src: img }));
 
+  const isService = product.kind === 'service';
   const hasPromo = product.promoPrice && product.promoPrice > 0;
   const discountPercentage = hasPromo && product.price > product.promoPrice
     ? Math.round(((product.price - product.promoPrice) / product.price) * 100)
@@ -540,10 +527,16 @@ const ProductDetail = (props) => {
                 )}
               </div>
 
-              <p className={`mt-3 inline-flex items-center gap-2 text-sm font-semibold ${product.inStock ? 'text-green-700' : 'text-gray-500'}`}>
-                <span className={`w-2 h-2 rounded-full ${product.inStock ? 'bg-green-600' : 'bg-gray-400'}`} aria-hidden="true" />
-                {product.inStock ? t.inStock : t.outOfStock}
-              </p>
+              {isService ? (
+                <p className="mt-3 inline-flex items-center px-2.5 py-1 rounded-md bg-purple-100 text-purple-900 text-sm font-semibold">
+                  {t.serviceBadge}
+                </p>
+              ) : (
+                <p className={`mt-3 inline-flex items-center gap-2 text-sm font-semibold ${product.inStock ? 'text-green-700' : 'text-gray-500'}`}>
+                  <span className={`w-2 h-2 rounded-full ${product.inStock ? 'bg-green-600' : 'bg-gray-400'}`} aria-hidden="true" />
+                  {product.inStock ? t.inStock : t.outOfStock}
+                </p>
+              )}
 
               {product.colors && product.colors.length > 0 && (
                 <div className="mt-4">
@@ -583,46 +576,77 @@ const ProductDetail = (props) => {
                 </div>
               )}
 
-              {/* Quantité et panier */}
-              <div className="mt-6 flex flex-wrap gap-3">
-                <div className="inline-flex items-center h-12 rounded-xl border border-gray-300 bg-white" role="group" aria-label={t.quantity}>
+              {isService ? (
+                <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
+                  <p className="text-sm text-green-950">{t.serviceHint}</p>
+                  <div className="mt-3 grid sm:grid-cols-2 gap-2">
+                    {seller?.whatsapp && (
+                      <button
+                        type="button"
+                        onClick={handleWhatsAppClick}
+                        className="inline-flex items-center justify-center gap-2 h-12 px-4 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold transition-colors"
+                      >
+                        <WhatsAppIcon className="w-5 h-5" />
+                        {t.contactWhatsApp}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowSendMessageModal(true)}
+                      disabled={!seller}
+                      className={`${secondaryButton} h-12 ${seller && !seller.whatsapp ? 'sm:col-span-2' : ''}`}
+                    >
+                      {t.sendMessage}
+                    </button>
+                  </div>
+                  {seller && !seller.whatsapp && (
+                    <p className="mt-2 text-sm text-gray-700">{t.serviceNoWhatsApp}</p>
+                  )}
+                </div>
+              ) : (
+                <>
+                {/* Quantité et panier */}
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <div className="inline-flex items-center h-12 rounded-xl border border-gray-300 bg-white" role="group" aria-label={t.quantity}>
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      aria-label="-1"
+                      className="!min-h-0 w-11 h-full text-xl text-gray-700 hover:text-purple-700"
+                    >
+                      −
+                    </button>
+                    <span className="price w-10 text-center text-lg" aria-live="polite">{quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(quantity + 1)}
+                      aria-label="+1"
+                      className="!min-h-0 w-11 h-full text-xl text-gray-700 hover:text-purple-700"
+                    >
+                      +
+                    </button>
+                  </div>
                   <button
-                    type="button"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    aria-label="-1"
-                    className="!min-h-0 w-11 h-full text-xl text-gray-700 hover:text-purple-700"
+                    onClick={() => addToCart(product, quantity)}
+                    disabled={!product.inStock}
+                    className="flex-1 min-w-[12rem] h-12 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:bg-gray-300 disabled:text-gray-600 text-white font-bold inline-flex items-center justify-center gap-2 transition-colors"
                   >
-                    −
-                  </button>
-                  <span className="price w-10 text-center text-lg" aria-live="polite">{quantity}</span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(quantity + 1)}
-                    aria-label="+1"
-                    className="!min-h-0 w-11 h-full text-xl text-gray-700 hover:text-purple-700"
-                  >
-                    +
+                    <CartIcon className="w-5 h-5" strokeWidth={2.2} />
+                    {t.addToCart}
                   </button>
                 </div>
                 <button
-                  onClick={() => addToCart(product, quantity)}
+                  onClick={() => {
+                    addToCart(product, quantity);
+                    navigate('/checkout');
+                  }}
                   disabled={!product.inStock}
-                  className="flex-1 min-w-[12rem] h-12 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:bg-gray-300 disabled:text-gray-600 text-white font-bold inline-flex items-center justify-center gap-2 transition-colors"
+                  className="mt-3 w-full h-12 rounded-xl border-2 border-purple-700 text-purple-800 hover:bg-purple-50 disabled:border-gray-300 disabled:text-gray-500 disabled:bg-transparent font-bold transition-colors"
                 >
-                  <CartIcon className="w-5 h-5" strokeWidth={2.2} />
-                  {t.addToCart}
+                  {t.buyNow}
                 </button>
-              </div>
-              <button
-                onClick={() => {
-                  addToCart(product, quantity);
-                  navigate('/checkout');
-                }}
-                disabled={!product.inStock}
-                className="mt-3 w-full h-12 rounded-xl border-2 border-purple-700 text-purple-800 hover:bg-purple-50 disabled:border-gray-300 disabled:text-gray-500 disabled:bg-transparent font-bold transition-colors"
-              >
-                {t.buyNow}
-              </button>
+                </>
+              )}
 
               {/* Vendeur */}
               {seller && (
@@ -667,7 +691,7 @@ const ProductDetail = (props) => {
                       {t.visitShop}
                     </Link>
                   </div>
-                  <div className="mt-4 grid sm:grid-cols-2 gap-2">
+                  {!isService && <div className="mt-4 grid sm:grid-cols-2 gap-2">
                     {seller.whatsapp && (
                       <button
                         onClick={handleWhatsAppClick}
@@ -680,7 +704,7 @@ const ProductDetail = (props) => {
                     <button onClick={() => setShowSendMessageModal(true)} className={secondaryButton}>
                       {t.sendMessage}
                     </button>
-                  </div>
+                  </div>}
                 </section>
               )}
 

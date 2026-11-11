@@ -349,6 +349,9 @@ def _normalize_colors(colors: Optional[List[str]]) -> List[str]:
 
 # État d'un produit : neuf, occasion, reconditionné
 ProductCondition = Literal["new", "used", "refurbished"]
+# Produit vendu en ligne (panier, stock) ou service (prestation : le client
+# contacte le vendeur sur WhatsApp ; ni panier, ni stock, ni état)
+ProductKind = Literal["product", "service"]
 
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: f"prod_{str(uuid.uuid4())[:8]}")
@@ -378,6 +381,9 @@ class Product(BaseModel):
     colors: List[str] = []
     brand: Optional[str] = None
     condition: Optional[ProductCondition] = None
+    kind: ProductKind = "product"
+    # Services : numéro WhatsApp du vendeur, ajouté aux réponses (non stocké)
+    sellerWhatsapp: Optional[str] = None
     # Caractéristiques libres : {"Taille": "M", "Matière": "Coton"}
     specs: Dict[str, str] = {}
     # Versions WebP réduites, alignées sur images ('' = pas encore créée) :
@@ -403,6 +409,7 @@ class ProductCreate(BaseModel):
     brand: Optional[str] = None
     condition: Optional[ProductCondition] = None
     specs: Optional[Dict[str, str]] = {}
+    kind: ProductKind = "product"
 
     @field_validator("colors")
     @classmethod
@@ -424,6 +431,7 @@ class ProductUpdate(BaseModel):
     brand: Optional[str] = None
     condition: Optional[ProductCondition] = None
     specs: Optional[Dict[str, str]] = None
+    kind: Optional[ProductKind] = None
 
     @field_validator("colors")
     @classmethod
@@ -1487,6 +1495,26 @@ PRODUCT_SORTS = {
 }
 
 
+def service_fields(data: dict) -> dict:
+    """Un service n'a ni stock, ni état, ni couleurs : on les vide."""
+    if data.get("kind") == "service":
+        data.update({"stock": 0, "condition": None, "colors": []})
+    return data
+
+
+async def with_service_contacts(products: List[dict]) -> List[dict]:
+    """Ajoute le WhatsApp du vendeur aux services (bouton « Contacter »)."""
+    seller_ids = {p.get("sellerId") for p in products if p.get("kind") == "service"}
+    if not seller_ids:
+        return products
+    sellers = await db.sellers.find({"id": {"$in": list(seller_ids)}}, {"_id": 0, "id": 1, "whatsapp": 1}).to_list(None)
+    numbers = {s["id"]: s.get("whatsapp") for s in sellers}
+    for p in products:
+        if p.get("kind") == "service":
+            p["sellerWhatsapp"] = numbers.get(p.get("sellerId"))
+    return products
+
+
 @api_router.get("/products", response_model=List[Product])
 async def get_products(
     response: Response,
@@ -1537,7 +1565,7 @@ async def get_products(
     response.headers["X-Total-Count"] = str(len(products))
     if limit is not None:
         products = products[skip:skip + limit]
-    return [Product(**p) for p in products]
+    return [Product(**p) for p in await with_service_contacts(products)]
 
 
 @api_router.get("/search/suggest")
@@ -1879,7 +1907,7 @@ async def get_product(product_identifier: str):
         
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return Product(**product)
+    return Product(**(await with_service_contacts([product]))[0])
 
 @api_router.post("/products", response_model=Product, dependencies=[Depends(seller_or_moderator_or_higher_required)])
 async def create_product(product_data: ProductCreate, background_tasks: BackgroundTasks,
@@ -1928,12 +1956,12 @@ async def create_product(product_data: ProductCreate, background_tasks: Backgrou
     if issues:
         raise HTTPException(status_code=400, detail=" ".join(issues))
 
-    product_dict = product_data.dict()
+    product_dict = service_fields(product_data.dict())
     product_dict["slug"] = await get_unique_slug(product_data.name)
     product = Product(**product_dict)
     product.sellerId = seller_id_to_use
     product.sellerName = seller_name_to_use
-    await db.products.insert_one(product.dict())
+    await db.products.insert_one(product.dict(exclude={"sellerWhatsapp"}))
     # Versions réduites des photos, après la réponse
     background_tasks.add_task(refresh_product_variants, db, product.id)
     return product
@@ -1944,6 +1972,9 @@ async def update_product(product_id: str, product_data: ProductUpdate, backgroun
     update_data = product_data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
+    if update_data.get("kind") is None:
+        update_data.pop("kind", None)
+    service_fields(update_data)
 
     # Un vendeur peut seulement mettre en vente ou archiver un produit déjà
     # validé ; la modération (pending, rejected…) reste réservée aux admins.
@@ -3212,6 +3243,8 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
         if not product_info or product_info.get("status") != "approved" or not (product_info.get("price") or 0) > 0:
             name = product_info["name"].strip() if product_info else "Un produit"
             raise HTTPException(status_code=400, detail=f"« {name} » n'est plus en vente : retirez-le de votre panier.")
+        if product_info.get("kind") == "service":
+            raise HTTPException(status_code=400, detail=f"« {product_info['name'].strip()} » est un service : contactez le vendeur sur WhatsApp et retirez-le de votre panier.")
         if item.quantity > (product_info.get("stock") or 0):
             raise HTTPException(status_code=400, detail=f"Stock insuffisant pour « {product_info['name'].strip()} » : {product_info.get('stock') or 0} disponible(s).")
 
