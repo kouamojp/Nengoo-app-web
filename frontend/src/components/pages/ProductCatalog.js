@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
+import PromoSlot from '../promotions/PromoSlot';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
@@ -264,6 +265,18 @@ const ProductCatalog = (props) => {
             <p className="mt-2 text-gray-600">{t.productCount(filteredProducts.length)}</p>
           )}
         </div>
+
+        {/* Bannière publicitaire : ciblée sur la catégorie et sa catégorie parente */}
+        {(selectedCategory === 'all' || !categoriesLoading) && (
+          <div className="mb-6 sm:mb-8 empty:hidden">
+            <PromoSlot
+              placement="category_top"
+              categories={[selectedCategoryId, selectedCategoryObj?.parentId]}
+              language={language}
+              eager
+            />
+          </div>
+        )}
 
         {/* Catégories (mobile et tablette) */}
         <div className="lg:hidden -mx-4 px-4 mb-4 flex gap-2 overflow-x-auto hide-scrollbar">

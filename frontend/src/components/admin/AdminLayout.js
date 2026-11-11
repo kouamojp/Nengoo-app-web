@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon, SearchIcon, RouteIcon,
   LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon, SparkIcon, ChatIcon,
+  MegaphoneIcon,
 } from '../ui/Icons';
 import { useSupportUnread } from '../../lib/support';
 import { AdminFeedbackHost } from './adminFeedback';
@@ -76,6 +77,9 @@ const navGroups = (user, counts) => [
       { id: 'searchMisses', label: 'Recherches sans résultat', Icon: SearchIcon },
       { id: 'assistant', label: 'Assistant IA', Icon: SparkIcon },
       { id: 'pickupPoints', label: 'Points de retrait', Icon: PinIcon },
+      ...(['super_admin', 'admin'].includes(user.role) ? [
+        { id: 'promotions', label: 'Publicités', Icon: MegaphoneIcon },
+      ] : []),
       ...(user.role === 'super_admin' ? [
         { id: 'homepage', label: 'Page d\'accueil', Icon: LayoutIcon },
         { id: 'about', label: 'Page À propos', Icon: InfoIcon },

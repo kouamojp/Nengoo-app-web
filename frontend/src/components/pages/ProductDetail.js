@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
@@ -8,7 +8,8 @@ import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
-import { CartIcon, WhatsAppIcon, PinIcon } from '../ui/Icons';
+import { CartIcon, WhatsAppIcon, PinIcon, InfoIcon } from '../ui/Icons';
+import ShopAboutDialog from '../product/ShopAboutDialog';
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import { listImage, previewImage } from '../../lib/productImages';
@@ -86,6 +87,8 @@ const ProductDetail = (props) => {
   const [seller, setSeller] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSendMessageModal, setShowSendMessageModal] = useState(false);
+  const [showShopAbout, setShowShopAbout] = useState(false);
+  const closeShopAbout = useCallback(() => setShowShopAbout(false), []);
   const [messageToSend, setMessageToSend] = useState('');
   const [open, setOpen] = React.useState(false);
   const [reviews, setReviews] = useState([]);
@@ -625,14 +628,23 @@ const ProductDetail = (props) => {
               {seller && (
                 <section className="mt-8 p-5 rounded-xl bg-white border border-gray-200" aria-label={t.soldBy}>
                   <div className="flex items-center gap-4">
-                    <div className="shrink-0 w-12 h-12 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center text-xl font-extrabold" aria-hidden="true">
-                      {seller.businessName.charAt(0).toUpperCase()}
+                    <div className="shrink-0 w-12 h-12 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center text-xl font-extrabold overflow-hidden" aria-hidden="true">
+                      {seller.logoUrl ? (
+                        <img src={seller.logoUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        seller.businessName.charAt(0).toUpperCase()
+                      )}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-xs text-gray-500">{t.soldBy}</p>
-                      <Link to={`/seller/${seller.id}`} className="block font-bold text-lg leading-tight hover:text-purple-700 truncate">
+                      <button
+                        type="button"
+                        onClick={() => setShowShopAbout(true)}
+                        aria-haspopup="dialog"
+                        className="!min-h-0 block max-w-full text-left font-bold text-lg leading-tight hover:text-purple-700 hover:underline underline-offset-4 truncate"
+                      >
                         {seller.businessName}
-                      </Link>
+                      </button>
                       {(seller.city || seller.region) && (
                         <p className="mt-0.5 flex items-center gap-1 text-sm text-gray-600">
                           <PinIcon className="w-4 h-4 shrink-0" />
@@ -641,9 +653,20 @@ const ProductDetail = (props) => {
                       )}
                     </div>
                   </div>
-                  {seller.description && (
-                    <p className="mt-3 text-sm text-gray-600">{seller.description}</p>
-                  )}
+                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setShowShopAbout(true)}
+                      aria-haspopup="dialog"
+                      className="!min-h-0 inline-flex items-center gap-1.5 py-1.5 text-purple-800 hover:underline underline-offset-4"
+                    >
+                      <InfoIcon className="w-4 h-4" />
+                      {t.aboutShop}
+                    </button>
+                    <Link to={`/seller/${seller.id}`} className="inline-flex items-center py-1.5 text-purple-800 hover:underline underline-offset-4">
+                      {t.visitShop}
+                    </Link>
+                  </div>
                   <div className="mt-4 grid sm:grid-cols-2 gap-2">
                     {seller.whatsapp && (
                       <button
@@ -766,6 +789,15 @@ const ProductDetail = (props) => {
             slides={lightboxSlides}
             index={selectedImage}
         />
+
+        {showShopAbout && seller && (
+          <ShopAboutDialog
+            seller={seller}
+            t={t}
+            onClose={closeShopAbout}
+            onWhatsApp={handleWhatsAppClick}
+          />
+        )}
 
         {showSendMessageModal && (
             <div

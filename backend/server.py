@@ -74,6 +74,7 @@ from sms import order_created_text, order_status_text, send_sms
 from delivery import load_settings as load_delivery_settings, new_courier_token, new_delivery_code, seller_fee
 from order_flow import RELEASES_STOCK, STATUSES as ORDER_STATUSES, check_transition, normalize_status, status_label
 from account_deletion import erase_buyer, erase_seller
+from rich_text import sanitize_description
 app.add_middleware(IdentityMiddleware)
 
 @app.exception_handler(DuplicateKeyError)
@@ -470,6 +471,11 @@ class SellerCreate(BaseModel):
     categories: List[str] = []
     description: str
 
+    @field_validator("description")
+    @classmethod
+    def _clean_description(cls, v):
+        return sanitize_description(v)
+
 class SellerUpdate(BaseModel):
     name: Optional[str] = None
     businessName: Optional[str] = None
@@ -485,6 +491,11 @@ class SellerUpdate(BaseModel):
     socialMedia: Optional[dict] = None
     deliveryPrice: Optional[float] = None
     password: Optional[str] = None
+
+    @field_validator("description")
+    @classmethod
+    def _clean_description(cls, v):
+        return sanitize_description(v)
 
 class SellerAnalyticsData(BaseModel):
     total_revenue: float
@@ -694,15 +705,6 @@ class Ad(BaseModel):
     endDate: Optional[str] = None
     isActive: bool = True
     createdAt: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-class AdCreate(BaseModel):
-    title: str
-    description: Optional[str] = None
-    imageUrl: Optional[str] = None
-    linkUrl: Optional[str] = None
-    startDate: Optional[str] = None
-    endDate: Optional[str] = None
-    isActive: bool = True
 
 class PresignedUrlRequest(BaseModel):
     fileName: str
@@ -3721,33 +3723,22 @@ async def reclassify_products(request: ReclassifyRequest):
     return {"updated": result.modified_count}
 
 # --- Ads Management ---
+# Ancienne route lue par les versions de l'app antérieures aux campagnes
+# (routers/ads.py) : elle renvoie les campagnes « App mobile : accueil » en
+# cours, au format d'origine. Les nouvelles versions lisent /promotions.
 @api_router.get("/ads/active", response_model=List[Ad])
 async def get_active_ads():
-    """
-    Récupère les annonces actives.
-    Retourne une liste vide s'il n'y a pas d'annonces (pas de 404).
-    """
-    # Chercher les ads actives
-    ads_cursor = db.ads.find({"isActive": True})
-    ads = await ads_cursor.to_list(100)
-
-    # Retourner la liste (vide ou avec des éléments)
-    return [Ad(**ad) for ad in ads]
-
-@api_router.post("/ads", response_model=Ad, dependencies=[Depends(admin_or_higher_required)])
-async def create_ad(ad_data: AdCreate):
-    """Créer une nouvelle annonce (admin uniquement)"""
-    ad = Ad(**ad_data.dict())
-    await db.ads.insert_one(ad.dict())
-    return ad
-
-@api_router.delete("/ads/{ad_id}", dependencies=[Depends(admin_or_higher_required)])
-async def delete_ad(ad_id: str):
-    """Supprimer une annonce (admin uniquement)"""
-    result = await db.ads.delete_one({"id": ad_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Ad not found")
-    return {"message": "Ad deleted successfully"}
+    from routers.ads import running_ads
+    return [
+        Ad(
+            id=ad["id"],
+            title=ad.get("alt") or ad.get("title") or "",
+            imageUrl=ad.get("imageMobile") or ad.get("imageDesktop"),
+            linkUrl=ad["link"] if ad["link"].startswith("http") else f"{SITE_URL}{ad['link']}",
+            isActive=True,
+        )
+        for ad in await running_ads("app_home")
+    ]
 
 # --- File Upload Management (AWS S3) ---
 @api_router.post("/generate-presigned-url", response_model=PresignedUrlResponse, dependencies=[Depends(seller_id_or_support_required)])
@@ -4088,10 +4079,20 @@ from routers.buyers import router as buyers_router
 from routers.assistant import router as assistant_router
 from routers.support import router as support_router
 from routers.push import router as push_router
+from routers.ads import router as ads_router, ensure_indexes as ensure_ad_indexes
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
 api_router.include_router(support_router)
 api_router.include_router(push_router)
+api_router.include_router(ads_router)
+
+
+@app.on_event("startup")
+async def create_ad_indexes():
+    try:
+        await ensure_ad_indexes()
+    except Exception as error:  # la base peut être injoignable au démarrage
+        logger.warning("Index des publicités non créés : %s", error)
 
 
 # --- OG / Social Preview SSR ---

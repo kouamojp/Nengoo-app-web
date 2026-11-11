@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import CityDatalist from '../ui/CityDatalist';
+import { RichTextEditor } from '../ui/RichText';
 import { CITIES_DATALIST_ID } from '../../lib/cities';
 import { Link } from 'react-router-dom';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
@@ -303,9 +304,15 @@ const SellerManagement = (props) => {
                     <input type="number" name="deliveryPrice" value={data.deliveryPrice} onChange={onChange} min="0" className="adm-input" required />
                 </Field>
             </div>
-            <Field label="Description de la boutique" required>
-                <textarea name="description" value={data.description} onChange={onChange} className="adm-input" rows="3" required />
-            </Field>
+            <div>
+                <span id={`seller-description-${isEdit ? 'edit' : 'new'}`} className="adm-label">Description de la boutique</span>
+                <RichTextEditor
+                    ariaLabelledBy={`seller-description-${isEdit ? 'edit' : 'new'}`}
+                    value={data.description}
+                    onChange={(html) => onChange({ target: { name: 'description', value: html } })}
+                    minHeight="7rem"
+                />
+            </div>
         </>
     );
 

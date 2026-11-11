@@ -17,10 +17,11 @@ import AboutPageManagement from './AboutPageManagement';
 import WhatsAppAnalytics from './WhatsAppAnalytics';
 import AdminLayout, { useAdminPendingCounts } from './AdminLayout';
 import SupportInbox from './SupportInbox';
+import PromotionManagement from './PromotionManagement';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SECTIONS = ['dashboard', 'support', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'homepage', 'about', 'shipping'];
+const SECTIONS = ['dashboard', 'support', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping'];
 
 const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
     style: 'currency',
@@ -223,6 +224,7 @@ const AdminDashboard = (props) => {
         {activeSection === 'searchMisses' && <SearchMisses />}
         {activeSection === 'assistant' && <AssistantStats />}
         {activeSection === 'couriers' && <CourierManagement />}
+        {activeSection === 'promotions' && ['super_admin', 'admin'].includes(user.role) && <PromotionManagement />}
         {user.role === 'super_admin' && (
             <>
                 <div className={sectionClass('shipping')}>

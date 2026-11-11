@@ -43,6 +43,62 @@
     letter-spacing: -0.01em;
   }
 
+  /* Texte mis en forme (description des boutiques) */
+  .rich-text {
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .rich-text > * + * {
+    margin-top: 0.75em;
+  }
+  .rich-text ul {
+    list-style: disc;
+    padding-left: 1.4em;
+  }
+  .rich-text ol {
+    list-style: decimal;
+    padding-left: 1.4em;
+  }
+  .rich-text li + li {
+    margin-top: 0.25em;
+  }
+  .rich-text strong,
+  .rich-text b {
+    font-weight: 700;
+    color: theme("colors.gray.900");
+  }
+  .rich-text a {
+    color: theme("colors.purple.800");
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .rich-text-editor:empty::before {
+    content: attr(data-placeholder);
+    color: theme("colors.gray.500");
+    pointer-events: none;
+  }
+
+  /* Bannière publicitaire : hauteur réservée avant le chargement de l'image */
+  .promo-slot-image {
+    aspect-ratio: var(--ratio-m);
+  }
+  @media (min-width: 640px) {
+    .promo-slot-image {
+      aspect-ratio: var(--ratio-d);
+    }
+  }
+
+  /* Enseigne de la page boutique : bord festonné, comme un auvent de marché */
+  .shop-awning {
+    --scallop: 22px;
+    -webkit-mask:
+      radial-gradient(calc(var(--scallop) / 2) at 50% 0, #000 98%, transparent) 50% 100% / var(--scallop) calc(var(--scallop) / 2) repeat-x,
+      linear-gradient(#000, #000) top / 100% calc(100% - var(--scallop) / 2 + 1px) no-repeat;
+    mask:
+      radial-gradient(calc(var(--scallop) / 2) at 50% 0, #000 98%, transparent) 50% 100% / var(--scallop) calc(var(--scallop) / 2) repeat-x,
+      linear-gradient(#000, #000) top / 100% calc(100% - var(--scallop) / 2 + 1px) no-repeat;
+  }
+
   /* Sur fond violet, le contour de focus passe en jaune */
   .on-dark :focus-visible {
     outline-color: theme("colors.yellow.300");
