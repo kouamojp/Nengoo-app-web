@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
 import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, DateSortSelect, sortByDate } from './AdminUI';
 import { ORDER_STATUSES, nextOrderStatuses, normalizeOrderStatus, orderStatusLabel } from '../../lib/orderStatuses';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -161,7 +162,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
     };
     
     const formatPrice = (price) => {
-        return new Intl.NumberFormat('fr-FR', {
+        return numberFormat('fr-FR', {
           style: 'currency',
           currency: 'XAF',
           minimumFractionDigits: 0,

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { SectionHeader, Toolbar, EmptyRow, LoadingRows, Modal, Field } from './AdminUI';
 import { notify, confirmAction } from './adminFeedback';
 import { topLevelCategories, subcategoriesOf } from '../../lib/categories';
+import { numberFormat } from '../../lib/numberFormat';
 
 // Bannières publicitaires (backend/routers/ads.py)
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
@@ -50,10 +51,10 @@ const fromLocalInput = (value) => (value ? new Date(value).toISOString() : null)
 const shortDate = (value) =>
   parseUtc(value)?.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 
-const number = (n) => new Intl.NumberFormat('fr-FR').format(n || 0);
+const number = (n) => numberFormat('fr-FR').format(n || 0);
 
 const ctr = (views, clicks) =>
-  views ? `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format((clicks / views) * 100)} %` : '—';
+  views ? `${numberFormat('fr-FR', { maximumFractionDigits: 1 }).format((clicks / views) * 100)} %` : '—';
 
 const errorText = async (response, fallback) => {
   const data = await response.json().catch(() => null);

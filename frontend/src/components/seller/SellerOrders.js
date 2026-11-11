@@ -4,6 +4,7 @@ import SellerHeader from './SellerHeader';
 import { Modal, StatusBadge, StatusSelect } from '../admin/AdminUI';
 import { WhatsAppIcon } from '../ui/Icons';
 import { nextOrderStatuses } from '../../lib/orderStatuses';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -19,7 +20,7 @@ const FILTERS = [
 ];
 
 const formatXAF = (value) =>
-  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
+  `${numberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
 
 const WhatsAppButton = ({ phone, children }) => {
   const href = whatsappUrl(phone);

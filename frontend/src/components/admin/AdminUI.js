@@ -1,5 +1,6 @@
 import React, { useEffect, useId } from 'react';
 import { statusLabel } from './adminFeedback';
+import { numberFormat } from '../../lib/numberFormat';
 
 // Briques de mise en page communes aux écrans de l'administration.
 
@@ -180,7 +181,7 @@ export const ChoiceCards = ({ name, value, onChange, options }) => (
   </div>
 );
 
-export const formatXAF = (price) => new Intl.NumberFormat('fr-FR', {
+export const formatXAF = (price) => numberFormat('fr-FR', {
   style: 'currency',
   currency: 'XAF',
   minimumFractionDigits: 0,

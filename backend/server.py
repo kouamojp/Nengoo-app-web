@@ -384,6 +384,9 @@ class Product(BaseModel):
     kind: ProductKind = "product"
     # Services : numéro WhatsApp du vendeur, ajouté aux réponses (non stocké)
     sellerWhatsapp: Optional[str] = None
+    # Logo de la boutique, ajouté aux réponses (non stocké) : image de
+    # secours d'un produit sans photo, avant le logo Nengoo
+    sellerLogo: Optional[str] = None
     # Caractéristiques libres : {"Taille": "M", "Matière": "Coton"}
     specs: Dict[str, str] = {}
     # Versions WebP réduites, alignées sur images ('' = pas encore créée) :
@@ -1502,16 +1505,21 @@ def service_fields(data: dict) -> dict:
     return data
 
 
-async def with_service_contacts(products: List[dict]) -> List[dict]:
-    """Ajoute le WhatsApp du vendeur aux services (bouton « Contacter »)."""
-    seller_ids = {p.get("sellerId") for p in products if p.get("kind") == "service"}
+async def with_seller_details(products: List[dict]) -> List[dict]:
+    """Ajoute le logo de la boutique (image de secours) à chaque produit, et
+    le WhatsApp du vendeur aux services (bouton « Contacter »)."""
+    seller_ids = {p.get("sellerId") for p in products if p.get("sellerId")}
     if not seller_ids:
         return products
-    sellers = await db.sellers.find({"id": {"$in": list(seller_ids)}}, {"_id": 0, "id": 1, "whatsapp": 1}).to_list(None)
-    numbers = {s["id"]: s.get("whatsapp") for s in sellers}
+    sellers = await db.sellers.find(
+        {"id": {"$in": list(seller_ids)}}, {"_id": 0, "id": 1, "whatsapp": 1, "logoUrl": 1}
+    ).to_list(None)
+    by_id = {s["id"]: s for s in sellers}
     for p in products:
+        seller = by_id.get(p.get("sellerId")) or {}
+        p["sellerLogo"] = seller.get("logoUrl") or None
         if p.get("kind") == "service":
-            p["sellerWhatsapp"] = numbers.get(p.get("sellerId"))
+            p["sellerWhatsapp"] = seller.get("whatsapp")
     return products
 
 
@@ -1541,9 +1549,9 @@ async def get_products(
     if status_filter:
         query["status"] = status_filter
         if status_filter == "approved":
-            # Pages publiques : une fiche sans photo ou sans prix n'est pas vendable
+            # Pages publiques : une fiche sans prix n'est pas vendable (sans
+            # photo, elle s'affiche avec le logo de la boutique)
             query["price"] = {"$gt": 0}
-            query["images"] = {"$elemMatch": {"$nin": ["", None]}}
     if seller_id:
         query["sellerId"] = seller_id
 
@@ -1565,7 +1573,7 @@ async def get_products(
     response.headers["X-Total-Count"] = str(len(products))
     if limit is not None:
         products = products[skip:skip + limit]
-    return [Product(**p) for p in await with_service_contacts(products)]
+    return [Product(**p) for p in await with_seller_details(products)]
 
 
 @api_router.get("/search/suggest")
@@ -1574,12 +1582,12 @@ async def search_suggest(q: str = Query("", max_length=100), limit: int = Query(
     if len(q.strip()) < 2:
         return {"products": [], "categories": []}
     products = await db.products.find(
-        {"status": "approved", "price": {"$gt": 0}, "images": {"$elemMatch": {"$nin": ["", None]}}},
-        {"_id": 0, "id": 1, "slug": 1, "name": 1, "price": 1, "promoPrice": 1, "images": 1, "thumbnails": 1,
+        {"status": "approved", "price": {"$gt": 0}},
+        {"_id": 0, "id": 1, "slug": 1, "name": 1, "price": 1, "promoPrice": 1, "images": 1, "thumbnails": 1, "sellerId": 1,
          "category": 1, "brand": 1, "tags": 1, "description": 1},
     ).to_list(None)
     names = await category_search_names()
-    found = search_products(products, q, names)[:limit]
+    found = await with_seller_details(search_products(products, q, names)[:limit])
     used = {p.get("category") for p in products}
     categories = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1, "nameEn": 1, "parentId": 1}).to_list(1000)
     # Catégories qui contiennent des produits, cherchées sur leur seul nom
@@ -1593,7 +1601,8 @@ async def search_suggest(q: str = Query("", max_length=100), limit: int = Query(
             "promoPrice": p.get("promoPrice"),
             # Petite version WebP quand elle existe
             "image": next((i for i in (p.get("thumbnails") or [])[:1] if i), None)
-            or next((i for i in p.get("images") or [] if i), None),
+            or next((i for i in p.get("images") or [] if i), None)
+            or p.get("sellerLogo"),  # sans photo : logo de la boutique
         } for p in found],
         "categories": [{"id": d["c"]["id"], "name": d["c"]["name"], "nameEn": d["c"].get("nameEn")} for d in matched],
     }
@@ -1907,7 +1916,7 @@ async def get_product(product_identifier: str):
         
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return Product(**(await with_service_contacts([product]))[0])
+    return Product(**(await with_seller_details([product]))[0])
 
 @api_router.post("/products", response_model=Product, dependencies=[Depends(seller_or_moderator_or_higher_required)])
 async def create_product(product_data: ProductCreate, background_tasks: BackgroundTasks,
@@ -1961,7 +1970,7 @@ async def create_product(product_data: ProductCreate, background_tasks: Backgrou
     product = Product(**product_dict)
     product.sellerId = seller_id_to_use
     product.sellerName = seller_name_to_use
-    await db.products.insert_one(product.dict(exclude={"sellerWhatsapp"}))
+    await db.products.insert_one(product.dict(exclude={"sellerWhatsapp", "sellerLogo"}))
     # Versions réduites des photos, après la réponse
     background_tasks.add_task(refresh_product_variants, db, product.id)
     return product
@@ -1975,6 +1984,13 @@ async def update_product(product_id: str, product_data: ProductUpdate, backgroun
     if update_data.get("kind") is None:
         update_data.pop("kind", None)
     service_fields(update_data)
+    # « À la une » : décidé par l'équipe, jamais par le vendeur lui-même
+    if "featured" in update_data:
+        if admin_role not in ["super_admin", "admin", "moderator"]:
+            del update_data["featured"]
+        else:
+            from routers.highlights import clear_cache
+            clear_cache()
 
     # Un vendeur peut seulement mettre en vente ou archiver un produit déjà
     # validé ; la modération (pending, rejected…) reste réservée aux admins.
@@ -2000,7 +2016,7 @@ async def update_product(product_id: str, product_data: ProductUpdate, backgroun
         check_promo_price(update_data.get("price", current.get("price")),
                           update_data.get("promoPrice", current.get("promoPrice")))
 
-    changed_fields = [f for f in ("price", "images", "description") if f in update_data]
+    changed_fields = [f for f in ("price", "description") if f in update_data]
     if changed_fields:
         current = await db.products.find_one({"id": product_id}, {f: 1 for f in changed_fields}) or {}
         changed = tuple(f for f in changed_fields if update_data[f] != current.get(f))
@@ -4113,11 +4129,13 @@ from routers.assistant import router as assistant_router
 from routers.support import router as support_router
 from routers.push import router as push_router
 from routers.ads import router as ads_router, ensure_indexes as ensure_ad_indexes
+from routers.highlights import router as highlights_router
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
 api_router.include_router(support_router)
 api_router.include_router(push_router)
 api_router.include_router(ads_router)
+api_router.include_router(highlights_router)
 
 
 @app.on_event("startup")

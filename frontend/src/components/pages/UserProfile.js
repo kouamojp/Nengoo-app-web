@@ -9,6 +9,7 @@ import { translations } from '../../lib/translations';
 import { orderStatusLabel, orderStatusTone } from '../../lib/orderStatuses';
 import UserSupportThread from '../support/UserSupportThread';
 import { useSupportUnread } from '../../lib/support';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -362,7 +363,7 @@ const UserProfile = (props) => {
     };
   
     const formatPrice = (price) => {
-      return new Intl.NumberFormat('fr-FR', {
+      return numberFormat('fr-FR', {
         style: 'currency',
         currency: 'XAF',
         minimumFractionDigits: 0,

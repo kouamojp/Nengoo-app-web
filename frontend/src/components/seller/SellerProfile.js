@@ -3,11 +3,12 @@ import SellerHeader from './SellerHeader';
 import { Field } from '../admin/AdminUI';
 import { CITIES as cameroonCities } from '../../lib/cities';
 import { RichText, RichTextEditor } from '../ui/RichText';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const formatXAF = (value) =>
-  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
+  `${numberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
 
 const fromUser = (user) => ({
   businessName: user.businessName || '',

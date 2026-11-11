@@ -9,7 +9,7 @@ import { RichText } from '../ui/RichText';
 import { PinIcon, WhatsAppIcon, SearchIcon, BoxIcon, ClockIcon, ExternalIcon } from '../ui/Icons';
 import { openWhatsApp } from '../../lib/utils';
 import { translations } from '../../lib/translations';
-import { listImage } from '../../lib/productImages';
+import { cardImage } from '../../lib/productImages';
 import { isBlank, safeLink, toPlainText } from '../../lib/richText';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
@@ -73,7 +73,7 @@ const SellerShop = (props) => {
             rawName: p.name,
             name: { [language]: p.name },
             description: { [language]: p.description },
-            image: listImage(p) || process.env.PUBLIC_URL + '/images/logo-nengoo.png',
+            image: cardImage(p),
             inStock: p.kind === 'service' || p.stock > 0,
             sellerWhatsApp: p.sellerWhatsapp,
             reviews: p.reviewsCount || 0,

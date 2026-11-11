@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+import { numberFormat } from '../../lib/numberFormat';
 
 const ShoppingCart = (props) => {
   const { language, cartItems, updateCartQuantity, removeFromCart, clearCart } = props;
@@ -47,7 +48,7 @@ const ShoppingCart = (props) => {
   }, [cartItems, API_BASE_URL]);
   
   const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', {
+    return numberFormat('fr-FR', {
       style: 'currency',
       currency: 'XAF',
       minimumFractionDigits: 0,

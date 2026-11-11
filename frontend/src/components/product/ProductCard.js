@@ -4,9 +4,11 @@ import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import { contactSellerOnWhatsApp } from '../../lib/utils';
 import { CartIcon, WhatsAppIcon } from '../ui/Icons';
+import { imageFallback, isLogoImage } from '../../lib/productImages';
+import { numberFormat } from '../../lib/numberFormat';
 
 const formatPrice = (price) => {
-  return new Intl.NumberFormat('fr-FR', {
+  return numberFormat('fr-FR', {
     style: 'currency',
     currency: 'XAF',
     minimumFractionDigits: 0,
@@ -20,7 +22,7 @@ const isNew = (creationDate) => {
   return new Date(creationDate) > twoDaysAgo;
 };
 
-const ProductCard = ({ product, language, addToCart }) => {
+const ProductCard = ({ product, language, addToCart, ribbon, promoted = false }) => {
   const t = translations[language];
   const productUrl = `/product/${product.slug || product.id}`;
   const name = product.name[language];
@@ -40,13 +42,11 @@ const ProductCard = ({ product, language, addToCart }) => {
         <img
           src={product.image}
           alt=""
-          className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+          className={`w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300 ${
+            isLogoImage(product, product.image) ? 'img-logo' : ''
+          }`}
           loading="lazy"
-          onError={(e) => {
-            e.target.onerror = null; // Prevent infinite loop if fallback also fails
-            e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo.png';
-            e.target.className = 'w-full h-full object-contain p-6';
-          }}
+          onError={imageFallback(product)}
         />
         {service ? (
           <span className="absolute top-2 left-2 bg-purple-900/90 text-white px-2 py-0.5 text-xs font-semibold rounded-md">
@@ -59,6 +59,15 @@ const ProductCard = ({ product, language, addToCart }) => {
         ) : isNew(product.createdAt) && (
           <span className="absolute top-2 left-2 bg-yellow-300 text-purple-950 px-2 py-0.5 text-xs font-bold rounded-md">
             {t.newBadge}
+          </span>
+        )}
+        {ribbon && (
+          <span
+            className={`absolute bottom-2 left-2 px-2 py-0.5 text-xs font-semibold rounded-md shadow-sm ${
+              promoted ? 'bg-yellow-300 text-purple-950' : 'bg-white/95 text-purple-900'
+            }`}
+          >
+            {ribbon}
           </span>
         )}
         {discountPercentage > 0 && (

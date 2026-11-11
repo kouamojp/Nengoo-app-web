@@ -78,6 +78,13 @@
     pointer-events: none;
   }
 
+  /* Logo à la place d'une photo produit absente : en entier, avec une marge */
+  img.img-logo {
+    object-fit: contain !important;
+    padding: 12%;
+    background-color: theme("colors.white");
+  }
+
   /* Bannière publicitaire : hauteur réservée avant le chargement de l'image */
   .promo-slot-image {
     aspect-ratio: var(--ratio-m);

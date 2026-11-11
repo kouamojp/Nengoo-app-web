@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams } from 'react-router-dom';
 import { whatsappUrl } from '../../lib/utils';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+const formatPrice = (price) => numberFormat('fr-FR', {
   style: 'currency', currency: 'XAF', minimumFractionDigits: 0,
 }).format(price || 0);
 

@@ -18,12 +18,13 @@ import WhatsAppAnalytics from './WhatsAppAnalytics';
 import AdminLayout, { useAdminPendingCounts } from './AdminLayout';
 import SupportInbox from './SupportInbox';
 import PromotionManagement from './PromotionManagement';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const SECTIONS = ['dashboard', 'support', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping'];
 
-const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+const formatPrice = (price) => numberFormat('fr-FR', {
     style: 'currency',
     currency: 'XAF',
     minimumFractionDigits: 0,

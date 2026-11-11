@@ -5,7 +5,7 @@ import { useLocation, Link } from 'react-router-dom';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
-import { listImage } from '../../lib/productImages';
+import { cardImage } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -41,7 +41,7 @@ const SearchResults = (props) => {
             ...p,
             name: { [language]: p.name },
             description: { [language]: p.description },
-            image: listImage(p) || 'https://via.placeholder.com/300',
+            image: cardImage(p),
             inStock: p.kind === 'service' || p.stock > 0,
             sellerWhatsApp: p.sellerWhatsapp,
             reviews: p.reviewsCount || 0,

@@ -20,12 +20,11 @@ MAX_DETAILS = 4
 DESCRIPTION_LENGTH = 220
 MAX_SPECS = 12
 
-# Un produit visible par les clients, avec du stock
+# Un produit visible par les clients : en stock, ou service (sans stock)
 FOR_SALE = {
     "status": "approved",
     "price": {"$gt": 0},
-    "stock": {"$gt": 0},
-    "images": {"$elemMatch": {"$nin": ["", None]}},
+    "$or": [{"stock": {"$gt": 0}}, {"kind": "service"}],
 }
 
 TOOLS = [
@@ -105,7 +104,7 @@ class Catalog:
 
     async def _seller_map(self) -> Dict[str, dict]:
         if self._sellers is None:
-            sellers = await self._db.sellers.find({}, {"_id": 0, "id": 1, "city": 1}).to_list(None)
+            sellers = await self._db.sellers.find({}, {"_id": 0, "id": 1, "city": 1, "logoUrl": 1}).to_list(None)
             self._sellers = {s.get("id"): s for s in sellers}
         return self._sellers
 
@@ -125,7 +124,9 @@ class Catalog:
             "name": product.get("name"),
             "price": _whole(product.get("price")),
             "paidPrice": _whole(paid_price(product)),
-            "image": _first_image(product),
+            # Sans photo : logo de la boutique
+            "image": _first_image(product)
+            or ((await self._seller_map()).get(product.get("sellerId")) or {}).get("logoUrl"),
             "sellerName": product.get("sellerName"),
             "sellerCity": await self._seller_city(product),
             "rating": product.get("rating") or 0,

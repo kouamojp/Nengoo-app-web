@@ -7,10 +7,12 @@ import NotificationList from '../ui/NotificationList';
 import { getUnreadNotificationsCount } from '../../lib/notifications';
 import { SearchIcon, CartIcon, UserIcon, BellIcon, StoreIcon, LogoutIcon, SparkIcon } from '../ui/Icons';
 import { openAssistant } from '../../lib/assistant';
+import { numberFormat } from '../../lib/numberFormat';
+import { imageFallback, NENGOO_IMAGE } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+const formatPrice = (price) => numberFormat('fr-FR', {
   style: 'currency',
   currency: 'XAF',
   minimumFractionDigits: 0,
@@ -189,7 +191,12 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
                         setSearchQuery('');
                       }}
                     >
-                      <img src={product.image} alt="" className="w-11 h-11 rounded-md object-cover bg-gray-100 shrink-0" />
+                      <img
+                        src={product.image || NENGOO_IMAGE}
+                        alt=""
+                        className={`w-11 h-11 rounded-md object-cover bg-gray-100 shrink-0 ${product.image ? '' : 'img-logo'}`}
+                        onError={imageFallback(null)}
+                      />
                       <span className="flex-1 min-w-0 truncate">{product.name}</span>
                       <span className="price text-purple-800 shrink-0">
                         {formatPrice(product.promoPrice > 0 ? product.promoPrice : product.price)}
