@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
-import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field } from './AdminUI';
+import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field, DateSortSelect, sortByDate } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -10,6 +10,7 @@ const BuyerManagement = (props) => {
     const [buyers, setBuyers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [dateOrder, setDateOrder] = useState('newest');
     const [selectedBuyers, setSelectedBuyers] = useState([]);
     const [editingBuyerId, setEditingBuyerId] = useState(null);
     const [editingData, setEditingData] = useState({ name: '', email: '' });
@@ -179,7 +180,7 @@ const BuyerManagement = (props) => {
         }).format(price);
     };
 
-    const filteredBuyers = buyers.filter(buyer => {
+    const filteredBuyers = sortByDate(buyers, dateOrder, (b) => b.joinDate || b.createdAt).filter(buyer => {
         const query = searchQuery.toLowerCase();
         return (
             (buyer.name || '').toLowerCase().includes(query) ||
@@ -208,6 +209,7 @@ const BuyerManagement = (props) => {
 
             <Toolbar>
                 <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Rechercher par nom, email ou WhatsApp" />
+                <DateSortSelect value={dateOrder} onChange={setDateOrder} />
             </Toolbar>
 
             <SelectionBar count={selectedBuyers.length} onDelete={handleBulkDelete} onClear={() => setSelectedBuyers([])} />

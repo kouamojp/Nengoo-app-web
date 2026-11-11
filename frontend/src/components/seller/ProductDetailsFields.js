@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { PRODUCT_CONDITIONS } from '../../lib/productRules';
+import { PRODUCT_CONDITIONS, PRODUCT_KINDS, isService } from '../../lib/productRules';
 
 // Marque, état et caractéristiques d'un produit (formulaires vendeur et admin).
 // Les caractéristiques sont des paires libres « Taille : M », « Matière : Coton »,
@@ -25,7 +25,7 @@ const ProductDetailsFields = ({ value, onChange }) => {
             className="adm-input"
           />
         </div>
-        <div>
+        {!isService(value) && <div>
           <label className="adm-label" htmlFor={`${id}-condition`}>État</label>
           <select
             id={`${id}-condition`}
@@ -36,7 +36,7 @@ const ProductDetailsFields = ({ value, onChange }) => {
             <option value="">Non précisé</option>
             {PRODUCT_CONDITIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
-        </div>
+        </div>}
       </div>
 
       <fieldset>
@@ -80,6 +80,43 @@ const ProductDetailsFields = ({ value, onChange }) => {
         </button>
       </fieldset>
     </div>
+  );
+};
+
+/** Choix entre produit et service, en tête des formulaires. */
+export const ProductKindField = ({ value, onChange }) => {
+  const id = useId();
+  const current = isService(value) ? 'service' : 'product';
+  return (
+    <fieldset>
+      <legend className="adm-label">Type d'annonce</legend>
+      <div className="grid sm:grid-cols-2 gap-2">
+        {PRODUCT_KINDS.map((kind) => {
+          const checked = current === kind.value;
+          return (
+            <label
+              key={kind.value}
+              className={`flex gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                checked ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-600' : 'border-gray-300 bg-white hover:border-purple-400'
+              }`}
+            >
+              <input
+                type="radio"
+                name={`${id}-kind`}
+                value={kind.value}
+                checked={checked}
+                onChange={() => onChange({ ...value, kind: kind.value })}
+                className="mt-1 accent-purple-700"
+              />
+              <span>
+                <span className="block font-semibold text-gray-900">{kind.label}</span>
+                <span className="block text-sm text-gray-600">{kind.hint}</span>
+              </span>
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 };
 

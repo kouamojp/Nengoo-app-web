@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { notify, confirmAction } from './adminFeedback';
-import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusBadge, EmptyRow, LoadingRows, Modal, Field, ChoiceCards } from './AdminUI';
+import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusBadge, EmptyRow, LoadingRows, Modal, Field, ChoiceCards, DateSortSelect, sortByDate } from './AdminUI';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
-import ProductDetailsFields from '../seller/ProductDetailsFields';
-import { productFormError, productPayload, productDetailsPayload, withSpecList } from '../../lib/productRules';
+import ProductDetailsFields, { ProductKindField } from '../seller/ProductDetailsFields';
+import { productFormError, productPayload, productDetailsPayload, withSpecList, isService } from '../../lib/productRules';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -18,6 +18,7 @@ const ProductManagement = (props) => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null); // State for editing
     const [searchQuery, setSearchQuery] = useState('');
+    const [dateOrder, setDateOrder] = useState('newest');
     const [selectedSellerId, setSelectedSellerId] = useState(''); // Filtre par vendeur
     const [selectedProducts, setSelectedProducts] = useState([]);
 
@@ -372,7 +373,7 @@ const ProductManagement = (props) => {
         }).format(price);
       };
 
-    const filteredProducts = products.filter(product => {
+    const filteredProducts = sortByDate(products, dateOrder, (p) => p.createdAt).filter(product => {
         const query = searchQuery.toLowerCase();
         const matchesSearch = (
             product.name.toLowerCase().includes(query) ||
@@ -424,6 +425,7 @@ const ProductManagement = (props) => {
 
             <Toolbar>
                 <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Rechercher par nom, description ou vendeur" />
+                <DateSortSelect value={dateOrder} onChange={setDateOrder} />
                 <select
                     value={selectedSellerId}
                     onChange={(e) => setSelectedSellerId(e.target.value)}
@@ -457,6 +459,7 @@ const ProductManagement = (props) => {
             {editingProduct && (
                 <Modal title="Modifier le produit" onClose={closeEditModal}>
                     <form onSubmit={handleUpdateProduct} className="space-y-4">
+                        <ProductKindField value={editingProduct} onChange={setEditingProduct} />
                         <Field label="Nom du produit">
                             <input type="text" name="name" value={editingProduct.name} onChange={handleEditInputChange} className="adm-input" />
                         </Field>
@@ -506,9 +509,11 @@ const ProductManagement = (props) => {
                             <Field label="Prix promo (FCFA)">
                                 <input type="number" name="promoPrice" value={editingProduct.promoPrice || ''} onChange={handleEditInputChange} min="0" className="adm-input" />
                             </Field>
-                            <Field label="Stock">
-                                <input type="number" name="stock" value={editingProduct.stock} onChange={handleEditInputChange} min="0" className="adm-input" />
-                            </Field>
+                            {!isService(editingProduct) && (
+                                <Field label="Stock">
+                                    <input type="number" name="stock" value={editingProduct.stock} onChange={handleEditInputChange} min="0" className="adm-input" />
+                                </Field>
+                            )}
                         </div>
                         <ProductDetailsFields value={editingProduct} onChange={setEditingProduct} />
                         <Field label="Statut">
@@ -531,6 +536,7 @@ const ProductManagement = (props) => {
             {showAddModal && (
                 <Modal title="Ajouter un produit" onClose={() => setShowAddModal(false)}>
                     <form onSubmit={handleAddProduct} className="space-y-4">
+                        <ProductKindField value={newProductData} onChange={setNewProductData} />
                         <Field label="Nom du produit" required>
                             <input type="text" name="name" value={newProductData.name} onChange={handleInputChange} placeholder="Ex. : Smartphone Samsung Galaxy" className="adm-input" required />
                         </Field>
@@ -554,9 +560,11 @@ const ProductManagement = (props) => {
                             <Field label="Prix promo (FCFA)">
                                 <input type="number" name="promoPrice" value={newProductData.promoPrice} onChange={handleInputChange} min="0" className="adm-input" />
                             </Field>
-                            <Field label="Stock" required>
-                                <input type="number" name="stock" value={newProductData.stock} onChange={handleInputChange} min="0" className="adm-input" required />
-                            </Field>
+                            {!isService(newProductData) && (
+                                <Field label="Stock" required>
+                                    <input type="number" name="stock" value={newProductData.stock} onChange={handleInputChange} min="0" className="adm-input" required />
+                                </Field>
+                            )}
                         </div>
                         <ProductDetailsFields value={newProductData} onChange={setNewProductData} />
                         <Field label="Vendeur" hint="Sans vendeur choisi, le produit est attribué à l'administration.">
@@ -675,7 +683,9 @@ const ProductManagement = (props) => {
                                         <span className="price">{formatPrice(product.price)}</span>
                                     )}
                                 </td>
-                                <td className={`adm-td text-right tabular-nums ${product.stock > 0 ? '' : 'text-red-600 font-semibold'}`}>{product.stock}</td>
+                                <td className={`adm-td text-right tabular-nums ${isService(product) || product.stock > 0 ? '' : 'text-red-600 font-semibold'}`}>
+                                    {isService(product) ? <span className="text-sm text-purple-800 font-semibold">Service</span> : product.stock}
+                                </td>
                                 <td className="adm-td"><StatusBadge status={product.status} /></td>
                                 <td className="adm-td whitespace-nowrap text-right">
                                     <button onClick={() => setEditingProduct(withSpecList(product))} className="adm-link !min-h-0">Modifier</button>

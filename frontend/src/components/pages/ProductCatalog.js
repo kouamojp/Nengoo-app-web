@@ -110,7 +110,8 @@ const ProductCatalog = (props) => {
           ...p,
           name: { [language]: p.name }, // Adapt name to be an object
           image: listImage(p) || process.env.PUBLIC_URL + '/images/logo-nengoo.png',
-          inStock: p.stock > 0,
+          inStock: p.kind === 'service' || p.stock > 0,
+          sellerWhatsApp: p.sellerWhatsapp,
           reviews: p.reviewsCount || 0,
           rating: p.rating || 0,
         }));

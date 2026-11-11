@@ -9,6 +9,15 @@ export const PRODUCT_CONDITIONS = [
   { value: 'refurbished', label: 'Reconditionné' },
 ];
 
+// Produit (vendu en ligne, ajouté au panier) ou service (prestation :
+// le client contacte le vendeur sur WhatsApp, pas de panier ni de stock)
+export const PRODUCT_KINDS = [
+  { value: 'product', label: 'Produit', hint: 'Article vendu en ligne : ajouté au panier, avec un stock.' },
+  { value: 'service', label: 'Service', hint: 'Prestation (réparation, coiffure, transport…) : le client vous contacte sur WhatsApp.' },
+];
+
+export const isService = (product) => product?.kind === 'service';
+
 export const conditionLabel = (value) =>
   PRODUCT_CONDITIONS.find((c) => c.value === value)?.label || '';
 
@@ -38,8 +47,10 @@ export const withSpecList = (product) => ({
 
 /** Marque, état et caractéristiques au format attendu par le serveur. */
 export const productDetailsPayload = (product) => ({
+  kind: isService(product) ? 'service' : 'product',
   brand: (product.brand || '').trim() || null,
-  condition: product.condition || null,
+  // L'état (neuf, occasion) ne concerne que les articles
+  condition: (!isService(product) && product.condition) || null,
   specs: Object.fromEntries(
     (product.specList || [])
       .map(([k, v]) => [k.trim(), String(v).trim()])

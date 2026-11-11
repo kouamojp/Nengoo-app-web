@@ -2,7 +2,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
-import { openWhatsApp, generateProductWhatsAppMessage } from '../../lib/utils';
+import { contactSellerOnWhatsApp } from '../../lib/utils';
 import { CartIcon, WhatsAppIcon } from '../ui/Icons';
 
 const formatPrice = (price) => {
@@ -25,10 +25,9 @@ const ProductCard = ({ product, language, addToCart }) => {
   const productUrl = `/product/${product.slug || product.id}`;
   const name = product.name[language];
 
-  const handleWhatsAppContact = () => {
-    const message = generateProductWhatsAppMessage(product, language);
-    openWhatsApp(product.sellerWhatsApp, message);
-  };
+  const service = product.kind === 'service';
+  const handleWhatsAppContact = () =>
+    contactSellerOnWhatsApp({ product, whatsapp: product.sellerWhatsApp, language });
 
   const hasPromo = product.promoPrice && product.promoPrice > 0;
   const discountPercentage = hasPromo && product.price > product.promoPrice
@@ -49,7 +48,11 @@ const ProductCard = ({ product, language, addToCart }) => {
             e.target.className = 'w-full h-full object-contain p-6';
           }}
         />
-        {!product.inStock ? (
+        {service ? (
+          <span className="absolute top-2 left-2 bg-purple-900/90 text-white px-2 py-0.5 text-xs font-semibold rounded-md">
+            {t.serviceBadge}
+          </span>
+        ) : !product.inStock ? (
           <span className="absolute top-2 left-2 bg-gray-900/80 text-white px-2 py-0.5 text-xs font-semibold rounded-md">
             {t.outOfStock}
           </span>
@@ -89,6 +92,28 @@ const ProductCard = ({ product, language, addToCart }) => {
           )}
         </div>
 
+        {service ? (
+          <div className="mt-auto">
+            {product.sellerWhatsApp ? (
+              <button
+                type="button"
+                onClick={handleWhatsAppContact}
+                aria-label={`${t.contactWhatsApp} : ${name}`}
+                className="w-full !min-w-0 h-10 !min-h-0 px-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-[0.8rem] sm:text-sm font-semibold leading-tight flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <WhatsAppIcon className="w-[1.1rem] h-[1.1rem] shrink-0" />
+                <span>{t.contactSeller}</span>
+              </button>
+            ) : (
+              <Link
+                to={productUrl}
+                className="w-full h-10 px-2 rounded-lg border border-purple-700 text-purple-800 hover:bg-purple-50 text-[0.8rem] sm:text-sm font-semibold flex items-center justify-center"
+              >
+                {t.seeService}
+              </Link>
+            )}
+          </div>
+        ) : (
         <div className="mt-auto flex gap-2">
           <button
             onClick={() => addToCart(product)}
@@ -109,6 +134,7 @@ const ProductCard = ({ product, language, addToCart }) => {
             </button>
           )}
         </div>
+        )}
       </div>
     </article>
   );

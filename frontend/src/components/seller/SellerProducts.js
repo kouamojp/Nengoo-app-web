@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
 import ColorPicker from './ColorPicker';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
-import ProductDetailsFields from './ProductDetailsFields';
-import { productFormError, productPayload, withSpecList } from '../../lib/productRules';
+import ProductDetailsFields, { ProductKindField } from './ProductDetailsFields';
+import { isService, productFormError, productPayload, withSpecList } from '../../lib/productRules';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -26,6 +26,7 @@ const SellerProducts = (props) => {
       brand: '',
       condition: '',
       specList: [],
+      kind: 'product',
     });
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [selectedProducts, setSelectedProducts] = useState([]);
@@ -348,8 +349,9 @@ const SellerProducts = (props) => {
         {/* Edit Product Form */}
         {editingProduct && (
           <div className="adm-card p-5 sm:p-6 mb-6">
-            <h2 className="adm-modal-title mb-5">Modifier le produit</h2>
+            <h2 className="adm-modal-title mb-5">{isService(editingProduct) ? 'Modifier le service' : 'Modifier le produit'}</h2>
             <form onSubmit={handleUpdateProduct} className="space-y-6">
+              <ProductKindField value={editingProduct} onChange={setEditingProduct} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="adm-label">Nom du produit</label>
@@ -392,22 +394,26 @@ const SellerProducts = (props) => {
                     className="adm-input"
                   />
                 </div>
-                <div>
-                  <label className="adm-label">Stock</label>
-                  <input
-                    type="number"
-                    required
-                    value={editingProduct.stock}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })}
-                    className="adm-input"
-                  />
-                </div>
+                {!isService(editingProduct) && (
+                  <div>
+                    <label className="adm-label">Stock</label>
+                    <input
+                      type="number"
+                      required
+                      value={editingProduct.stock}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, stock: parseInt(e.target.value) || 0 })}
+                      className="adm-input"
+                    />
+                  </div>
+                )}
               </div>
               
-              <ColorPicker
-                value={editingProduct.colors || []}
-                onChange={(colors) => setEditingProduct({ ...editingProduct, colors })}
-              />
+              {!isService(editingProduct) && (
+                <ColorPicker
+                  value={editingProduct.colors || []}
+                  onChange={(colors) => setEditingProduct({ ...editingProduct, colors })}
+                />
+              )}
 
               <ProductDetailsFields value={editingProduct} onChange={setEditingProduct} />
 
@@ -473,8 +479,9 @@ const SellerProducts = (props) => {
         {/* Add Product Form */}
         {showAddForm && (
           <div className="adm-card p-5 sm:p-6 mb-6">
-            <h2 className="adm-modal-title mb-5">Nouveau produit</h2>
+            <h2 className="adm-modal-title mb-5">{isService(newProduct) ? 'Nouveau service' : 'Nouveau produit'}</h2>
             <form onSubmit={handleAddProduct} className="space-y-6">
+              <ProductKindField value={newProduct} onChange={setNewProduct} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="adm-label">Nom du produit</label>
@@ -517,22 +524,26 @@ const SellerProducts = (props) => {
                     className="adm-input"
                   />
                 </div>
-                <div>
-                  <label className="adm-label">Stock</label>
-                  <input
-                    type="number"
-                    required
-                    value={newProduct.stock}
-                    onChange={(e) => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) || 0 })}
-                    className="adm-input"
-                  />
-                </div>
+                {!isService(newProduct) && (
+                  <div>
+                    <label className="adm-label">Stock</label>
+                    <input
+                      type="number"
+                      required
+                      value={newProduct.stock}
+                      onChange={(e) => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) || 0 })}
+                      className="adm-input"
+                    />
+                  </div>
+                )}
               </div>
               
-              <ColorPicker
-                value={newProduct.colors}
-                onChange={(colors) => setNewProduct({ ...newProduct, colors })}
-              />
+              {!isService(newProduct) && (
+                <ColorPicker
+                  value={newProduct.colors}
+                  onChange={(colors) => setNewProduct({ ...newProduct, colors })}
+                />
+              )}
 
               <ProductDetailsFields value={newProduct} onChange={setNewProduct} />
 
@@ -630,9 +641,13 @@ const SellerProducts = (props) => {
                       {hasPromo && <span className="text-sm text-gray-500 line-through">{formatPrice(product.price)}</span>}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      <span className={`px-2 py-0.5 rounded-full font-semibold ${product.stock > 0 ? (product.stock < 5 ? 'bg-yellow-100 text-yellow-900' : 'bg-green-100 text-green-800') : 'bg-red-100 text-red-800'}`}>
-                        {product.stock > 0 ? `Stock : ${product.stock}` : 'Rupture'}
-                      </span>
+                      {isService(product) ? (
+                        <span className="px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-900">Service</span>
+                      ) : (
+                        <span className={`px-2 py-0.5 rounded-full font-semibold ${product.stock > 0 ? (product.stock < 5 ? 'bg-yellow-100 text-yellow-900' : 'bg-green-100 text-green-800') : 'bg-red-100 text-red-800'}`}>
+                          {product.stock > 0 ? `Stock : ${product.stock}` : 'Rupture'}
+                        </span>
+                      )}
                       {categoryName && <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-800">{categoryName}</span>}
                       {product.colors?.length > 0 && (
                         <span className="flex items-center gap-0.5" role="img" aria-label={`${product.colors.length} couleur(s)`}>

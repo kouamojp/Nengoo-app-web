@@ -45,7 +45,30 @@ export const generateProductWhatsAppMessage = (product, language) => {
   const productName = typeof product.name === 'object' ? product.name[language] : product.name;
   const slug = product.slug || product.id;
   const productUrl = `${SITE_URL}/product/${slug}`;
+  if (product.kind === 'service') {
+    return `Bonjour ! Je suis intéressé(e) par votre service "${productName}" sur Nengoo : ${productUrl}. Pourriez-vous me donner vos disponibilités et vos conditions ? Merci !`;
+  }
   return `Bonjour! Je suis intéressé(e) par votre produit "${productName}" sur Nengoo: ${productUrl}. Pourriez-vous me donner plus d'informations? Merci!`;
+};
+
+/**
+ * Contact du vendeur sur WhatsApp à propos d'une annonce : le clic est
+ * enregistré (statistiques « Contacts WhatsApp » de l'admin) sans retarder
+ * l'ouverture de WhatsApp.
+ */
+export const contactSellerOnWhatsApp = ({ product, whatsapp, sellerId, sellerName, language }) => {
+  const productName = typeof product.name === 'object' ? product.name[language] : product.name;
+  fetch(`${API_URL}/analytics/whatsapp-click`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      productId: product.id,
+      productName,
+      sellerId: sellerId || product.sellerId,
+      sellerName: sellerName || product.sellerName,
+    }),
+  }).catch(() => {});
+  return openWhatsApp(whatsapp, generateProductWhatsAppMessage(product, language));
 };
 
 export const createSlug = (text) => {
