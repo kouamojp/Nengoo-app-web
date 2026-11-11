@@ -9,11 +9,12 @@ import SellerMessages from './SellerMessages';
 import SellerProfile from './SellerProfile';
 import SellerSupport from './SellerSupport';
 import { StatusBadge } from '../admin/AdminUI';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 export const formatXAF = (value) =>
-  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
+  `${numberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
 
 const Stat = ({ label, value, hint }) => (
   <div className="adm-card p-5">

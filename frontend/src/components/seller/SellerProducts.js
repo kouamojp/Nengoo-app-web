@@ -5,6 +5,7 @@ import ColorPicker from './ColorPicker';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
 import ProductDetailsFields, { ProductKindField } from './ProductDetailsFields';
 import { isService, productFormError, productPayload, withSpecList } from '../../lib/productRules';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -315,7 +316,7 @@ const SellerProducts = (props) => {
     };
   
     const formatPrice = (price) => {
-      return new Intl.NumberFormat('fr-FR', {
+      return numberFormat('fr-FR', {
         style: 'currency',
         currency: 'XAF',
         minimumFractionDigits: 0,

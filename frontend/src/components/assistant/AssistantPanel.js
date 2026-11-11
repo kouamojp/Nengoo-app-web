@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import { newConversationId, preparePhoto, sendToAssistant } from '../../lib/assistant';
 import { CameraIcon, SparkIcon } from '../ui/Icons';
+import { numberFormat } from '../../lib/numberFormat';
+import { imageFallback, NENGOO_IMAGE } from '../../lib/productImages';
 
 const STORAGE_KEY = 'nengoo-assistant';
 const MAX_LENGTH = 500;
 
-const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+const formatPrice = (price) => numberFormat('fr-FR', {
   style: 'currency',
   currency: 'XAF',
   minimumFractionDigits: 0,
@@ -39,7 +41,13 @@ const ProductResult = ({ product, t, onOpen }) => (
     className="flex gap-3 p-2 rounded-xl bg-white border border-gray-200 hover:border-purple-400 transition-colors text-left text-gray-900"
   >
     {product.image ? (
-      <img src={product.image} alt="" loading="lazy" className="w-16 h-16 rounded-lg object-cover bg-gray-100 shrink-0" />
+      <img
+        src={product.image || NENGOO_IMAGE}
+        alt=""
+        loading="lazy"
+        className={`w-16 h-16 rounded-lg object-cover bg-gray-100 shrink-0 ${product.image ? '' : 'img-logo'}`}
+        onError={imageFallback(null)}
+      />
     ) : (
       <span className="w-16 h-16 rounded-lg bg-gray-100 shrink-0" aria-hidden="true" />
     )}

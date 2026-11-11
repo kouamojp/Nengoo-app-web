@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 const formatXAF = (value) =>
-  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
+  `${numberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value || 0)} XAF`;
 
 // 1 250 000 -> « 1,3 M » ; 85 000 -> « 85 k » (étiquettes courtes du graphique)
 const compact = (value) =>
-  new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(value || 0);
+  numberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(value || 0);
 
 const Stat = ({ label, value }) => (
   <div className="adm-card p-5">

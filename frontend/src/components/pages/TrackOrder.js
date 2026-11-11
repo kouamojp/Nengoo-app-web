@@ -5,11 +5,12 @@ import { translations } from '../../lib/translations';
 import { orderStatusLabel, orderStatusTone } from '../../lib/orderStatuses';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const inputClass = 'w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500';
 
-const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+const formatPrice = (price) => numberFormat('fr-FR', {
   style: 'currency', currency: 'XAF', minimumFractionDigits: 0,
 }).format(price || 0);
 

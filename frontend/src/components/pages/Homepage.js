@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import PromoSlot from '../promotions/PromoSlot';
+import HighlightsSection from './HighlightsSection';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
@@ -19,7 +20,7 @@ import './HeroSwiper.css';
 import { PinIcon } from '../ui/Icons';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
 import { topLevelCategories, categoryFamilyIds, categoryName } from '../../lib/categories';
-import { listImage } from '../../lib/productImages';
+import { cardImage } from '../../lib/productImages';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -174,7 +175,7 @@ const Homepage = (props) => {
           ...p,
           name: { [language]: p.name },
           description: { [language]: p.description },
-          image: listImage(p) || 'https://via.placeholder.com/300',
+          image: cardImage(p),
           inStock: p.kind === 'service' || p.stock > 0,
           sellerWhatsApp: p.sellerWhatsapp,
           reviews: p.reviewsCount || 0,
@@ -451,6 +452,9 @@ const Homepage = (props) => {
           </div>
         </section>
       )}
+
+      {/* À la une : promus par l'équipe, puis les plus demandés */}
+      <HighlightsSection language={language} addToCart={addToCart} />
 
       {/* Bannière publicitaire (rien si aucune campagne en cours) */}
       <div className="container mx-auto px-4 pt-10 lg:pt-14 empty:hidden">

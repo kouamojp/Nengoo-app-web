@@ -23,9 +23,9 @@ export const conditionLabel = (value) =>
 
 /**
  * Premier problème de la fiche, ou null. En modification (previous), une
- * description ou des photos inchangées ne bloquent pas, comme côté serveur.
+ * description inchangée ne bloque pas, comme côté serveur.
  */
-export const productFormError = (product, imageCount, previous = null) => {
+export const productFormError = (product, _imageCount, previous = null) => {
   const price = Number(product.price) || 0;
   const promo = Number(product.promoPrice) || 0;
   if (price <= 0) return 'Le prix doit être supérieur à 0.';
@@ -34,8 +34,7 @@ export const productFormError = (product, imageCount, previous = null) => {
   if (descriptionChanged && (product.description || '').trim().length < MIN_DESCRIPTION_LENGTH) {
     return `La description doit faire au moins ${MIN_DESCRIPTION_LENGTH} caractères.`;
   }
-  const hadImages = previous && (previous.images || []).some(Boolean);
-  if (!imageCount && (!previous || hadImages)) return 'Ajoutez au moins une photo.';
+  // Photo facultative : sans photo, le logo de la boutique s'affiche
   return null;
 };
 

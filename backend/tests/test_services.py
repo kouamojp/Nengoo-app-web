@@ -61,7 +61,8 @@ def test_service_contact_and_checkout(monkeypatch):
         db = client[name]
         monkeypatch.setattr(server, "db", db)
         try:
-            await db.sellers.insert_one({"id": "s1", "whatsapp": "+237690000001", "businessName": "Atelier"})
+            await db.sellers.insert_one({"id": "s1", "whatsapp": "+237690000001", "businessName": "Atelier",
+                                         "logoUrl": "https://cdn/logo-atelier.png"})
             await db.products.insert_many([
                 {**server.service_fields({**BASE, "kind": "service"}), "id": "p_service", "status": "approved"},
                 {**BASE, "id": "p_article", "name": "Coque", "status": "approved"},
@@ -76,6 +77,9 @@ def test_service_contact_and_checkout(monkeypatch):
             assert listed["p_article"].sellerWhatsapp is None
             assert (await server.get_product("p_service")).sellerWhatsapp == "+237690000001"
             assert "sellerWhatsapp" not in (await db.products.find_one({"id": "p_service"}))
+            # Logo de la boutique sur tous les produits : image de secours
+            assert listed["p_article"].sellerLogo == listed["p_service"].sellerLogo == "https://cdn/logo-atelier.png"
+            assert "sellerLogo" not in (await db.products.find_one({"id": "p_article"}))
 
             # Un service ne se commande pas, même envoyé directement à l'API
             request = server.CheckoutRequest(
@@ -89,3 +93,15 @@ def test_service_contact_and_checkout(monkeypatch):
             await client.drop_database(name)
 
     asyncio.run(scenario())
+
+
+def test_photo_is_optional():
+    from catalog_rules import product_issues
+    assert product_issues(5000, [], "Description assez longue.") == []
+    assert product_issues(0, [], "court") != []  # prix et description restent obligatoires
+
+
+def test_assistant_sells_services():
+    import assistant_tools
+    assert {"kind": "service"} in assistant_tools.FOR_SALE["$or"]
+    assert "images" not in assistant_tools.FOR_SALE

@@ -12,13 +12,14 @@ import { CartIcon, WhatsAppIcon, PinIcon, InfoIcon } from '../ui/Icons';
 import ShopAboutDialog from '../product/ShopAboutDialog';
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
-import { listImage, previewImage } from '../../lib/productImages';
+import { listImage, previewImage, cardImage, imageFallback, isLogoImage, NENGOO_IMAGE } from '../../lib/productImages';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const SITE_URL = 'https://www.nengoo.com';
 
 const formatPrice = (price) => {
-  return new Intl.NumberFormat('fr-FR', {
+  return numberFormat('fr-FR', {
     style: 'currency',
     currency: 'XAF',
     minimumFractionDigits: 0,
@@ -66,7 +67,7 @@ const adaptProduct = (p, language) => ({
   ...p,
   name: { [language]: p.name },
   description: { [language]: p.description },
-  image: listImage(p) || process.env.PUBLIC_URL + '/images/logo-nengoo.png',
+  image: cardImage(p),
   images: p.images || [],
   inStock: p.kind === 'service' || p.stock > 0,
   reviews: p.reviewsCount || 0,
@@ -89,6 +90,23 @@ const ProductDetail = (props) => {
   const [showSendMessageModal, setShowSendMessageModal] = useState(false);
   const [showShopAbout, setShowShopAbout] = useState(false);
   const closeShopAbout = useCallback(() => setShowShopAbout(false), []);
+
+  // Visite de la fiche (classement « À la une ») : une par fiche et par session
+  const productId = product?.id;
+  useEffect(() => {
+    if (!productId) return;
+    const key = `nengoo-viewed-${productId}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // stockage indisponible : on compte quand même
+    }
+    const url = `${API_BASE_URL}/products/${encodeURIComponent(productId)}/view`;
+    if (!(navigator.sendBeacon && navigator.sendBeacon(url))) {
+      fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
+    }
+  }, [productId]);
   const [messageToSend, setMessageToSend] = useState('');
   const [open, setOpen] = React.useState(false);
   const [reviews, setReviews] = useState([]);
@@ -312,7 +330,8 @@ const ProductDetail = (props) => {
   }
 
   const name = product.name[language];
-  const images = product.images.length > 0 ? product.images : [process.env.PUBLIC_URL + '/images/logo-nengoo.png'];
+  // Sans photo : logo de la boutique, sinon logo Nengoo
+  const images = product.images.length > 0 ? product.images : [product.sellerLogo || NENGOO_IMAGE];
   const lightboxSlides = images.map(img => ({ src: img }));
 
   const isService = product.kind === 'service';
@@ -452,11 +471,8 @@ const ProductDetail = (props) => {
                 <img
                   src={previewImage(product, selectedImage) || images[selectedImage]}
                   alt={name}
-                  className="w-full h-full object-contain"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo-web.png';
-                  }}
+                  className={`w-full h-full object-contain ${product.images.length === 0 && isLogoImage(product, images[0]) ? 'img-logo' : ''}`}
+                  onError={imageFallback(product, process.env.PUBLIC_URL + '/images/logo-nengoo-web.png')}
                 />
                 {discountPercentage > 0 && (
                   <span className="price absolute top-3 left-3 bg-red-600 text-white px-2.5 py-1 text-base rounded-lg">
@@ -482,10 +498,7 @@ const ProductDetail = (props) => {
                         alt=""
                         className="w-full h-full object-cover"
                         loading="lazy"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = process.env.PUBLIC_URL + '/images/logo-nengoo-web.png';
-                        }}
+                        onError={imageFallback(product, process.env.PUBLIC_URL + '/images/logo-nengoo-web.png')}
                       />
                     </button>
                   ))}

@@ -44,7 +44,7 @@ def test_whatsapp(raw, expected):
 def test_product_issues():
     assert product_issues(5000, ["https://x/1.jpg"], "Robe en coton, taille M à XL") == []
     issues = product_issues(0, ["", None], "Robe")
-    assert len(issues) == 3
+    assert len(issues) == 2  # prix et description ; la photo est facultative
     # Seuls les champs modifiés sont contrôlés
     assert product_issues(None, None, "Robe", check=("description",)) == [
         "La description doit faire au moins 20 caractères."

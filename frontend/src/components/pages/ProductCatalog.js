@@ -9,11 +9,12 @@ import ProductCard from '../product/ProductCard';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
 import { FilterIcon } from '../ui/Icons';
 import { topLevelCategories, subcategoriesOf, categoryFamilyIds, categoryName, findCategoryByName } from '../../lib/categories';
-import { listImage } from '../../lib/productImages';
+import { cardImage } from '../../lib/productImages';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const formatPrice = (price) => new Intl.NumberFormat('fr-FR', {
+const formatPrice = (price) => numberFormat('fr-FR', {
   style: 'currency',
   currency: 'XAF',
   minimumFractionDigits: 0,
@@ -109,7 +110,7 @@ const ProductCatalog = (props) => {
         const adaptedProducts = shuffledData.map(p => ({
           ...p,
           name: { [language]: p.name }, // Adapt name to be an object
-          image: listImage(p) || process.env.PUBLIC_URL + '/images/logo-nengoo.png',
+          image: cardImage(p),
           inStock: p.kind === 'service' || p.stock > 0,
           sellerWhatsApp: p.sellerWhatsapp,
           reviews: p.reviewsCount || 0,

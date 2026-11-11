@@ -5,6 +5,7 @@ import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusBadge, EmptyRo
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
 import ProductDetailsFields, { ProductKindField } from '../seller/ProductDetailsFields';
 import { productFormError, productPayload, productDetailsPayload, withSpecList, isService } from '../../lib/productRules';
+import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -19,6 +20,7 @@ const ProductManagement = (props) => {
     const [editingProduct, setEditingProduct] = useState(null); // State for editing
     const [searchQuery, setSearchQuery] = useState('');
     const [dateOrder, setDateOrder] = useState('newest');
+    const [featuredOnly, setFeaturedOnly] = useState(false);
     const [selectedSellerId, setSelectedSellerId] = useState(''); // Filtre par vendeur
     const [selectedProducts, setSelectedProducts] = useState([]);
 
@@ -275,14 +277,7 @@ const ProductManagement = (props) => {
     const handleAddProduct = async (e) => {
         e.preventDefault();
 
-        if (uploadMethod === 'url' && !imageUrl.trim()) {
-            notify('Veuillez entrer une URL d\'image valide.', 'error');
-            return;
-        }
-        if (uploadMethod === 'file' && !selectedFile) {
-            notify('Veuillez sélectionner une image pour le produit.', 'error');
-            return;
-        }
+        // Image facultative : sans image, le logo de la boutique s'affiche
         const formError = productFormError(newProductData, 1);
         if (formError) {
             notify(formError, 'error');
@@ -293,8 +288,8 @@ const ProductManagement = (props) => {
         let finalImageUrl = '';
 
         try {
-            if (uploadMethod === 'url') {
-                finalImageUrl = imageUrl;
+            if (uploadMethod === 'url' || !selectedFile) {
+                finalImageUrl = uploadMethod === 'url' ? imageUrl.trim() : '';
             } else {
                 const presignedResponse = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
                     method: 'POST',
@@ -333,7 +328,7 @@ const ProductManagement = (props) => {
                 ...productPayload(newProductData),
                 sellerId: finalSellerId,
                 sellerName: finalSellerName,
-                images: [finalImageUrl],
+                images: finalImageUrl ? [finalImageUrl] : [],
             };
 
             const response = await fetch(`${API_BASE_URL}/products`, {
@@ -366,7 +361,7 @@ const ProductManagement = (props) => {
     };
     
     const formatPrice = (price) => {
-        return new Intl.NumberFormat('fr-FR', {
+        return numberFormat('fr-FR', {
           style: 'currency',
           currency: 'XAF',
           minimumFractionDigits: 0,
@@ -385,8 +380,25 @@ const ProductManagement = (props) => {
         // Filtrer par vendeur si un vendeur est sélectionné
         const matchesSeller = selectedSellerId === '' || product.sellerId === selectedSellerId;
 
-        return matchesSearch && matchesSeller;
+        return matchesSearch && matchesSeller && (!featuredOnly || product.featured);
     });
+
+    // « À la une » de l'accueil : en tête de la section, avant le classement automatique
+    const toggleFeatured = async (product) => {
+        const featured = !product.featured;
+        try {
+            const response = await fetch(`${API_BASE_URL}/products/${product.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ featured }),
+            });
+            if (!response.ok) throw new Error();
+            setProducts((list) => list.map((p) => (p.id === product.id ? { ...p, featured } : p)));
+            notify(featured ? `« ${product.name.trim()} » est à la une de l'accueil.` : `« ${product.name.trim()} » n'est plus mis en avant.`);
+        } catch {
+            notify("La mise à la une n'a pas été enregistrée.", 'error');
+        }
+    };
 
     // Les produits référencent leur catégorie par id (comme le formulaire vendeur et le catalogue public)
     const categoryName = (categoryId) => categoryPath(categories, categoryId);
@@ -426,6 +438,10 @@ const ProductManagement = (props) => {
             <Toolbar>
                 <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Rechercher par nom, description ou vendeur" />
                 <DateSortSelect value={dateOrder} onChange={setDateOrder} />
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+                    <input type="checkbox" checked={featuredOnly} onChange={(e) => setFeaturedOnly(e.target.checked)} />
+                    À la une ({products.filter((p) => p.featured).length})
+                </label>
                 <select
                     value={selectedSellerId}
                     onChange={(e) => setSelectedSellerId(e.target.value)}
@@ -579,7 +595,8 @@ const ProductManagement = (props) => {
                         </Field>
 
                         <fieldset className="space-y-3">
-                            <legend className="adm-label">Image du produit <span className="text-red-600" aria-hidden="true">*</span></legend>
+                            <legend className="adm-label">Image du produit (facultative)</legend>
+                            <p className="-mt-2 text-xs text-gray-500">Sans image, le logo de la boutique s'affiche à la place.</p>
                             <ChoiceCards
                                 name="uploadMethod"
                                 value={uploadMethod}
@@ -597,7 +614,6 @@ const ProductManagement = (props) => {
                                     placeholder="https://exemple.com/image.jpg"
                                     aria-label="URL de l'image"
                                     className="adm-input"
-                                    required
                                 />
                             ) : (
                                 <input
@@ -607,7 +623,6 @@ const ProductManagement = (props) => {
                                     className="adm-input py-2"
                                     accept="image/*"
                                     aria-label="Fichier image"
-                                    required
                                 />
                             )}
                         </fieldset>
@@ -668,6 +683,9 @@ const ProductManagement = (props) => {
                                         )}
                                         <div className="min-w-0">
                                             <p className="font-semibold leading-snug line-clamp-2">{product.name}</p>
+                                            {product.featured && (
+                                                <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-yellow-300 text-purple-950 text-xs font-semibold">À la une</span>
+                                            )}
                                             <p className="text-xs text-gray-500">{categoryName(product.category) || 'Sans catégorie'}</p>
                                         </div>
                                     </div>
@@ -688,6 +706,9 @@ const ProductManagement = (props) => {
                                 </td>
                                 <td className="adm-td"><StatusBadge status={product.status} /></td>
                                 <td className="adm-td whitespace-nowrap text-right">
+                                    <button onClick={() => toggleFeatured(product)} className="adm-link !min-h-0 mr-4">
+                                        {product.featured ? 'Retirer de la une' : 'Mettre à la une'}
+                                    </button>
                                     <button onClick={() => setEditingProduct(withSpecList(product))} className="adm-link !min-h-0">Modifier</button>
                                     <button onClick={() => handleDeleteProduct(product.id)} className="adm-link-danger !min-h-0 ml-4">Supprimer</button>
                                 </td>

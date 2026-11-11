@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
+import { numberFormat } from '../../lib/numberFormat';
 
 const inputClass = 'w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500';
 
@@ -100,7 +101,7 @@ const Checkout = (props) => {
   }, [API_BASE_URL]);
 
   const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', {
+    return numberFormat('fr-FR', {
       style: 'currency',
       currency: 'XAF',
       minimumFractionDigits: 0,
