@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import SellerHeader from './SellerHeader';
 import { Field } from '../admin/AdminUI';
 import { CITIES as cameroonCities } from '../../lib/cities';
+import { RichText, RichTextEditor } from '../ui/RichText';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -83,7 +84,7 @@ const SellerProfile = (props) => {
           whatsapp: form.whatsapp.trim(),
           address: form.address.trim(),
           city: form.city,
-          description: form.description.trim(),
+          description: form.description,
           logoUrl: form.logoUrl || null,
           deliveryPrice: Number(form.deliveryPrice) || 0,
           socialMedia: { ...(user.socialMedia || {}), facebook: form.facebook.trim() || undefined },
@@ -152,7 +153,7 @@ const SellerProfile = (props) => {
             <Row label="E-mail">{form.email}</Row>
             <Row label="Adresse">{[form.address, form.city].filter(Boolean).join(', ')}</Row>
             <Row label="Frais de livraison">{formatXAF(form.deliveryPrice)}</Row>
-            <Row label="Présentation">{form.description}</Row>
+            <Row label="Présentation">{form.description && <RichText value={form.description} className="text-gray-800" />}</Row>
             <Row label="Facebook">{form.facebook && <a href={form.facebook} target="_blank" rel="noopener noreferrer" className="adm-link">{form.facebook}</a>}</Row>
           </dl>
         </section>
@@ -199,9 +200,16 @@ const SellerProfile = (props) => {
             </Field>
           </div>
 
-          <Field label="Présentation de la boutique">
-            <textarea className="adm-input" rows={4} value={form.description} onChange={set('description')} />
-          </Field>
+          <div>
+            <span id="seller-description-label" className="adm-label">Présentation de la boutique</span>
+            <RichTextEditor
+              ariaLabelledBy="seller-description-label"
+              value={form.description}
+              onChange={(html) => setForm(f => ({ ...f, description: html }))}
+              placeholder="Ce que vous vendez, vos points forts, vos horaires…"
+            />
+            <span className="block text-xs text-gray-500 mt-1">Visible sur votre page boutique et depuis vos fiches produit.</span>
+          </div>
           <Field label="Page Facebook" hint="Facultatif.">
             <input className="adm-input" type="url" value={form.facebook} onChange={set('facebook')} placeholder="https://facebook.com/…" />
           </Field>

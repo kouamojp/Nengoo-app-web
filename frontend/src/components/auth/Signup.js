@@ -7,6 +7,8 @@ import {
   PasswordInput, PhoneInput, rememberType, SubmitButton,
 } from './AuthLayout';
 import { isValidPhone, PHONE_COUNTRIES, toInternational } from '../../lib/phoneCountries';
+import { RichTextEditor } from '../ui/RichText';
+import { isBlank } from '../../lib/richText';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const MIN_PASSWORD_LENGTH = 6; // comme le serveur (password_reset.py)
@@ -51,6 +53,11 @@ const Signup = ({ language, setUser }) => {
     // Le numéro devient l'identifiant du compte : il doit être complet pour le pays choisi
     if (!isValidPhone(country, form.whatsapp)) {
       setError(t.invalidPhone);
+      return;
+    }
+    if (seller && isBlank(form.description)) {
+      setError(t.descriptionRequired);
+      document.getElementById('signup-description')?.focus();
       return;
     }
     setSending(true);
@@ -146,9 +153,17 @@ const Signup = ({ language, setUser }) => {
                 <Field id="signup-address" label={t.address} className="sm:col-span-2">
                   <input {...bind('address')} type="text" autoComplete="street-address" className={fieldClass} />
                 </Field>
-                <Field id="signup-description" label={t.description} className="sm:col-span-2">
-                  <textarea {...bind('description')} rows={3} placeholder={t.descriptionPlaceholder} className={`${fieldClass} h-auto py-3`} />
-                </Field>
+                <div className="sm:col-span-2">
+                  <p id="signup-description-label" className="mb-1.5 text-sm font-semibold text-gray-900">{t.description}</p>
+                  <RichTextEditor
+                    id="signup-description"
+                    ariaLabelledBy="signup-description-label"
+                    value={form.description}
+                    onChange={(html) => setForm(current => ({ ...current, description: html }))}
+                    placeholder={t.descriptionPlaceholder}
+                    minHeight="7rem"
+                  />
+                </div>
               </div>
             </fieldset>
           </>

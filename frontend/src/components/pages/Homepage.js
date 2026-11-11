@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
+import PromoSlot from '../promotions/PromoSlot';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
@@ -449,6 +450,11 @@ const Homepage = (props) => {
           </div>
         </section>
       )}
+
+      {/* Bannière publicitaire (rien si aucune campagne en cours) */}
+      <div className="container mx-auto px-4 pt-10 lg:pt-14 empty:hidden">
+        <PromoSlot placement="home_middle" language={language} />
+      </div>
 
       {/* Featured Products */}
       <section className="pt-10 pb-14 lg:pt-14 lg:pb-20">
