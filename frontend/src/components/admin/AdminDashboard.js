@@ -17,13 +17,15 @@ import AboutPageManagement from './AboutPageManagement';
 import WhatsAppAnalytics from './WhatsAppAnalytics';
 import AdminLayout, { CHAT_REPORT_ROLES, useAdminPendingCounts } from './AdminLayout';
 import ChatReports from './ChatReports';
+import PromoCodesManager from '../promo/PromoCodesManager';
+import { SectionHeader } from './AdminUI';
 import SupportInbox from './SupportInbox';
 import PromotionManagement from './PromotionManagement';
 import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SECTIONS = ['dashboard', 'support', 'chatReports', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping'];
+const SECTIONS = ['dashboard', 'support', 'chatReports', 'promoCodes', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping'];
 
 const formatPrice = (price) => numberFormat('fr-FR', {
     style: 'currency',
@@ -223,6 +225,19 @@ const AdminDashboard = (props) => {
         </div>
         {activeSection === 'support' && <SupportInbox user={user} active />}
         {activeSection === 'chatReports' && CHAT_REPORT_ROLES.includes(user.role) && <ChatReports />}
+        {activeSection === 'promoCodes' && ['super_admin', 'admin'].includes(user.role) && (
+            <PromoCodesManager
+                isTeam
+                header={(count, action) => (
+                    <SectionHeader
+                        title="Codes promo"
+                        count={count}
+                        description="Codes de l'équipe, financés par Nengoo (le vendeur est payé au prix plein), et codes créés par les vendeurs sur leur boutique, à leur charge."
+                        actions={action}
+                    />
+                )}
+            />
+        )}
         {activeSection === 'reclassify' && <ProductReclassification />}
         {activeSection === 'searchMisses' && <SearchMisses />}
         {activeSection === 'assistant' && <AssistantStats />}

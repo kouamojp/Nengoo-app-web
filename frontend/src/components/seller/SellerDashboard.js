@@ -8,6 +8,7 @@ import SellerAnalytics from './SellerAnalytics';
 import SellerMessages from './SellerMessages';
 import SellerProfile from './SellerProfile';
 import SellerSupport from './SellerSupport';
+import SellerPromoCodes from './SellerPromoCodes';
 import { StatusBadge } from '../admin/AdminUI';
 import { numberFormat } from '../../lib/numberFormat';
 
@@ -128,6 +129,7 @@ const SECTIONS = {
   orders: SellerOrders,
   analytics: SellerAnalytics,
   messages: SellerMessages,
+  promos: SellerPromoCodes,
   support: SellerSupport,
   profile: SellerProfile,
 };

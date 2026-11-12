@@ -11,6 +11,7 @@ import {
   MenuIcon,
   ExternalIcon,
   ChatIcon,
+  TagIcon,
 } from "../ui/Icons";
 import { useSupportUnread } from "../../lib/support";
 import { useChatUnread } from "../../lib/chat";
@@ -30,6 +31,12 @@ export const SELLER_SECTIONS = [
     label: "Statistiques",
     path: "/seller/analytics",
     Icon: ChartIcon,
+  },
+  {
+    id: "promos",
+    label: "Codes promo",
+    path: "/seller/promos",
+    Icon: TagIcon,
   },
   {
     id: "messages",

@@ -8,7 +8,13 @@ export const PLACEMENT_RATIOS = {
   home_middle: { desktop: [1200, 300], mobile: [800, 400] },
   category_top: { desktop: [1200, 200], mobile: [800, 300] },
   app_home: { desktop: null, mobile: [800, 400] },
+  feed: { desktop: [1200, 300], mobile: [800, 400] },
 };
+
+// Bannières entre les produits : une tous les FEED_EVERY produits (multiple de
+// 2, 3 et 4 colonnes : jamais de rangée à moitié vide), FEED_PER_PAGE au plus
+export const FEED_EVERY = 12;
+export const FEED_PER_PAGE = 4;
 
 const CACHE_MS = 60 * 1000;
 const cache = new Map();
@@ -38,6 +44,40 @@ export const pickWeighted = (items, random = Math.random) => {
     if (roll < 0) return item;
   }
   return items[items.length - 1];
+};
+
+/**
+ * Ordre d'affichage tiré au sort, pondéré et sans répétition : la campagne de
+ * poids 3 a trois fois plus de chances de passer en premier.
+ */
+export const orderWeighted = (items, random = Math.random) => {
+  const pool = [...items];
+  const ordered = [];
+  while (pool.length) {
+    const picked = pickWeighted(pool, random);
+    ordered.push(picked);
+    pool.splice(pool.indexOf(picked), 1);
+  }
+  return ordered;
+};
+
+/**
+ * Produits et bannières mêlés : une bannière après chaque groupe de `every`
+ * produits, `perPage` au plus, chaque campagne une seule fois. Pas de
+ * bannière après le dernier produit.
+ */
+export const interleavePromotions = (products, promotions, every = FEED_EVERY, perPage = FEED_PER_PAGE) => {
+  const slots = promotions.slice(0, perPage);
+  const out = [];
+  products.forEach((product, i) => {
+    out.push({ type: 'product', product });
+    const position = i + 1;
+    const slot = position / every - 1;
+    if (position % every === 0 && position < products.length && slot < slots.length) {
+      out.push({ type: 'promotion', promotion: slots[slot] });
+    }
+  });
+  return out;
 };
 
 const beacon = (path) => {

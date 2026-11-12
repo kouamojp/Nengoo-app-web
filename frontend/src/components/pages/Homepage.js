@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import PromoSlot from '../promotions/PromoSlot';
+import ProductGridWithPromos from '../promotions/ProductGridWithPromos';
 import HighlightsSection from './HighlightsSection';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
@@ -485,11 +486,12 @@ const Homepage = (props) => {
           {loading ? (
             <ProductGridSkeleton label={t.loadingProducts} />
           ) : featuredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5">
-              {featuredProducts.map(product => (
-                <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
-              ))}
-            </div>
+            <ProductGridWithPromos
+              className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5"
+              products={featuredProducts}
+              language={language}
+              renderProduct={(product) => <ProductCard product={product} language={language} addToCart={addToCart} />}
+            />
           ) : (
             <div className="py-14 px-6 bg-white rounded-xl border border-dashed border-gray-300 text-center">
               <h3 className="text-xl font-bold mb-2">{t.noProducts}</h3>

@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import PromoSlot from '../promotions/PromoSlot';
+import ProductGridWithPromos from '../promotions/ProductGridWithPromos';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
@@ -415,11 +416,13 @@ const ProductCatalog = (props) => {
                 </button>
               </div>
             ) : filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5">
-                {filteredProducts.map(product => (
-                  <ProductCard key={product.id} product={product} language={language} addToCart={addToCart} />
-                ))}
-              </div>
+              <ProductGridWithPromos
+                className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-5"
+                products={filteredProducts}
+                categories={[selectedCategoryId, selectedCategoryObj?.parentId]}
+                language={language}
+                renderProduct={(product) => <ProductCard product={product} language={language} addToCart={addToCart} />}
+              />
             ) : (
               <div className="py-14 px-6 bg-white rounded-xl border border-dashed border-gray-300 text-center">
                 <h2 className="text-xl font-bold mb-2">{products.length === 0 ? t.noProducts : t.noMatch}</h2>

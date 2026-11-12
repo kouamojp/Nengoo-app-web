@@ -182,3 +182,16 @@ def test_admin_routes_guarded():
     assert admin_paths and admin_paths <= guarded
     public = {r.path for r in ads.router.routes} - admin_paths
     assert all("ads" not in path for path in public)  # bloqueurs de publicité
+
+
+def test_feed_placements():
+    """Entre les produits : 4 bannières au plus par page, ciblables par catégorie."""
+    for key in ("feed", "app_feed"):
+        spec = ads.PLACEMENTS[key]
+        assert spec["perPage"] == ads.FEED_PER_PAGE == 4 and spec["targetable"]
+    # Site : multiple de 2, 3 et 4 colonnes (pas de rangée à moitié vide)
+    assert ads.PLACEMENTS["feed"]["every"] % 12 == 0
+    assert banner(placement="feed", categories=["cat_1"]).categories == ["cat_1"]
+    app = banner(placement="app_feed", imageMobile=None)
+    assert app.imageDesktop is None and app.imageMobile == IMG
+
