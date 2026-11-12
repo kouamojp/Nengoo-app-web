@@ -68,6 +68,7 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
 from category_tree import normalize_name, suggest_category_name
 from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
+from geocode import geocode
 from product_search import normalize_query, search_products, search_products_detailed
 from image_variants import aligned_variants, refresh_product_variants
 from sms import order_created_text, order_status_text, send_sms
@@ -644,7 +645,24 @@ class PickupPoint(BaseModel):
     rating: float = 0.0
     reviewsCount: int = 0
     approvedDate: Optional[datetime] = None
-    
+    # Position GPS (saisie par l'admin ou calculée depuis l'adresse) : sert à
+    # trouver le point le plus proche dans l'app
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    # Dernier essai de géocodage (évite de réessayer sans arrêt une adresse introuvable)
+    geocodedAt: Optional[datetime] = None
+
+
+def has_coordinates(point: dict) -> bool:
+    return point.get("latitude") is not None and point.get("longitude") is not None
+
+
+async def locate_pickup_point(point: "PickupPoint") -> None:
+    """Calcule latitude et longitude depuis l'adresse (None si introuvable)."""
+    found = await geocode(point.address, point.city, point.region)
+    point.latitude, point.longitude = found if found else (None, None)
+    point.geocodedAt = datetime.utcnow()
+
 class PickupPointCreate(BaseModel):
     name: str
     address: str
@@ -656,6 +674,9 @@ class PickupPointCreate(BaseModel):
     email: str
     hours: str
     description: str
+    # Facultatives : calculées depuis l'adresse si absentes
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 
 class PickupPointUpdate(BaseModel):
     name: Optional[str] = None
@@ -669,6 +690,9 @@ class PickupPointUpdate(BaseModel):
     hours: Optional[str] = None
     description: Optional[str] = None
     status: Optional[str] = None
+    # null efface les coordonnées : elles sont alors recalculées depuis l'adresse
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 class Category(BaseModel):
     id: str = Field(default_factory=lambda: f"cat_{str(uuid.uuid4())[:8]}")
     name: str
@@ -3531,6 +3555,9 @@ async def list_cities():
 async def create_pickup_point(pickup_data: PickupPointCreate):
     pickup_data.city = normalize_city(pickup_data.city)
     pickup_point = PickupPoint(**pickup_data.dict())
+    # Coordonnées saisies par l'admin, sinon calculées depuis l'adresse
+    if not has_coordinates(pickup_point.dict()):
+        await locate_pickup_point(pickup_point)
     await db.pickupPoints.insert_one(pickup_point.dict())
     return pickup_point
 
@@ -3547,7 +3574,20 @@ async def update_pickup_point(pickup_point_id: str, pickup_data: PickupPointUpda
         update_data["city"] = normalize_city(update_data["city"])
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
-    
+
+    current = await db.pickupPoints.find_one({"id": pickup_point_id})
+    if not current:
+        raise HTTPException(status_code=404, detail="Pickup point not found")
+    merged = {**current, **update_data}
+    moved = any(k in update_data and update_data[k] != current.get(k) for k in ("address", "city", "region"))
+    coords_edited = any(k in update_data and update_data[k] != current.get(k) for k in ("latitude", "longitude"))
+    # Adresse modifiée sans nouvelles coordonnées, ou coordonnées effacées :
+    # on recalcule depuis l'adresse
+    if (moved and not coords_edited) or not has_coordinates(merged):
+        point = PickupPoint(**merged)
+        await locate_pickup_point(point)
+        update_data.update(latitude=point.latitude, longitude=point.longitude, geocodedAt=point.geocodedAt)
+
     await db.pickupPoints.update_one({"id": pickup_point_id}, {"$set": update_data})
     updated_pickup_point = await db.pickupPoints.find_one({"id": pickup_point_id})
     if not updated_pickup_point:
@@ -4130,12 +4170,14 @@ from routers.support import router as support_router
 from routers.push import router as push_router
 from routers.ads import router as ads_router, ensure_indexes as ensure_ad_indexes
 from routers.highlights import router as highlights_router
+from routers.nearby import router as nearby_router
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
 api_router.include_router(support_router)
 api_router.include_router(push_router)
 api_router.include_router(ads_router)
 api_router.include_router(highlights_router)
+api_router.include_router(nearby_router)
 
 
 @app.on_event("startup")

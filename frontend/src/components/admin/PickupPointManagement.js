@@ -7,6 +7,10 @@ import { SectionHeader, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
+// Champ GPS vide → null : le backend recalcule la position depuis l'adresse
+const toCoordinate = (value) => (value === '' || value == null || Number.isNaN(Number(value)) ? null : Number(value));
+const withCoordinates = (data) => ({ ...data, latitude: toCoordinate(data.latitude), longitude: toCoordinate(data.longitude) });
+
 const PickupPointManagement = (props) => {
     const [pickupPoints, setPickupPoints] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -104,7 +108,7 @@ const PickupPointManagement = (props) => {
             const response = await fetch(`${API_BASE_URL}/pickup-points`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Admin-Role': 'super_admin' },
-                body: JSON.stringify(newPickupPointData),
+                body: JSON.stringify(withCoordinates(newPickupPointData)),
             });
             if (!response.ok) {
                 const err = await response.json();
@@ -132,7 +136,7 @@ const PickupPointManagement = (props) => {
             const response = await fetch(`${API_BASE_URL}/pickup-points/${currentPickupPoint.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Admin-Role': 'super_admin' },
-                body: JSON.stringify(currentPickupPoint),
+                body: JSON.stringify(withCoordinates(currentPickupPoint)),
             });
             if (!response.ok) {
                 const err = await response.json();
@@ -214,6 +218,14 @@ const PickupPointManagement = (props) => {
                 </Field>
                 <Field label="Email" required>
                     <input type="email" name="email" value={data.email} onChange={onChange} className="adm-input" required />
+                </Field>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Latitude" hint="Vide : calculée depuis l'adresse.">
+                    <input type="number" step="any" min="-90" max="90" name="latitude" value={data.latitude ?? ''} onChange={onChange} placeholder="Ex. : 4.0511" className="adm-input" />
+                </Field>
+                <Field label="Longitude" hint="Sert à trouver le point le plus proche dans l'app.">
+                    <input type="number" step="any" min="-180" max="180" name="longitude" value={data.longitude ?? ''} onChange={onChange} placeholder="Ex. : 9.7679" className="adm-input" />
                 </Field>
             </div>
             <Field label="Horaires" required>
@@ -303,6 +315,11 @@ const PickupPointManagement = (props) => {
                                 <td className="adm-td">
                                     <p className="font-semibold">{point.name}</p>
                                     <p className="text-xs text-gray-500">{[point.address, point.city].filter(Boolean).join(', ')}</p>
+                                    {point.latitude == null || point.longitude == null ? (
+                                        <p className="text-xs text-amber-700">Position GPS introuvable : saisissez-la pour l'app.</p>
+                                    ) : (
+                                        <a href={`https://www.openstreetmap.org/?mlat=${point.latitude}&mlon=${point.longitude}#map=17/${point.latitude}/${point.longitude}`} target="_blank" rel="noopener noreferrer" className="text-xs adm-link !min-h-0">Voir sur la carte</a>
+                                    )}
                                 </td>
                                 <td className="adm-td">
                                     <p>{point.managerName}</p>
