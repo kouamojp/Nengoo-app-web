@@ -19,7 +19,7 @@ const parseDate = (value) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(value) ? value
  * vendeur et le profil acheteur. `mine(message)` dit si un message est du
  * côté de celui qui regarde (affiché à droite).
  */
-const SupportChat = ({ messages, mine, loading, error, onSend, emptyText, placeholder = 'Votre message…', className = 'h-[28rem]' }) => {
+const SupportChat = ({ messages, mine, loading, error, onSend, emptyText, placeholder = 'Votre message…', className = 'h-[28rem]', renderExtra, disabledText }) => {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
@@ -73,7 +73,8 @@ const SupportChat = ({ messages, mine, loading, error, onSend, emptyText, placeh
               {showDay && <p className="pt-2 text-center text-xs font-semibold text-gray-500 first-letter:uppercase">{day}</p>}
               <div className={`flex ${own ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2 ${own ? 'bg-purple-700 text-white rounded-br-md' : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'}`}>
-                  {!own && <p className="text-xs font-bold text-purple-800 mb-0.5">{message.senderName}</p>}
+                  {!own && message.senderName && <p className="text-xs font-bold text-purple-800 mb-0.5">{message.senderName}</p>}
+                  {renderExtra && renderExtra(message, own)}
                   <p className="whitespace-pre-wrap break-words">{message.body}</p>
                   <p className={`mt-1 text-right text-xs ${own ? 'text-purple-200' : 'text-gray-500'}`}>
                     {own && message.senderType === 'admin' && `${message.senderName} · `}
@@ -86,6 +87,9 @@ const SupportChat = ({ messages, mine, loading, error, onSend, emptyText, placeh
         })}
       </div>
 
+      {disabledText ? (
+        <p className="border-t border-gray-200 bg-white p-4 text-center text-sm text-gray-600">{disabledText}</p>
+      ) : (
       <form onSubmit={submit} className="border-t border-gray-200 bg-white p-3">
         {sendError && <p role="alert" className="mb-2 text-sm text-red-700">{sendError}</p>}
         <div className="flex items-end gap-2">
@@ -110,6 +114,7 @@ const SupportChat = ({ messages, mine, loading, error, onSend, emptyText, placeh
           </button>
         </div>
       </form>
+      )}
     </div>
   );
 };

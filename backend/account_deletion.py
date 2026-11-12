@@ -12,11 +12,19 @@ DELETED_NAME = "Compte supprimé"
 
 
 async def _delete_conversations(db, field: str, user_id: str) -> None:
+    # Ancienne messagerie (retirée) et messagerie acheteur ↔ vendeur actuelle
     conversations = await db.conversations.find({field: user_id}).to_list(None)
     ids = [c["id"] for c in conversations if c.get("id")]
     if ids:
         await db.messages.delete_many({"conversation_id": {"$in": ids}})
     await db.conversations.delete_many({field: user_id})
+    chat_field = "buyerId" if field == "buyer_id" else "sellerId"
+    threads = await db.chat_threads.find({chat_field: user_id}).to_list(None)
+    thread_ids = [t["id"] for t in threads if t.get("id")]
+    if thread_ids:
+        await db.chat_messages.delete_many({"threadId": {"$in": thread_ids}})
+        await db.chat_reports.delete_many({"threadId": {"$in": thread_ids}})
+    await db.chat_threads.delete_many({chat_field: user_id})
 
 
 async def erase_buyer(db, buyer_id: str) -> None:

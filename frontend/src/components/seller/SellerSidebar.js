@@ -13,6 +13,7 @@ import {
   ChatIcon,
 } from "../ui/Icons";
 import { useSupportUnread } from "../../lib/support";
+import { useChatUnread } from "../../lib/chat";
 
 // Sections de l'espace vendeur ; chacune a sa propre URL (lien direct, retour arrière)
 export const SELLER_SECTIONS = [
@@ -85,6 +86,7 @@ const SellerSidebar = ({
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const supportUnread = useSupportUnread(user);
+  const chatUnread = useChatUnread(user);
 
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
@@ -143,7 +145,9 @@ const SellerSidebar = ({
                 ? pendingOrders
                 : item.id === "support"
                   ? supportUnread
-                  : 0;
+                  : item.id === "messages"
+                    ? chatUnread
+                    : 0;
             return (
               <li key={item.id}>
                 <Link
@@ -165,7 +169,7 @@ const SellerSidebar = ({
                     <span
                       className="price min-w-[1.5rem] h-6 px-1.5 rounded-full bg-yellow-300 text-purple-950 text-xs flex items-center justify-center"
                       aria-label={
-                        item.id === "support"
+                        item.id === "support" || item.id === "messages"
                           ? `${count} message${count > 1 ? "s" : ""} non lu${count > 1 ? "s" : ""}`
                           : `${count} à confirmer`
                       }

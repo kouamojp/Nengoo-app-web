@@ -5,9 +5,9 @@ Un seul fil par compte (comme une conversation WhatsApp avec le support) :
 l'admin comme l'utilisateur peuvent l'ouvrir. Distinct des échanges
 acheteur ↔ vendeur sur les produits (/messages, /conversations).
 
-Identité : les en-têtes X-Seller-Id / X-Buyer-Id et X-Admin-Id / X-Admin-Role
-sont vérifiés (ou posés) par IdentityMiddleware à partir du jeton de session ;
-les droits admin ne viennent jamais du client.
+Identité : le compte vient du seul jeton de session (session_auth), jamais
+d'un en-tête ; les droits admin (X-Admin-Role) sont posés par
+IdentityMiddleware à partir du jeton, jamais par le client.
 
 Alertes par e-mail, sans inonder : l'équipe est prévenue quand un compte écrit
 alors que sa conversation n'avait rien en attente ; le compte, quand l'équipe
@@ -21,13 +21,14 @@ import uuid
 from datetime import datetime
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, status
 from fastapi_mail import MessageSchema
 from pydantic import BaseModel, Field, field_validator
 from pymongo import ReturnDocument
 
 from push import notify
 from server import SITE_URL, db, fm, support_or_higher_required
+from session_auth import require_session
 
 logger = logging.getLogger(__name__)
 
@@ -248,17 +249,14 @@ async def _post(thread: dict, sender_type: str, sender_id: str, sender_name: str
 
 # --- Côté vendeur / acheteur ---------------------------------------------------
 
-async def current_account(
-    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id"),
-    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
-) -> tuple:
-    if x_seller_id and x_buyer_id:
-        raise HTTPException(status_code=400, detail="Un seul type de compte à la fois")
-    if x_seller_id:
-        return "seller", x_seller_id
-    if x_buyer_id:
-        return "buyer", x_buyer_id
-    raise HTTPException(status_code=401, detail="Connectez-vous pour écrire à l'équipe Nengoo")
+async def current_account(request: Request) -> tuple:
+    """Acheteur ou vendeur de la session (jeton vérifié). Un en-tête X-Seller-Id
+    ou X-Buyer-Id seul ne suffit pas : il permettait de lire la conversation
+    d'un autre compte ou de recevoir ses notifications push."""
+    claims = require_session(request)
+    if claims.get("typ") not in ("buyer", "seller"):
+        raise HTTPException(status_code=403, detail="Réservé aux comptes acheteur et vendeur")
+    return claims["typ"], claims["sub"]
 
 
 @router.get("/support/thread", response_model=ThreadWithMessages)

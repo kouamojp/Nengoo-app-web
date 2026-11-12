@@ -418,6 +418,12 @@ Le middleware `backend/auth_tokens.py` vérifie que les en-têtes d'identité co
 3. Mettre `LEGACY_AUTH_HEADERS=false` dans `.env`, puis `touch tmp/restart.txt`.
    Une session sans jeton reçoit alors un 401 et l'utilisateur est renvoyé vers la connexion.
 
+Quel que soit ce réglage, les routes qui exposent des données privées ou touchent au compte
+n'acceptent que le jeton (`backend/session_auth.py`) : messagerie (`/api/chat`, `/api/support`),
+notifications, commandes, adresses enregistrées, statistiques vendeur, profil vendeur, produits
+et upload côté vendeur, avis, favoris, jetons push. Un ancien en-tête seul y reçoit un 401
+`auth_required` (retour à la connexion). `LEGACY_AUTH_HEADERS=false` reste conseillé pour le reste.
+
 Ne jamais changer `JWT_SECRET_KEY` sans raison : toutes les sessions seraient invalidées.
 
 ---
