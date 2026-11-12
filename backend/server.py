@@ -77,6 +77,9 @@ from order_flow import RELEASES_STOCK, STATUSES as ORDER_STATUSES, check_transit
 from account_deletion import erase_buyer, erase_seller
 from rich_text import sanitize_description
 app.add_middleware(IdentityMiddleware)
+import session_auth  # noqa: E402
+from session_auth import is_account, is_staff, require_account_or_staff, require_session, session_claims  # noqa: E402
+session_auth.install(app)
 
 @app.exception_handler(DuplicateKeyError)
 async def duplicate_key_handler(_request, error):
@@ -190,24 +193,20 @@ def migrate_seller_data(seller_data: dict) -> dict:
 
 # --- Security (Mock Authorization) ---
 
-async def get_user_id_from_request(
-    authorization: Optional[str] = Header(None),
-    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
-    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")
-) -> Optional[str]:
-    """Extract user ID from Authorization Bearer token or X-Buyer-Id/X-Seller-Id headers"""
-    # First check custom headers (legacy support)
-    if x_buyer_id:
-        return x_buyer_id
-    if x_seller_id:
-        return x_seller_id
+def _claimed_identity_without_session(request: Request) -> bool:
+    """Un ancien en-tête d'identité (ou un « jeton » qui n'est qu'un id) sans
+    session valide : on demande de se reconnecter au lieu de le croire."""
+    return any(request.headers.get(h) for h in ("x-buyer-id", "x-seller-id", "authorization"))
 
-    # Extract from Bearer token
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization.replace("Bearer ", "").strip()
-        # Token is the user ID itself (e.g., "buyer_73b41c54")
-        return token
 
+async def get_user_id_from_request(request: Request) -> Optional[str]:
+    """Acheteur ou vendeur de la session (favoris, notes). Jamais un en-tête seul :
+    il suffirait de l'écrire pour lire ou modifier les favoris d'un autre."""
+    claims = session_claims(request)
+    if claims and claims.get("typ") in ("buyer", "seller"):
+        return claims["sub"]
+    if not claims and _claimed_identity_without_session(request):
+        raise session_auth.SessionRequired()
     return None
 
 async def get_current_admin_role(x_admin_role: str = Header(None)) -> Optional[str]:
@@ -241,8 +240,15 @@ async def support_or_higher_required(role: str = Depends(get_current_admin_role)
             detail="Support, Moderator, Admin, or Super admin privileges required."
         )
 
-async def get_current_seller_optional(x_seller_id: Optional[str] = Header(None)) -> Optional[str]:
-    return x_seller_id
+async def get_current_seller_optional(request: Request) -> Optional[str]:
+    """Vendeur de la session. Un en-tête X-Seller-Id sans jeton ne prouve rien
+    (n'importe qui peut l'écrire) : il faut se reconnecter."""
+    claims = session_claims(request)
+    if claims and claims.get("typ") == "seller":
+        return claims["sub"]
+    if not claims and request.headers.get("x-seller-id"):
+        raise session_auth.SessionRequired()
+    return None
 
 async def seller_id_or_support_required(seller_id: Optional[str] = Depends(get_current_seller_optional), role: str = Depends(get_current_admin_role)):
     if seller_id:
@@ -292,7 +298,7 @@ async def product_owner_or_moderator_required(
 
 async def order_owner_or_support_required(
     order_id: str,
-    seller_id: Optional[str] = Header(None, alias="X-Seller-Id"),
+    seller_id: Optional[str] = Depends(get_current_seller_optional),
     role: Optional[str] = Header(None, alias="X-Admin-Role")
 ):
     # If the user is support or higher, they are authorized.
@@ -818,17 +824,6 @@ class AboutPageSettingsUpdate(BaseModel):
     mission_text_1: Optional[str] = None
     mission_text_2: Optional[str] = None
 
-class Message(BaseModel):
-    id: str = Field(default_factory=lambda: f"msg_{str(uuid.uuid4())[:8]}")
-    conversation_id: str
-    sender_id: str
-    receiver_id: str
-    sender_type: str  # 'buyer' or 'seller'
-    receiver_type: str # 'buyer' or 'seller'
-    message: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    read_status: bool = False
-
 class Notification(BaseModel):
     id: str = Field(default_factory=lambda: f"notif_{str(uuid.uuid4())[:8]}")
     recipient_id: str
@@ -847,16 +842,6 @@ class NotificationCreate(BaseModel):
     title: str
     message: str
     link: Optional[str] = None
-
-class Conversation(BaseModel):
-    id: str = Field(default_factory=lambda: f"conv_{str(uuid.uuid4())[:8]}")
-    buyer_id: str
-    seller_id: str
-    product_id: str
-    last_message_timestamp: datetime = Field(default_factory=datetime.utcnow)
-    last_message_preview: str
-    seller_unread: bool = False
-    buyer_unread: bool = False
 
 class BulkDeleteRequest(BaseModel):
     ids: List[str]
@@ -1039,146 +1024,33 @@ async def reset_password_with_code(request: ResetPasswordCodeRequest, http_reque
     return {"message": "Password successfully reset"}
 
 # --- Messaging Endpoints ---
-
-class MessageCreate(BaseModel):
-    receiver_id: str
-    message: str
-    product_id: Optional[str] = None # Needed to create a new conversation
-
-@api_router.post("/messages", response_model=Message)
-async def create_message(message_data: MessageCreate, background_tasks: BackgroundTasks, sender_id: str = Header(...), sender_type: str = Header(...)):
-    if sender_type not in ['buyer', 'seller']:
-        raise HTTPException(status_code=400, detail="Invalid sender_type")
-
-    receiver_type = 'seller' if sender_type == 'buyer' else 'buyer'
-    
-    # Find conversation or create new one
-    conversation = await db.conversations.find_one({
-        "$or": [
-            {"buyer_id": sender_id, "seller_id": message_data.receiver_id, "product_id": message_data.product_id},
-            {"buyer_id": message_data.receiver_id, "seller_id": sender_id, "product_id": message_data.product_id}
-        ]
-    })
-
-    if not conversation:
-        if sender_type == 'buyer' and message_data.product_id:
-            conversation_id = f"conv_{str(uuid.uuid4())[:8]}"
-            new_conv = Conversation(
-                id=conversation_id,
-                buyer_id=sender_id,
-                seller_id=message_data.receiver_id,
-                product_id=message_data.product_id,
-                last_message_preview=message_data.message,
-                seller_unread=True
-            )
-            await db.conversations.insert_one(new_conv.dict())
-            conversation = new_conv.dict()
-        else:
-            raise HTTPException(status_code=400, detail="Conversation does not exist. A buyer must initiate a conversation from a product page.")
-    else:
-        # Update conversation
-        update_data = {
-            "last_message_timestamp": datetime.utcnow(),
-            "last_message_preview": message_data.message
-        }
-        if sender_type == 'buyer':
-            update_data['seller_unread'] = True
-        else:
-            update_data['buyer_unread'] = True
-        await db.conversations.update_one({"id": conversation["id"]}, {"$set": update_data})
-
-
-    new_message = Message(
-        conversation_id=conversation["id"],
-        sender_id=sender_id,
-        receiver_id=message_data.receiver_id,
-        sender_type=sender_type,
-        receiver_type=receiver_type,
-        message=message_data.message
-    )
-    await db.messages.insert_one(new_message.dict())
-
-    # Create in-app notification for receiver
-    notif_title = f"Nouveau message de {buyer.get('name')}" if sender_type == 'buyer' else f"Nouveau message de {seller.get('businessName')}"
-    notif_link = f"/seller/dashboard/messages/{conversation['id']}" if receiver_type == 'seller' else f"/profile/messages"
-    
-    new_notification = Notification(
-        recipient_id=message_data.receiver_id,
-        recipient_type=receiver_type,
-        type='new_message',
-        title=notif_title,
-        message=message_data.message[:50] + "..." if len(message_data.message) > 50 else message_data.message,
-        link=notif_link
-    )
-    await notify(db, new_notification.dict(), background_tasks)
-
-    # Send email notification to seller
-    if receiver_type == 'seller':
-        seller = await db.sellers.find_one({"id": message_data.receiver_id})
-        buyer = await db.users.find_one({"id": sender_id})
-        if seller and seller.get("email") and buyer:
-            email_message = MessageSchema(
-                subject=f"Nouveau message de {buyer.get('name')} sur Nengoo",
-                recipients=[seller["email"]],
-                template_body={
-                    "seller_name": seller["businessName"],
-                    "buyer_name": buyer.get('name'),
-                    "message_content": new_message.message,
-                    "conversation_url": f"https://www.nengoo.com/seller/dashboard/messages/{conversation['id']}"
-                },
-                subtype="html"
-            )
-            background_tasks.add_task(fm.send_message, email_message, template_name="new_message_seller.html")
-
-    return new_message
-
-@api_router.get("/conversations", response_model=List[Conversation])
-async def get_conversations(user_id: str = Header(...), user_type: str = Header(...)):
-    if user_type not in ['buyer', 'seller']:
-        raise HTTPException(status_code=400, detail="Invalid user_type")
-        
-    query_field = f"{user_type}_id"
-    conversations_cursor = db.conversations.find({query_field: user_id}).sort("last_message_timestamp", -1)
-    conversations = await conversations_cursor.to_list(1000)
-    return [Conversation(**c) for c in conversations]
-
-@api_router.get("/conversations/{conversation_id}/messages", response_model=List[Message])
-async def get_messages(conversation_id: str):
-    messages_cursor = db.messages.find({"conversation_id": conversation_id}).sort("timestamp", 1)
-    messages = await messages_cursor.to_list(1000)
-    return [Message(**m) for m in messages]
-
-@api_router.put("/messages/{message_id}/read", status_code=status.HTTP_204_NO_CONTENT)
-async def mark_message_as_read(message_id: str):
-    await db.messages.update_one({"id": message_id}, {"$set": {"read_status": True}})
-    return
+# Messagerie acheteur ↔ vendeur : routers/chat.py (l'ancienne version, cassée et
+# lisible par n'importe qui, a été retirée)
 
 # --- Notification Endpoints ---
 
+def _notification_owner(request: Request) -> tuple:
+    """Compte de la session (acheteur ou vendeur) : les notifications contiennent
+    des extraits de messages et de commandes, jamais lisibles par un autre."""
+    claims = require_session(request)
+    if claims.get("typ") not in ("buyer", "seller"):
+        raise HTTPException(status_code=403, detail="Notifications réservées aux comptes acheteur et vendeur.")
+    return claims["sub"], claims["typ"]
+
+
 @api_router.get("/notifications", response_model=List[Notification])
-async def get_notifications(
-    user_id: str = Header(..., alias="X-User-Id"),
-    user_type: str = Header(..., alias="X-User-Type")
-):
-    if user_type not in ['buyer', 'seller']:
-        raise HTTPException(status_code=400, detail="Invalid user_type")
-    
+async def get_notifications(request: Request):
+    user_id, user_type = _notification_owner(request)
     notifications_cursor = db.notifications.find({
         "recipient_id": user_id,
         "recipient_type": user_type
     }).sort("created_at", -1)
-    
     notifications = await notifications_cursor.to_list(100) # Limit to last 100 notifications
     return [Notification(**n) for n in notifications]
 
 @api_router.get("/notifications/unread-count")
-async def get_unread_notifications_count(
-    user_id: str = Header(..., alias="X-User-Id"),
-    user_type: str = Header(..., alias="X-User-Type")
-):
-    if user_type not in ['buyer', 'seller']:
-        raise HTTPException(status_code=400, detail="Invalid user_type")
-        
+async def get_unread_notifications_count(request: Request):
+    user_id, user_type = _notification_owner(request)
     count = await db.notifications.count_documents({
         "recipient_id": user_id,
         "recipient_type": user_type,
@@ -1187,12 +1059,10 @@ async def get_unread_notifications_count(
     return {"count": count}
 
 @api_router.put("/notifications/{notification_id}/read", status_code=status.HTTP_204_NO_CONTENT)
-async def mark_notification_as_read(
-    notification_id: str,
-    user_id: str = Header(..., alias="X-User-Id")
-):
+async def mark_notification_as_read(notification_id: str, request: Request):
+    user_id, user_type = _notification_owner(request)
     result = await db.notifications.update_one(
-        {"id": notification_id, "recipient_id": user_id},
+        {"id": notification_id, "recipient_id": user_id, "recipient_type": user_type},
         {"$set": {"read": True}}
     )
     if result.matched_count == 0:
@@ -1200,10 +1070,8 @@ async def mark_notification_as_read(
     return
 
 @api_router.put("/notifications/read-all", status_code=status.HTTP_204_NO_CONTENT)
-async def mark_all_notifications_as_read(
-    user_id: str = Header(..., alias="X-User-Id"),
-    user_type: str = Header(..., alias="X-User-Type")
-):
+async def mark_all_notifications_as_read(request: Request):
+    user_id, user_type = _notification_owner(request)
     await db.notifications.update_many(
         {"recipient_id": user_id, "recipient_type": user_type, "read": False},
         {"$set": {"read": True}}
@@ -1211,11 +1079,10 @@ async def mark_all_notifications_as_read(
     return
 
 @api_router.delete("/notifications/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_notification(
-    notification_id: str,
-    user_id: str = Header(..., alias="X-User-Id")
-):
-    result = await db.notifications.delete_one({"id": notification_id, "recipient_id": user_id})
+async def delete_notification(notification_id: str, request: Request):
+    user_id, user_type = _notification_owner(request)
+    result = await db.notifications.delete_one(
+        {"id": notification_id, "recipient_id": user_id, "recipient_type": user_type})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Notification not found")
     return
@@ -2134,9 +2001,13 @@ async def get_product_reviews(product_id: str):
 async def create_product_review(
     product_id: str,
     review_data: ReviewCreate,
-    x_buyer_id: str = Header(..., alias="X-Buyer-Id")
+    request: Request,
 ):
-    buyer_id = x_buyer_id
+    # Acheteur de la session : un avis ne s'écrit pas au nom d'un autre
+    claims = require_session(request)
+    if claims.get("typ") != "buyer":
+        raise HTTPException(status_code=403, detail="Seuls les acheteurs peuvent laisser un avis.")
+    buyer_id = claims["sub"]
     
     # 1. Check if product exists
     product = await db.products.find_one({"id": product_id})
@@ -2192,8 +2063,11 @@ class CanReviewResponse(BaseModel):
 @api_router.get("/products/{product_id}/can-review", response_model=CanReviewResponse)
 async def can_user_review_product(
     product_id: str,
-    x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id")
+    request: Request,
 ):
+    # Révèle ce qu'un acheteur a acheté : seulement pour lui-même
+    claims = session_claims(request)
+    x_buyer_id = claims["sub"] if claims and claims.get("typ") == "buyer" else None
     if not x_buyer_id:
         return CanReviewResponse(canReview=False, hasAlreadyReviewed=False)
 
@@ -2416,6 +2290,8 @@ async def get_user_interactions(
 # --- Seller Management ---
 # Champs sensibles jamais renvoyés par les routes publiques des vendeurs
 SELLER_PRIVATE_FIELDS = {"password", "reset_token", "reset_token_expiry"}
+# Données personnelles : visibles du vendeur lui-même et de l'équipe seulement
+SELLER_HIDDEN_FROM_PUBLIC = SELLER_PRIVATE_FIELDS | {"email", "oauth_provider", "oauth_uid", "last_login"}
 
 @api_router.post("/sellers", response_model=Seller, response_model_exclude=SELLER_PRIVATE_FIELDS)
 async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends(get_current_admin_role)):
@@ -2449,8 +2325,8 @@ async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends
 
 
 # Sur une liste, l'exclusion doit viser chaque élément ("__all__")
-@api_router.get("/sellers", response_model=List[Seller], response_model_exclude={"__all__": SELLER_PRIVATE_FIELDS})
-async def list_sellers():
+@api_router.get("/sellers")
+async def list_sellers(request: Request):
     sellers_cursor = db.sellers.find()
     sellers = await sellers_cursor.to_list(1000)
     valid_sellers = []
@@ -2465,10 +2341,13 @@ async def list_sellers():
             # Only the id: the document holds the password hash, and printing accented
             # data crashed the request (UnicodeEncodeError) under Passenger/LiteSpeed.
             logging.warning("Skipping invalid seller %s: %s", s.get("id"), type(e).__name__)
-    return valid_sellers
+    # Liste publique (boutiques, WhatsApp, logo) ; e-mail et compte Google
+    # réservés à l'équipe
+    hidden = SELLER_PRIVATE_FIELDS if is_staff(session_claims(request)) else SELLER_HIDDEN_FROM_PUBLIC
+    return [seller.dict(exclude=hidden) for seller in valid_sellers]
 
-@api_router.get("/sellers/{seller_id}", response_model=Seller, response_model_exclude=SELLER_PRIVATE_FIELDS)
-async def get_seller(seller_id: str):
+@api_router.get("/sellers/{seller_id}")
+async def get_seller(seller_id: str, request: Request):
     seller = await db.sellers.find_one({"id": seller_id})
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
@@ -2476,7 +2355,10 @@ async def get_seller(seller_id: str):
     # Migrate legacy seller data
     seller = migrate_seller_data(seller)
 
-    return Seller(**seller)
+    # Fiche complète pour le vendeur lui-même (page Profil) et l'équipe
+    claims = session_claims(request)
+    owner = is_account(claims, "seller", seller_id) or is_staff(claims)
+    return Seller(**seller).dict(exclude=SELLER_PRIVATE_FIELDS if owner else SELLER_HIDDEN_FROM_PUBLIC)
 
 class SellerLoginRequest(BaseModel):
     whatsapp: str
@@ -2625,11 +2507,13 @@ async def approve_seller(seller_id: str):
 async def update_seller(
     seller_id: str, 
     seller_data: SellerUpdate, 
-    x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id"),
+    request: Request,
     role: str = Depends(get_current_admin_role)
 ):
-    # Authorization check
-    if role not in ["super_admin", "admin"] and x_seller_id != seller_id:
+    # Profil, e-mail et mot de passe : le vendeur de la session ou un admin.
+    # Un simple en-tête X-Seller-Id permettait de prendre le compte d'un autre.
+    if role not in ["super_admin", "admin"] and not is_account(session_claims(request), "seller", seller_id):
+        require_session(request)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to update this seller profile."
@@ -2680,7 +2564,9 @@ async def delete_seller(seller_id: str):
     return
 
 @api_router.get("/sellers/{seller_id}/analytics", response_model=SellerAnalyticsData)
-async def get_seller_analytics(seller_id: str):
+async def get_seller_analytics(seller_id: str, request: Request):
+    # Chiffre d'affaires et clients : le vendeur lui-même ou l'équipe
+    require_account_or_staff(request, "seller", seller_id)
     # Fetch all orders for the seller
     orders_cursor = db.orders.find({"sellerId": seller_id})
     orders = await orders_cursor.to_list(1000)
@@ -2731,24 +2617,26 @@ async def get_seller_products(seller_id: str):
 
 # --- Order Management ---
 @api_router.get("/orders", response_model=List[Order])
-async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] = None,
-                      role: str = Depends(get_current_admin_role),
-                      x_buyer_id: Optional[str] = Header(None, alias="X-Buyer-Id"),
-                      x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")):
+async def list_orders(request: Request, seller_id: Optional[str] = None, buyer_id: Optional[str] = None,
+                      role: str = Depends(get_current_admin_role)):
     query = {}
-    is_staff = role in ["super_admin", "admin", "moderator", "support"]
-    # Un client ou un vendeur ne voit que ses propres commandes (identité tirée
-    # du jeton de session par le middleware) ; l'équipe voit tout
-    if buyer_id and not is_staff and x_buyer_id != buyer_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez voir que vos propres commandes.")
-    if seller_id and not buyer_id and not is_staff and x_seller_id != seller_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Vous ne pouvez voir que les commandes de votre boutique.")
+    # Adresses et numéros des clients : un client ou un vendeur ne voit que ses
+    # propres commandes, d'après son jeton de session (jamais un simple
+    # en-tête) ; l'équipe voit tout
+    claims = session_claims(request)
+    staff = is_staff(claims)
+    if not staff and not (buyer_id or seller_id):
+        require_session(request)
+    if buyer_id and not staff:
+        require_account_or_staff(request, "buyer", buyer_id)
+    if seller_id and not buyer_id and not staff:
+        require_account_or_staff(request, "seller", seller_id)
 
     if buyer_id:
         query["buyerId"] = buyer_id
     elif seller_id:
         query["sellerId"] = seller_id
-    elif role in ["super_admin", "admin", "moderator", "support"]:
+    elif staff:
         pass  # Empty query means all orders
     else:
         raise HTTPException(
@@ -2812,7 +2700,7 @@ async def list_orders(seller_id: Optional[str] = None, buyer_id: Optional[str] =
 @api_router.put("/orders/{order_id}", response_model=Order, dependencies=[Depends(order_owner_or_support_required)])
 async def update_order(order_id: str, order_data: OrderUpdate, background_tasks: BackgroundTasks,
                        role: Optional[str] = Depends(get_current_admin_role),
-                       x_seller_id: Optional[str] = Header(None, alias="X-Seller-Id")):
+                       x_seller_id: Optional[str] = Depends(get_current_seller_optional)):
     update_data = order_data.dict(exclude_unset=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided.")
@@ -3495,11 +3383,9 @@ class BuyerSavedInfo(BaseModel):
     pickupPoints: List[SavedPickupPoint]
 
 @api_router.get("/buyers/{buyer_id}/saved-info", response_model=BuyerSavedInfo)
-async def get_buyer_saved_info(buyer_id: str, x_user_id: str = Header(..., alias="X-User-Id")):
-    # Authorization: User can only access their own info
-    if buyer_id != x_user_id:
-         # We allow admins too? For now, strict check.
-         pass # Logic could be improved for admin access
+async def get_buyer_saved_info(buyer_id: str, request: Request):
+    # Adresses et numéros de livraison : le client lui-même ou l'équipe
+    require_account_or_staff(request, "buyer", buyer_id)
 
     orders_cursor = db.orders.find({"buyerId": buyer_id}).sort("orderedDate", -1)
     orders = await orders_cursor.to_list(1000)
@@ -4171,6 +4057,7 @@ from routers.push import router as push_router
 from routers.ads import router as ads_router, ensure_indexes as ensure_ad_indexes
 from routers.highlights import router as highlights_router
 from routers.nearby import router as nearby_router
+from routers.chat import router as chat_router, ensure_indexes as ensure_chat_indexes
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
 api_router.include_router(support_router)
@@ -4178,6 +4065,7 @@ api_router.include_router(push_router)
 api_router.include_router(ads_router)
 api_router.include_router(highlights_router)
 api_router.include_router(nearby_router)
+api_router.include_router(chat_router)
 
 
 @app.on_event("startup")
@@ -4186,6 +4074,10 @@ async def create_ad_indexes():
         await ensure_ad_indexes()
     except Exception as error:  # la base peut être injoignable au démarrage
         logger.warning("Index des publicités non créés : %s", error)
+    try:
+        await ensure_chat_indexes()
+    except Exception as error:
+        logger.warning("Index de la messagerie non créés : %s", error)
 
 
 # --- OG / Social Preview SSR ---

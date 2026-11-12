@@ -15,14 +15,15 @@ import ShippingSettingsManagement from './ShippingSettingsManagement';
 import HomepageManagement from './HomepageManagement';
 import AboutPageManagement from './AboutPageManagement';
 import WhatsAppAnalytics from './WhatsAppAnalytics';
-import AdminLayout, { useAdminPendingCounts } from './AdminLayout';
+import AdminLayout, { CHAT_REPORT_ROLES, useAdminPendingCounts } from './AdminLayout';
+import ChatReports from './ChatReports';
 import SupportInbox from './SupportInbox';
 import PromotionManagement from './PromotionManagement';
 import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SECTIONS = ['dashboard', 'support', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping'];
+const SECTIONS = ['dashboard', 'support', 'chatReports', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping'];
 
 const formatPrice = (price) => numberFormat('fr-FR', {
     style: 'currency',
@@ -221,6 +222,7 @@ const AdminDashboard = (props) => {
             <CategoryManagement {...props} />
         </div>
         {activeSection === 'support' && <SupportInbox user={user} active />}
+        {activeSection === 'chatReports' && CHAT_REPORT_ROLES.includes(user.role) && <ChatReports />}
         {activeSection === 'reclassify' && <ProductReclassification />}
         {activeSection === 'searchMisses' && <SearchMisses />}
         {activeSection === 'assistant' && <AssistantStats />}

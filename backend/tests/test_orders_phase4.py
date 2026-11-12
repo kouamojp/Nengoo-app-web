@@ -16,6 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import login_limiter  # noqa: E402
 import server  # noqa: E402
+from session_auth import SessionRequired  # noqa: E402
+from session_helpers import fake_request, session  # noqa: E402
 from order_flow import check_transition, normalize_status, status_label  # noqa: E402
 
 
@@ -171,15 +173,25 @@ def test_orders_list_is_private(monkeypatch):
     monkeypatch.setattr(server, "db", Db())
 
     async def scenario():
+        # Sans session : connexion demandée, même avec un en-tête d'identité
+        with pytest.raises(SessionRequired):
+            await server.list_orders(fake_request(), buyer_id="buyer_a", role=None)
+        with pytest.raises(SessionRequired):
+            await server.list_orders(fake_request(headers={"X-Buyer-Id": "buyer_a"}), buyer_id="buyer_a", role=None)
+        with pytest.raises(SessionRequired):
+            await server.list_orders(fake_request(), role=None)
+        # Un autre compte : refusé
         with pytest.raises(HTTPException) as err:
-            await server.list_orders(buyer_id="buyer_a", role=None, x_buyer_id=None, x_seller_id=None)
+            await server.list_orders(session("buyer", "buyer_b"), buyer_id="buyer_a", role=None)
         assert err.value.status_code == 403
         with pytest.raises(HTTPException):
-            await server.list_orders(buyer_id="buyer_a", role=None, x_buyer_id="buyer_b", x_seller_id=None)
+            await server.list_orders(session("seller", "s2"), seller_id="s1", role=None)
         with pytest.raises(HTTPException):
-            await server.list_orders(seller_id="s1", role=None, x_buyer_id=None, x_seller_id="s2")
-        assert await server.list_orders(buyer_id="buyer_a", role=None, x_buyer_id="buyer_a", x_seller_id=None) == []
-        assert await server.list_orders(seller_id="s1", role=None, x_buyer_id=None, x_seller_id="s1") == []
-        assert await server.list_orders(buyer_id="buyer_a", role="support", x_buyer_id=None, x_seller_id=None) == []
+            await server.list_orders(session("buyer", "buyer_a"), role=None)
+        assert await server.list_orders(session("buyer", "buyer_a"), buyer_id="buyer_a", role=None) == []
+        assert await server.list_orders(session("seller", "s1"), seller_id="s1", role=None) == []
+        staff = session("admin", "a1", "support")
+        assert await server.list_orders(staff, buyer_id="buyer_a", role="support") == []
+        assert await server.list_orders(staff, role="support") == []
 
     asyncio.run(scenario())

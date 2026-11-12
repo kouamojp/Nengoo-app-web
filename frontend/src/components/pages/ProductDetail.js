@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { chatApi } from '../../lib/chat';
 import { translations } from '../../lib/translations';
 import { categoryName } from '../../lib/categories';
 import { contactSellerOnWhatsApp } from '../../lib/utils';
@@ -108,6 +109,8 @@ const ProductDetail = (props) => {
     }
   }, [productId]);
   const [messageToSend, setMessageToSend] = useState('');
+  const [messageError, setMessageError] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
   const [open, setOpen] = React.useState(false);
   const [reviews, setReviews] = useState([]);
   const [canReview, setCanReview] = useState(false);
@@ -218,35 +221,31 @@ const ProductDetail = (props) => {
         console.error("❌ [ProductDetail] Erreur récupération vendeur:", error);
       }
     };
+  // Messagerie Nengoo (backend/routers/chat.py) : le fil s'ouvre dans « Mes messages »
+  const openMessageForm = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setMessageError('');
+    setShowSendMessageModal(true);
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!user) {
-        alert("Veuillez vous connecter pour envoyer un message.");
-        return;
-    }
+    const body = messageToSend.trim();
+    if (!body || sendingMessage) return;
+    setSendingMessage(true);
+    setMessageError('');
     try {
-        const response = await fetch(`${API_BASE_URL}/messages`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'sender-id': user.id,
-                'sender-type': user.type,
-            },
-            body: JSON.stringify({
-                receiver_id: seller.id,
-                message: messageToSend,
-                product_id: product.id,
-            }),
-        });
-        if (!response.ok) {
-            throw new Error('Failed to send message');
-        }
+        const { thread } = await chatApi.start({ sellerId: seller.id, productId: product.id, body });
         setShowSendMessageModal(false);
         setMessageToSend('');
-        alert('Message envoyé avec succès!');
+        navigate(`/profile?tab=messages&thread=${encodeURIComponent(thread.id)}`);
     } catch (error) {
-        console.error('Error sending message:', error);
-        alert(`Erreur: ${error.message}`);
+        setMessageError(error.message);
+    } finally {
+        setSendingMessage(false);
     }
   };
 
@@ -605,7 +604,7 @@ const ProductDetail = (props) => {
                     )}
                     <button
                       type="button"
-                      onClick={() => setShowSendMessageModal(true)}
+                      onClick={openMessageForm}
                       disabled={!seller}
                       className={`${secondaryButton} h-12 ${seller && !seller.whatsapp ? 'sm:col-span-2' : ''}`}
                     >
@@ -714,7 +713,7 @@ const ProductDetail = (props) => {
                         {t.contactWhatsApp}
                       </button>
                     )}
-                    <button onClick={() => setShowSendMessageModal(true)} className={secondaryButton}>
+                    <button onClick={openMessageForm} className={secondaryButton}>
                       {t.sendMessage}
                     </button>
                   </div>}
@@ -857,8 +856,10 @@ const ProductDetail = (props) => {
                             value={messageToSend}
                             onChange={(e) => setMessageToSend(e.target.value)}
                             autoFocus
+                            maxLength={2000}
                             required
                         ></textarea>
+                        {messageError && <p role="alert" className="-mt-2 mb-4 text-sm text-red-700">{messageError}</p>}
                         <div className="flex justify-end gap-3">
                             <button
                                 type="button"
@@ -869,9 +870,10 @@ const ProductDetail = (props) => {
                             </button>
                             <button
                                 type="submit"
-                                className="h-11 px-5 rounded-full bg-purple-700 hover:bg-purple-800 text-white font-semibold"
+                                disabled={sendingMessage}
+                                className="h-11 px-5 rounded-full bg-purple-700 hover:bg-purple-800 text-white font-semibold disabled:opacity-60"
                             >
-                                {t.send}
+                                {sendingMessage ? 'Envoi…' : t.send}
                             </button>
                         </div>
                     </form>

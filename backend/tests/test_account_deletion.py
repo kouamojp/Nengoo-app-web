@@ -54,7 +54,8 @@ class FakeCollection:
 class FakeDb:
     def __init__(self, **collections):
         for name in ["users", "sellers", "products", "orders", "reviews", "notifications",
-                     "interactions", "conversations", "messages", "whatsapp_clicks"]:
+                     "interactions", "conversations", "messages", "whatsapp_clicks",
+                     "chat_threads", "chat_messages", "chat_reports"]:
             setattr(self, name, FakeCollection(collections.get(name)))
 
 
@@ -74,6 +75,10 @@ def _db():
                        {"id": "c2", "buyer_id": "buyer_2", "seller_id": "seller_1"}],
         messages=[{"conversation_id": "c1"}, {"conversation_id": "c2"}],
         whatsapp_clicks=[{"sellerId": "seller_1"}, {"sellerId": "seller_2"}],
+        chat_threads=[{"id": "t1", "buyerId": "buyer_1", "sellerId": "seller_2"},
+                      {"id": "t2", "buyerId": "buyer_2", "sellerId": "seller_1"}],
+        chat_messages=[{"threadId": "t1"}, {"threadId": "t2"}],
+        chat_reports=[{"threadId": "t1"}, {"threadId": "t2"}],
     )
 
 
@@ -84,6 +89,9 @@ def test_erase_buyer():
     assert [i["userId"] for i in db.interactions.docs] == ["buyer_2"]
     assert [c["id"] for c in db.conversations.docs] == ["c2"]
     assert [m["conversation_id"] for m in db.messages.docs] == ["c2"]
+    assert [t["id"] for t in db.chat_threads.docs] == ["t2"]
+    assert [m["threadId"] for m in db.chat_messages.docs] == ["t2"]
+    assert [r["threadId"] for r in db.chat_reports.docs] == ["t2"]
     assert [n["recipient_id"] for n in db.notifications.docs] == ["seller_1"]
     # Commande gardée, sans coordonnées
     order = db.orders.docs[0]
@@ -102,5 +110,7 @@ def test_erase_seller():
     assert [c["sellerId"] for c in db.whatsapp_clicks.docs] == ["seller_2"]
     assert [c["id"] for c in db.conversations.docs] == ["c1"]
     assert [m["conversation_id"] for m in db.messages.docs] == ["c1"]
+    assert [t["id"] for t in db.chat_threads.docs] == ["t1"]
+    assert [m["threadId"] for m in db.chat_messages.docs] == ["t1"]
     assert [n["recipient_id"] for n in db.notifications.docs] == ["buyer_1"]
     assert len(db.orders.docs) == 1  # commandes gardées

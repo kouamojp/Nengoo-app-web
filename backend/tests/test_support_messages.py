@@ -16,6 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import server  # noqa: E402
 from routers import support  # noqa: E402
+from session_auth import SessionRequired  # noqa: E402
+from session_helpers import fake_request, session  # noqa: E402
 
 
 def _local_mongo():
@@ -45,9 +47,15 @@ def test_routes_need_a_session():
     assert len(admin_routes) == 4
     for route in admin_routes:
         assert any(d.call is server.support_or_higher_required for d in route.dependant.dependencies)
+    # Compte : seulement d'après le jeton de session, jamais un en-tête seul
+    with pytest.raises(SessionRequired):
+        asyncio.run(support.current_account(fake_request()))
+    with pytest.raises(SessionRequired):
+        asyncio.run(support.current_account(fake_request(headers={"X-Seller-Id": "s1"})))
+    assert asyncio.run(support.current_account(session("seller", "s1"))) == ("seller", "s1")
     with pytest.raises(HTTPException) as err:
-        asyncio.run(support.current_account(None, None))
-    assert err.value.status_code == 401
+        asyncio.run(support.current_account(session("admin", "a1", "support")))
+    assert err.value.status_code == 403
 
 
 @pytest.mark.skipif(not _local_mongo(), reason="pas de MongoDB local")
@@ -155,9 +163,9 @@ def test_support_flow(monkeypatch):
             with pytest.raises(HTTPException) as err:
                 await support.admin_open_thread("buyer", "nobody")
             assert err.value.status_code == 404
-            # Un vendeur ne peut pas se faire passer pour un acheteur en même temps
-            with pytest.raises(HTTPException):
-                await support.current_account("s1", "b1")
+            # Le compte vient du jeton : un en-tête d'un autre compte ne compte pas
+            assert await support.current_account(
+                fake_request({"sub": "s1", "typ": "seller"}, {"X-Buyer-Id": "b1"})) == ("seller", "s1")
         finally:
             await client.drop_database(name)
 

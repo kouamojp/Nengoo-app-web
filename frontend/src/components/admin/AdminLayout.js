@@ -51,11 +51,44 @@ export const useAdminPendingCounts = (user) => {
   return counts;
 };
 
+// Rôles qui traitent les signalements de la messagerie (comme le backend)
+export const CHAT_REPORT_ROLES = ['super_admin', 'admin', 'moderator'];
+
+/** Signalements de conversations à traiter (pastille du menu). */
+const useChatReportsCount = (user) => {
+  const [count, setCount] = useState(0);
+  const enabled = Boolean(user?.type === 'admin' && CHAT_REPORT_ROLES.includes(user.role));
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/admin/chat/reports-count`);
+        if (response.ok && !cancelled) setCount((await response.json()).count || 0);
+      } catch {
+        // Compteur indicatif : on garde la dernière valeur
+      }
+    };
+    refresh();
+    const interval = setInterval(refresh, 120000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [enabled]);
+
+  return count;
+};
+
 const navGroups = (user, counts) => [
   {
     items: [
       { id: 'dashboard', label: 'Vue d\'ensemble', Icon: HomeIcon },
       { id: 'support', label: 'Messagerie', Icon: ChatIcon, count: counts.support, countLabel: 'non lues' },
+      ...(CHAT_REPORT_ROLES.includes(user.role) ? [
+        { id: 'chatReports', label: 'Signalements', Icon: ShieldIcon, count: counts.reports, countLabel: 'à traiter' },
+      ] : []),
     ],
   },
   {
@@ -99,7 +132,8 @@ const AdminLayout = ({ user, setUser, active, onSelect, title, description, acti
   const [menuOpen, setMenuOpen] = useState(false);
   const pending = useAdminPendingCounts(user);
   const support = useSupportUnread(user, 30000);
-  const counts = { ...pending, support };
+  const reports = useChatReportsCount(user);
+  const counts = { ...pending, support, reports };
 
   // Les droits admin ne viennent que du jeton de session : une session
   // ouverte avant son introduction doit se reconnecter
@@ -209,7 +243,7 @@ const AdminLayout = ({ user, setUser, active, onSelect, title, description, acti
           className="relative !min-h-0 !min-w-0 w-10 h-10 rounded-lg flex items-center justify-center hover:bg-white/10"
         >
           <MenuIcon />
-          {counts.sellers + counts.orders + counts.support > 0 && (
+          {counts.sellers + counts.orders + counts.support + counts.reports > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-yellow-300" aria-hidden="true" />
           )}
         </button>
