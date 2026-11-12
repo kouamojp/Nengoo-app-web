@@ -100,6 +100,9 @@ const navGroups = (user, counts) => [
       { id: 'buyers', label: 'Acheteurs', Icon: UsersIcon },
       { id: 'couriers', label: 'Livreurs', Icon: RouteIcon },
       { id: 'whatsappAnalytics', label: 'Contacts WhatsApp', Icon: ChartIcon },
+      ...(['super_admin', 'admin'].includes(user.role) ? [
+        { id: 'promoCodes', label: 'Codes promo', Icon: TagIcon },
+      ] : []),
     ],
   },
   {

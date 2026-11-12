@@ -69,6 +69,7 @@ from pymongo.errors import DuplicateKeyError
 from category_tree import normalize_name, suggest_category_name
 from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
 from geocode import geocode
+from promo import PromoError, compute_discounts as compute_promo_discounts, describe as promo_describe,     lines_by_seller as promo_lines_by_seller
 from product_search import normalize_query, search_products, search_products_detailed
 from image_variants import aligned_variants, refresh_product_variants
 from sms import order_created_text, order_status_text, send_sms
@@ -567,6 +568,11 @@ class Order(BaseModel):
     orderedDate: datetime
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
+    # Code promo : réduction déjà retirée de totalAmount ; « platform » : Nengoo
+    # la rembourse au vendeur, « seller » : à la charge du vendeur
+    promoCode: Optional[str] = None
+    discount: float = 0
+    discountFundedBy: Optional[str] = None
 
 class OrderUpdate(BaseModel):
     status: Optional[str] = None
@@ -594,6 +600,7 @@ class CheckoutRequest(BaseModel):
     deliveryOption: str
     selectedPickupPoint: Optional[str] = None
     cartItems: List[CheckoutProduct]
+    promoCode: Optional[str] = None
 
 class Admin(BaseModel):
     id: str
@@ -2772,6 +2779,13 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
     await db.orders.update_one({"id": order_id}, {"$set": update_data, **push})
     updated_order = await db.orders.find_one({"id": order_id})
 
+    # Commande annulée : l'utilisation du code promo est rendue au client
+    # quand toutes les commandes concernées le sont
+    if (order_before_update.get("promoCode") and update_data.get("status") == "cancelled"
+            and normalize_status(order_before_update.get("status")) != "cancelled"):
+        from routers.promo_codes import cancel_order as cancel_promo_order
+        await cancel_promo_order(order_id)
+
     # Check if status has changed and send notification
     if 'status' in update_data and order_before_update.get('status') != updated_order.get('status'):
         status_fr = get_status_text_fr(updated_order["status"])
@@ -2919,6 +2933,9 @@ class DeliveryQuoteRequest(BaseModel):
     neighborhood: Optional[str] = None
     deliveryOption: str = "home"
     cartItems: List[CheckoutProduct]
+    # Code promo à essayer, et téléphone pour vérifier la limite par client
+    promoCode: Optional[str] = None
+    phone: Optional[str] = None
 
 
 @api_router.post("/delivery/quote")
@@ -2943,8 +2960,38 @@ async def delivery_quote(request: DeliveryQuoteRequest):
     sellers = list(by_seller.values())
     subtotal = sum(e["subtotal"] for e in sellers)
     shipping = sum(e["shipping"] for e in sellers)
-    return {"sellers": sellers, "subtotal": subtotal, "shipping": shipping, "total": subtotal + shipping,
-            "freeAbove": settings["freeAbove"]}
+    result = {"sellers": sellers, "subtotal": subtotal, "shipping": shipping, "total": subtotal + shipping,
+              "freeAbove": settings["freeAbove"], "discount": 0}
+    if (request.promoCode or "").strip():
+        # Même calcul qu'à la commande ; un code refusé n'empêche pas le devis
+        try:
+            promo_doc, discounts = await promo_for_cart(
+                request.promoCode, await buyer_id_for_phone(request.phone),
+                [(products[i.id], i.quantity) for i in request.cartItems if i.id in products],
+                {e["sellerId"]: e["shipping"] for e in sellers})
+        except PromoError as error:
+            result["promoError"] = str(error)
+        else:
+            for e in sellers:
+                e["discount"] = discounts.get(e["sellerId"], 0)
+            result["discount"] = sum(discounts.values())
+            result["total"] -= result["discount"]
+            result["promo"] = {"code": promo_doc["code"], "label": promo_describe(promo_doc)}
+    return result
+
+
+async def buyer_id_for_phone(phone: Optional[str]) -> Optional[str]:
+    if not phone or not whatsapp_digits(phone):
+        return None
+    buyer = await db.users.find_one({**whatsapp_lookup(phone), "type": "buyer"}, {"id": 1})
+    return (buyer or {}).get("id")
+
+
+async def promo_for_cart(code: str, buyer_id: Optional[str], items: list, shipping: dict):
+    """(code, réduction par vendeur) ; PromoError si le code ne s'applique pas."""
+    from routers.promo_codes import find_valid
+    promo_doc = await find_valid(code, buyer_id)
+    return promo_doc, compute_promo_discounts(promo_doc, promo_lines_by_seller(items, shipping))
 
 
 class Courier(BaseModel):
@@ -3176,6 +3223,29 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
         if item.quantity > (product_info.get("stock") or 0):
             raise HTTPException(status_code=400, detail=f"Stock insuffisant pour « {product_info['name'].strip()} » : {product_info.get('stock') or 0} disponible(s).")
 
+    # Frais de livraison par vendeur, puis code promo : vérifié avant de
+    # réserver le stock (un code refusé ne bloque rien)
+    shipping_by_seller = {}
+    for seller_id in {products_from_db[i.id]["sellerId"] for i in checkout_data.cartItems}:
+        seller_doc = await db.sellers.find_one({"id": seller_id})
+        if not seller_doc and await db.admins.find_one({"id": seller_id}):
+            seller_doc = {"deliveryPrice": 0}
+        subtotal = sum(
+            (products_from_db[i.id].get("promoPrice") if (products_from_db[i.id].get("promoPrice") or 0) > 0
+             else products_from_db[i.id]["price"]) * i.quantity
+            for i in checkout_data.cartItems if products_from_db[i.id]["sellerId"] == seller_id)
+        shipping_by_seller[seller_id] = seller_fee(seller_doc or {}, subtotal, delivery_settings,
+                                                   delivery_settings["standardFee"], checkout_data.city,
+                                                   checkout_data.neighborhood, checkout_data.deliveryOption == "pickup")
+    promo_doc, discounts = None, {}
+    if (checkout_data.promoCode or "").strip():
+        try:
+            promo_doc, discounts = await promo_for_cart(
+                checkout_data.promoCode, buyer_id,
+                [(products_from_db[i.id], i.quantity) for i in checkout_data.cartItems], shipping_by_seller)
+        except PromoError as error:
+            raise HTTPException(status_code=400, detail=str(error))
+
     # Stock retiré tout de suite, de façon atomique : deux clients ne peuvent pas
     # acheter le même dernier article
     reserved = []
@@ -3187,6 +3257,14 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
                 await db.products.update_one({"id": pid}, {"$inc": {"stock": q}})
             raise HTTPException(status_code=409, detail=f"« {products_from_db[item.id]['name'].strip()} » vient d'être acheté par un autre client : stock insuffisant.")
         reserved.append((item.id, item.quantity))
+
+    # Une utilisation du code, sans dépasser le nombre prévu (atomique)
+    if promo_doc:
+        from routers.promo_codes import claim as claim_promo
+        if not await claim_promo(promo_doc):
+            for pid, q in reserved:
+                await db.products.update_one({"id": pid}, {"$inc": {"stock": q}})
+            raise HTTPException(status_code=400, detail="Ce code promo vient d'atteindre son nombre d'utilisations.")
 
     # Group cart items by seller
     seller_orders = {} # {seller_id: {sellerName: str, products: []}}
@@ -3243,10 +3321,9 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
                 raise HTTPException(status_code=404, detail=f"Seller {seller_id} not found.")
 
         products_total = sum(p.price * p.quantity for p in order_details["products"])
-        shipping_cost = seller_fee(seller, products_total, delivery_settings, delivery_settings["standardFee"],
-                                   checkout_data.city, checkout_data.neighborhood,
-                                   checkout_data.deliveryOption == "pickup")
-        total_amount = products_total + shipping_cost
+        shipping_cost = shipping_by_seller[seller_id]
+        discount = discounts.get(seller_id, 0)
+        total_amount = products_total + shipping_cost - discount
         
         new_order = Order(
             id=f"ord_{str(uuid.uuid4())[:8]}",
@@ -3270,7 +3347,10 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             paymentStatus="pending" if checkout_data.paymentMethod != 'cashOnDelivery' else 'unpaid',
             pickupPointId=checkout_data.selectedPickupPoint if checkout_data.deliveryOption == 'pickup' else None,
             pickupStatus="pending_pickup" if checkout_data.deliveryOption == 'pickup' else "not_applicable",
-            orderedDate=datetime.utcnow()
+            orderedDate=datetime.utcnow(),
+            promoCode=promo_doc["code"] if discount else None,
+            discount=discount,
+            discountFundedBy=promo_doc["ownerType"] if discount else None,
         )
         await db.orders.insert_one(new_order.dict())
         created_orders.append(new_order)
@@ -3360,6 +3440,10 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
             # but I'll use new_order_seller.html as a base if no specific one is provided.
             background_tasks.add_task(fm.send_message, message_admin, template_name="new_order_seller.html")
 
+    if promo_doc:
+        from routers.promo_codes import record as record_promo
+        await record_promo(promo_doc, buyer_id, [o.id for o in created_orders if o.discount],
+                           int(sum(o.discount for o in created_orders)))
     return created_orders
 
 class SavedAddress(BaseModel):
@@ -4058,6 +4142,7 @@ from routers.ads import router as ads_router, ensure_indexes as ensure_ad_indexe
 from routers.highlights import router as highlights_router
 from routers.nearby import router as nearby_router
 from routers.chat import router as chat_router, ensure_indexes as ensure_chat_indexes
+from routers.promo_codes import router as promo_codes_router, ensure_indexes as ensure_promo_indexes
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
 api_router.include_router(support_router)
@@ -4066,6 +4151,7 @@ api_router.include_router(ads_router)
 api_router.include_router(highlights_router)
 api_router.include_router(nearby_router)
 api_router.include_router(chat_router)
+api_router.include_router(promo_codes_router)
 
 
 @app.on_event("startup")
@@ -4078,6 +4164,10 @@ async def create_ad_indexes():
         await ensure_chat_indexes()
     except Exception as error:
         logger.warning("Index de la messagerie non créés : %s", error)
+    try:
+        await ensure_promo_indexes()
+    except Exception as error:
+        logger.warning("Index des codes promo non créés : %s", error)
 
 
 # --- OG / Social Preview SSR ---

@@ -41,6 +41,12 @@ const Checkout = (props) => {
   });
   const [pickupPoints, setPickupPoints] = useState([]);
   const [shippingCost, setShippingCost] = useState(0);
+  // Code promo : saisi, appliqué (envoyé au devis et à la commande), résultat
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedCode, setAppliedCode] = useState('');
+  const [discount, setDiscount] = useState(0);
+  const [promoLabel, setPromoLabel] = useState('');
+  const [promoError, setPromoError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   // Commandes créées : écran de confirmation avec leurs numéros
@@ -72,15 +78,43 @@ const Checkout = (props) => {
             neighborhood: formData.neighborhood || null,
             deliveryOption: formData.deliveryOption,
             cartItems: cartItems.map(item => ({ id: item.id.toString(), quantity: item.quantity })),
+            promoCode: appliedCode || null,
+            phone: formData.phone || null,
           }),
         });
-        if (response.ok) setShippingCost((await response.json()).shipping);
+        if (response.ok) {
+          const quote = await response.json();
+          setShippingCost(quote.shipping);
+          setDiscount(quote.discount || 0);
+          setPromoLabel(quote.promo ? `${quote.promo.code} : ${quote.promo.label}` : '');
+          if (quote.promoError) {
+            // Code refusé : expliqué, et retiré de la commande
+            setPromoError(quote.promoError);
+            setAppliedCode('');
+          }
+        }
       } catch (e) {
         console.error('Delivery quote failed', e);
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [cartItems, formData.deliveryOption, formData.city, formData.neighborhood, API_BASE_URL]);
+  }, [cartItems, formData.deliveryOption, formData.city, formData.neighborhood, formData.phone, appliedCode, API_BASE_URL]);
+
+  const applyPromo = (e) => {
+    e.preventDefault();
+    const code = promoInput.trim();
+    setPromoError('');
+    if (!code) return;
+    setAppliedCode(code.toUpperCase());
+  };
+
+  const removePromo = () => {
+    setAppliedCode('');
+    setPromoInput('');
+    setPromoError('');
+    setDiscount(0);
+    setPromoLabel('');
+  };
 
   useEffect(() => {
     const fetchPickupPoints = async () => {
@@ -112,7 +146,7 @@ const Checkout = (props) => {
     const priceToUse = (item.promoPrice && item.promoPrice > 0) ? item.promoPrice : item.price;
     return sum + (priceToUse * item.quantity);
   }, 0);
-  const total = subtotal + shippingCost;
+  const total = subtotal + shippingCost - discount;
 
   const handleInputChange = (e) => {
     setFormData({
@@ -139,7 +173,8 @@ const Checkout = (props) => {
     const checkoutPayload = {
       ...formData,
       email: formData.email.trim() || null,
-      cartItems: preparedCartItems
+      cartItems: preparedCartItems,
+      promoCode: appliedCode || null,
     };
 
     try {
@@ -389,6 +424,35 @@ const Checkout = (props) => {
 
               <hr className="my-4" />
 
+              {/* Code promo (formulaire à part : Entrée applique le code, pas la commande) */}
+              {appliedCode && discount > 0 ? (
+                <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-green-50 px-3 py-2 text-sm">
+                  <span className="text-green-900">Code <strong>{appliedCode}</strong> appliqué</span>
+                  <button type="button" onClick={removePromo} className="font-semibold text-gray-700 hover:underline">Retirer</button>
+                </div>
+              ) : (
+                <form onSubmit={applyPromo} className="mb-4">
+                  <label htmlFor="promo-code" className="block text-sm font-semibold mb-1">Code promo</label>
+                  <div className="flex gap-2">
+                    <input
+                      id="promo-code"
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value)}
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      maxLength={30}
+                      aria-describedby={promoError ? 'promo-error' : undefined}
+                      aria-invalid={promoError ? 'true' : undefined}
+                      className="flex-1 min-w-0 h-11 rounded-xl border border-gray-300 px-3 uppercase focus:outline-none focus:border-purple-700 focus:ring-2 focus:ring-purple-200"
+                    />
+                    <button type="submit" disabled={!promoInput.trim()} className="h-11 shrink-0 rounded-xl border border-purple-700 px-4 font-semibold text-purple-800 hover:bg-purple-50 disabled:opacity-50">
+                      Appliquer
+                    </button>
+                  </div>
+                  {promoError && <p id="promo-error" role="alert" className="mt-1 text-sm text-red-700">{promoError}</p>}
+                </form>
+              )}
+
               {/* Totals */}
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -401,6 +465,12 @@ const Checkout = (props) => {
                   </span>
                   <span>{shippingCost === 0 ? 'Gratuit' : formatPrice(shippingCost)}</span>
                 </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-green-800 font-semibold">
+                    <span>Réduction{promoLabel ? ` (${promoLabel})` : ''}</span>
+                    <span>−{formatPrice(discount)}</span>
+                  </div>
+                )}
                 {formData.deliveryOption === 'pickup' && formData.selectedPickupPoint && (
                   <div className="pt-2 border-t">
                     <p className="text-sm font-medium text-purple-600">Point de retrait:</p>

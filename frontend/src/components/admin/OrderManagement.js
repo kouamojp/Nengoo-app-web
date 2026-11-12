@@ -368,7 +368,15 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                         </td>
                                         <td className="adm-td">{order.buyerName}</td>
                                         <td className="adm-td">{order.sellerName}</td>
-                                        <td className="adm-td text-right price whitespace-nowrap">{formatPrice(order.totalAmount)}</td>
+                                        <td className="adm-td text-right whitespace-nowrap">
+                                            <span className="price">{formatPrice(order.totalAmount)}</span>
+                                            {order.discount > 0 && (
+                                                <span className="block text-xs text-green-800">
+                                                    {order.promoCode} −{formatPrice(order.discount)}
+                                                    {order.discountFundedBy === 'platform' ? ' (Nengoo)' : ' (vendeur)'}
+                                                </span>
+                                            )}
+                                        </td>
                                         <td className="adm-td">
                                             <StatusSelect
                                                 value={order.status}

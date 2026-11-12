@@ -73,8 +73,17 @@ const OrderDetail = ({ order, onClose }) => (
         </li>
       ))}
     </ul>
+    {order.discount > 0 && (
+      <p className="mt-3 pt-3 border-t border-gray-200 flex justify-between text-sm text-green-800">
+        <span>
+          Code {order.promoCode}
+          {order.discountFundedBy === 'platform' ? ' (offert par Nengoo, qui vous reverse la réduction)' : ' (votre code)'}
+        </span>
+        <span className="price tabular-nums">−{formatXAF(order.discount)}</span>
+      </p>
+    )}
     <p className="mt-3 pt-3 border-t border-gray-200 flex justify-between font-bold">
-      <span>Total</span>
+      <span>{order.discount > 0 ? 'Total payé par le client' : 'Total'}</span>
       <span className="price text-lg text-purple-950 tabular-nums">{formatXAF(order.totalAmount)}</span>
     </p>
 
