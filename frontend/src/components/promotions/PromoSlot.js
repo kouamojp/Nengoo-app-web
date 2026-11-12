@@ -1,29 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { fetchPromotions, internalPath, pickWeighted, PLACEMENT_RATIOS, trackOpen, trackView } from '../../lib/promotions';
+import { FEED_PER_PAGE, fetchPromotions, internalPath, orderWeighted, pickWeighted, PLACEMENT_RATIOS, trackOpen, trackView } from '../../lib/promotions';
 
 const LABEL = { fr: 'Sponsorisé', en: 'Sponsored' };
 
 /**
- * Emplacement publicitaire : affiche une bannière en cours de l'emplacement
- * (tirage pondéré), ou rien du tout s'il n'y en a pas.
- * Une vue est comptée quand la bannière est visible au moins à moitié.
+ * Une bannière : image large ou mobile, lien, mention « Sponsorisé ».
+ * Une vue est comptée quand elle est visible au moins à moitié.
  */
-const PromoSlot = ({ placement, categories = [], language = 'fr', eager = false, className = '' }) => {
+export const PromoBanner = ({ promotion, placement, language = 'fr', eager = false, className = '' }) => {
   const location = useLocation();
-  const [promotion, setPromotion] = useState(null);
   const ref = useRef(null);
-  const categoryKey = categories.filter(Boolean).join(',');
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchPromotions(placement, categoryKey ? categoryKey.split(',') : []).then((items) => {
-      if (!cancelled) setPromotion(pickWeighted(items));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [placement, categoryKey, location.pathname]);
 
   useEffect(() => {
     const el = ref.current;
@@ -100,6 +87,50 @@ const PromoSlot = ({ placement, categories = [], language = 'fr', eager = false,
       )}
     </aside>
   );
+};
+
+/**
+ * Emplacement publicitaire : affiche une bannière en cours de l'emplacement
+ * (tirage pondéré), ou rien du tout s'il n'y en a pas.
+ */
+const PromoSlot = ({ placement, categories = [], language = 'fr', eager = false, className = '' }) => {
+  const location = useLocation();
+  const [promotion, setPromotion] = useState(null);
+  const categoryKey = categories.filter(Boolean).join(',');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPromotions(placement, categoryKey ? categoryKey.split(',') : []).then((items) => {
+      if (!cancelled) setPromotion(pickWeighted(items));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [placement, categoryKey, location.pathname]);
+
+  return <PromoBanner promotion={promotion} placement={placement} language={language} eager={eager} className={className} />;
+};
+
+/**
+ * Bannières « entre les produits » d'une page : jusqu'à FEED_PER_PAGE
+ * campagnes différentes, dans un ordre tiré au sort (pondéré).
+ */
+export const useFeedPromotions = (categories = []) => {
+  const location = useLocation();
+  const [promotions, setPromotions] = useState([]);
+  const categoryKey = categories.filter(Boolean).join(',');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPromotions('feed', categoryKey ? categoryKey.split(',') : []).then((items) => {
+      if (!cancelled) setPromotions(orderWeighted(items).slice(0, FEED_PER_PAGE));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryKey, location.pathname]);
+
+  return promotions;
 };
 
 export default PromoSlot;

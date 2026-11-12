@@ -49,8 +49,30 @@ PLACEMENTS: Dict[str, dict] = {
         "desktop": None,
         "mobile": [800, 400],
     },
+    # Bannières glissées entre les produits des listes : une tous les
+    # `every` produits, `perPage` au plus par page, jamais deux fois la même
+    "feed": {
+        "label": "Site : entre les produits (accueil et catalogue)",
+        "surface": "site",
+        "desktop": [1200, 300],
+        "mobile": [800, 400],
+        "targetable": True,
+        "every": 12,
+        "perPage": 4,
+    },
+    "app_feed": {
+        "label": "App mobile : entre les produits (accueil et catégories)",
+        "surface": "app",
+        "desktop": None,
+        "mobile": [800, 400],
+        "targetable": True,
+        "every": 6,
+        "perPage": 4,
+    },
 }
-Placement = Literal["home_middle", "category_top", "app_home"]
+Placement = Literal["home_middle", "category_top", "app_home", "feed", "app_feed"]
+# Au plus tant de bannières sur une même page de liste
+FEED_PER_PAGE = 4
 
 MAX_PER_PLACEMENT = 10
 CACHE_SECONDS = 60
