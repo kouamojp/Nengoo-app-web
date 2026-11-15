@@ -64,6 +64,7 @@ import login_limiter
 import password_reset
 from push import notify
 from account_email import EMAIL_TAKEN, account_query, email_taken, ensure_email_free, normalize_email
+from buyer_profile import BuyerSelfUpdate, update_own_profile
 from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
 from category_tree import normalize_name, suggest_category_name
@@ -1340,6 +1341,22 @@ async def bulk_delete_buyers(request: BulkDeleteRequest):
     
     await db.users.delete_many({"id": {"$in": request.ids}, "type": "buyer"})
     return
+
+# Déclarée avant /buyers/{buyer_id} (réservée à l'équipe) : « me » n'est pas un identifiant
+@api_router.put("/buyers/me", response_model=Buyer, response_model_exclude=BUYER_PRIVATE_FIELDS)
+async def update_own_buyer_profile(data: BuyerSelfUpdate, request: Request):
+    """Le client connecté modifie son nom, son e-mail ou son numéro WhatsApp
+    (page /profile du site, « Mes informations » dans l'app)."""
+    claims = require_session(request)
+    if claims.get("typ") != "buyer":
+        raise HTTPException(status_code=403, detail="Réservé aux comptes client.")
+    buyer = await update_own_profile(
+        db.users, claims["sub"], data,
+        normalize_whatsapp=normalize_whatsapp,
+        whatsapp_lookup=whatsapp_lookup,
+        verify_password=verify_password,
+    )
+    return Buyer(**buyer)
 
 @api_router.put("/buyers/{buyer_id}", response_model=Buyer, dependencies=[Depends(admin_or_higher_required)])
 async def update_buyer(buyer_id: str, buyer_data: BuyerUpdate):

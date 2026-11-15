@@ -185,9 +185,68 @@ const UserProfile = (props) => {
         }
     }, [user, activeTab]);
   
-    const handleProfileUpdate = () => {
-      setEditMode(false);
-      alert('Profil mis à jour avec succès!');
+    // Modification par le client lui-même (PUT /api/buyers/me). Le numéro
+    // WhatsApp sert à se connecter : le changer demande le mot de passe actuel.
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [savingProfile, setSavingProfile] = useState(false);
+    const [profileError, setProfileError] = useState('');
+    const [profileSaved, setProfileSaved] = useState(false);
+    const compactPhone = (value) => (value || '').replace(/[\s-]/g, '');
+    const whatsappChanged = compactPhone(profileData.whatsapp) !== compactPhone(user?.whatsapp);
+
+    const resetProfileForm = () => {
+      setProfileData((data) => ({
+        ...data,
+        name: user?.name || '',
+        whatsapp: user?.whatsapp || '',
+        email: user?.email || '',
+      }));
+      setCurrentPassword('');
+      setProfileError('');
+    };
+
+    const toggleEditMode = () => {
+      if (editMode) resetProfileForm();
+      setProfileSaved(false);
+      setEditMode(!editMode);
+    };
+
+    const handleProfileUpdate = async (event) => {
+      event?.preventDefault();
+      setSavingProfile(true);
+      setProfileError('');
+      try {
+        const body = { name: profileData.name, email: profileData.email };
+        if (whatsappChanged) {
+          body.whatsapp = profileData.whatsapp;
+          if (currentPassword) body.currentPassword = currentPassword;
+        }
+        const response = await fetch(`${API_BASE_URL}/buyers/me`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const detail = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail;
+          throw new Error(detail || "Vos informations n'ont pas pu être enregistrées.");
+        }
+        // Le jeton de session est conservé par setUser (App.js)
+        setUser({ ...user, ...data });
+        setProfileData((current) => ({
+          ...current,
+          name: data.name || '',
+          whatsapp: data.whatsapp || '',
+          email: data.email || '',
+        }));
+        setCurrentPassword('');
+        setEditMode(false);
+        setProfileSaved(true);
+      } catch (error) {
+        setProfileError(error.message);
+      } finally {
+        setSavingProfile(false);
+      }
     };
   
     const formatPrice = (price) => {
@@ -368,17 +427,24 @@ const UserProfile = (props) => {
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg md:text-2xl font-bold">Informations personnelles</h2>
                     <button
-                      onClick={() => setEditMode(!editMode)}
+                      type="button"
+                      onClick={toggleEditMode}
                       className="text-purple-600 hover:text-purple-700 font-semibold"
                     >
                       {editMode ? '✕ Annuler' : '✏️ Modifier'}
                     </button>
                   </div>
   
-                  <div className="space-y-4 text-left ">
+                  {profileSaved && (
+                    <p role="status" className="mb-4 rounded-lg bg-green-50 border border-green-200 text-green-800 px-4 py-3 text-sm">
+                      Vos informations sont enregistrées.
+                    </p>
+                  )}
+                  <form onSubmit={handleProfileUpdate} className="space-y-4 text-left">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
+                      <label htmlFor="profile-name" className="block text-sm font-medium text-gray-700 mb-2">Nom complet</label>
                       <input
+                        id="profile-name"
                         type="text"
                         value={profileData.name}
                         onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
@@ -388,8 +454,9 @@ const UserProfile = (props) => {
                     </div>
   
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Numéro WhatsApp</label>
+                      <label htmlFor="profile-whatsapp" className="block text-sm font-medium text-gray-700 mb-2">Numéro WhatsApp</label>
                       <input
+                        id="profile-whatsapp"
                         type="tel"
                         value={profileData.whatsapp}
                         onChange={(e) => setProfileData({ ...profileData, whatsapp: e.target.value })}
@@ -399,8 +466,9 @@ const UserProfile = (props) => {
                     </div>
   
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                      <label htmlFor="profile-email" className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                       <input
+                        id="profile-email"
                         type="email"
                         value={profileData.email}
                         onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
@@ -410,15 +478,37 @@ const UserProfile = (props) => {
                       />
                     </div>
   
+                    {editMode && whatsappChanged && (
+                      <div>
+                        <label htmlFor="profile-current-password" className="block text-sm font-medium text-gray-700 mb-2">Mot de passe actuel</label>
+                        <input
+                          id="profile-current-password"
+                          type="password"
+                          autoComplete="current-password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <p className="mt-1 text-sm text-gray-600">Demandé pour changer de numéro WhatsApp, qui sert à vous connecter.</p>
+                      </div>
+                    )}
+
+                    {profileError && (
+                      <p role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
+                        {profileError}
+                      </p>
+                    )}
+
                     {editMode && (
                       <button
-                        onClick={handleProfileUpdate}
-                        className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                        type="submit"
+                        disabled={savingProfile}
+                        className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
                       >
-                        Enregistrer les modifications
+                        {savingProfile ? 'Enregistrement…' : 'Enregistrer les modifications'}
                       </button>
                     )}
-                  </div>
+                  </form>
                 </div>
               </div>
 
