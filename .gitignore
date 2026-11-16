@@ -120,3 +120,6 @@ nengoo-front
 .claude/settings.local.json
 
 GEMINI_LOG.md
+
+# Local Netlify folder
+.netlify
