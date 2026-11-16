@@ -4,6 +4,7 @@ import CityDatalist from '../ui/CityDatalist';
 import { CITIES_DATALIST_ID } from '../../lib/cities';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
 import { SectionHeader, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field } from './AdminUI';
+import AddressAutocomplete from './AddressAutocomplete';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -191,13 +192,38 @@ const PickupPointManagement = (props) => {
         }
     };
 
-    const pickupFields = (data, onChange) => (
+    // Coordonnées venues de la dernière suggestion choisie : effacées si
+    // l'adresse est ensuite retouchée à la main (le backend les recalcule)
+    const [suggested, setSuggested] = useState(null);
+
+    const pickupFields = (data, onChange, setData) => (
         <>
             <Field label="Nom du point de retrait" required>
                 <input type="text" name="name" value={data.name} onChange={onChange} className="adm-input" required />
             </Field>
-            <Field label="Adresse" required hint="Assez précise pour être trouvée : quartier, repère proche.">
-                <input type="text" name="address" value={data.address} onChange={onChange} className="adm-input" required />
+            <Field label="Adresse" required hint="Tapez au moins 3 lettres, puis choisissez une proposition : la ville, la région et la position GPS se remplissent.">
+                <AddressAutocomplete
+                    value={data.address}
+                    required
+                    onChange={(e) => {
+                        const address = e.target.value;
+                        const stale = suggested && address !== suggested.address
+                            && data.latitude === suggested.latitude && data.longitude === suggested.longitude;
+                        setData(d => ({ ...d, address, ...(stale ? { latitude: '', longitude: '' } : {}) }));
+                        if (stale) setSuggested(null);
+                    }}
+                    onSelect={(item) => {
+                        setSuggested(item);
+                        setData(d => ({
+                            ...d,
+                            address: item.address,
+                            city: item.city || d.city,
+                            region: item.region || d.region,
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                        }));
+                    }}
+                />
             </Field>
             <div className="grid sm:grid-cols-2 gap-4">
                 <Field label="Ville" required>
@@ -257,7 +283,7 @@ const PickupPointManagement = (props) => {
             {showAddModal && (
                 <Modal title="Ajouter un point de retrait" onClose={() => setShowAddModal(false)}>
                     <form onSubmit={handleAddPickupPoint} className="space-y-4">
-                        {pickupFields(newPickupPointData, handleInputChange)}
+                        {pickupFields(newPickupPointData, handleInputChange, setNewPickupPointData)}
                         <div className="flex justify-end gap-2 pt-2">
                             <button type="button" onClick={() => setShowAddModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
                             <button type="submit" className="adm-btn adm-btn-primary">Ajouter le point de retrait</button>
@@ -269,7 +295,7 @@ const PickupPointManagement = (props) => {
             {showEditModal && currentPickupPoint && (
                 <Modal title={`Modifier ${currentPickupPoint.name}`} onClose={() => setShowEditModal(false)}>
                     <form onSubmit={handleUpdatePickupPoint} className="space-y-4">
-                        {pickupFields(currentPickupPoint, handleEditInputChange)}
+                        {pickupFields(currentPickupPoint, handleEditInputChange, setCurrentPickupPoint)}
                         <div className="flex justify-end gap-2 pt-2">
                             <button type="button" onClick={() => setShowEditModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
                             <button type="submit" className="adm-btn adm-btn-primary">Enregistrer</button>

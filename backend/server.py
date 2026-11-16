@@ -69,7 +69,7 @@ from fastapi.responses import JSONResponse
 from pymongo.errors import DuplicateKeyError
 from category_tree import normalize_name, suggest_category_name
 from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
-from geocode import geocode
+from geocode import geocode, suggest as geocode_suggest, SuggestUnavailable
 from promo import PromoError, compute_discounts as compute_promo_discounts, describe as promo_describe,     lines_by_seller as promo_lines_by_seller
 from product_search import normalize_query, search_products, search_products_detailed
 from image_variants import aligned_variants, refresh_product_variants
@@ -3538,6 +3538,15 @@ async def list_cities():
     return CITIES
 
 # --- Pickup Point Management ---
+@api_router.get("/admin/address-suggestions", dependencies=[Depends(moderator_or_higher_required)])
+async def address_suggestions(q: str = Query("", max_length=100)):
+    """Adresses au Cameroun correspondant à la saisie (formulaire des points de
+    retrait) : adresse, ville, région et coordonnées GPS."""
+    try:
+        return {"items": await geocode_suggest(q)}
+    except SuggestUnavailable:
+        raise HTTPException(status_code=503, detail="Suggestions d'adresses indisponibles. Saisissez l'adresse à la main.")
+
 @api_router.post("/pickup-points", response_model=PickupPoint, dependencies=[Depends(super_admin_required)])
 async def create_pickup_point(pickup_data: PickupPointCreate):
     pickup_data.city = normalize_city(pickup_data.city)
