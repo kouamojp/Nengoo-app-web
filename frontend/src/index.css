@@ -748,3 +748,37 @@ code {
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation: none; border-top-color: transparent; }
 }
+
+/* Carte des points de retrait (components/pickup/PickupMap.js) */
+.pickup-pin {
+  display: block;
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: #7e22ce;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgba(59, 7, 100, 0.45);
+}
+.pickup-pin--nearest {
+  background: #facc15;
+  border-color: #3b0764;
+  width: 34px;
+  height: 34px;
+}
+.pickup-me {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.25);
+}
+.pickup-popup { font-family: inherit; min-width: 12rem; }
+.pickup-popup p { margin: 0 0 4px; }
+.pickup-popup__badge { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #fde047; color: #3b0764; font-size: 11px; font-weight: 700; }
+.pickup-popup__name { font-weight: 700; font-size: 15px; color: #111827; }
+.pickup-popup__address, .pickup-popup__hours { font-size: 13px; color: #4b5563; }
+.pickup-popup__distance { font-size: 13px; font-weight: 700; color: #6b21a8; }
+.pickup-popup__link { font-size: 13px; font-weight: 700; color: #7e22ce !important; }

@@ -1,11 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { whatsappUrl } from '../../lib/utils';
 import { Helmet } from 'react-helmet-async';
 import { translations } from '../../lib/translations';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import { PinIcon, ClockIcon, PhoneIcon, RouteIcon, WhatsAppIcon } from '../ui/Icons';
+import { BusyLabel } from '../ui/Spinner';
+import { byDistance, formatDistance, hasCoordinates } from '../../lib/pickupDistance';
+
+// Leaflet n'est chargé que sur cette page
+const PickupMap = lazy(() => import('../pickup/PickupMap'));
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -28,6 +33,12 @@ export const PickupPointsMap = (props) => {
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedCity, setSelectedCity] = useState('all');
+  // Position de l'utilisateur : demandée seulement au clic, jamais envoyée au serveur
+  const [user, setUser] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState('');
+  const [focus, setFocus] = useState(null);
+  const [highlightId, setHighlightId] = useState(null);
 
   useEffect(() => {
     const fetchPickupPoints = async () => {
@@ -50,14 +61,75 @@ export const PickupPointsMap = (props) => {
     fetchPickupPoints();
   }, [reloadKey]);
 
-  const pointsByCity = points.reduce((acc, point) => {
-    const city = formatCity(point.city);
-    (acc[city] = acc[city] || []).push(point);
-    return acc;
-  }, {});
-  const cities = Object.keys(pointsByCity).sort((a, b) => a.localeCompare(b, 'fr'));
-  const visiblePoints = (selectedCity === 'all' ? cities : [selectedCity])
-    .flatMap(city => pointsByCity[city] || []);
+  // Calculs mémorisés : la carte ne se redessine (et ne se recadre) que si les
+  // points, la ville choisie ou la position changent
+  const { pointsByCity, cities } = useMemo(() => {
+    const byCity = points.reduce((acc, point) => {
+      const city = formatCity(point.city);
+      (acc[city] = acc[city] || []).push(point);
+      return acc;
+    }, {});
+    return { pointsByCity: byCity, cities: Object.keys(byCity).sort((a, b) => a.localeCompare(b, 'fr')) };
+  }, [points]);
+
+  // Une fois la position connue : distances, du plus proche au plus loin
+  const located = useMemo(() => (user ? byDistance(points, user) : []), [points, user]);
+  const nearest = located[0] || null;
+  const distanceById = useMemo(() => Object.fromEntries(located.map(p => [p.id, p.distanceKm])), [located]);
+  const visiblePoints = useMemo(() => {
+    const cityPoints = (selectedCity === 'all' ? cities : [selectedCity]).flatMap(city => pointsByCity[city] || []);
+    return user
+      ? [...cityPoints].sort((a, b) => (distanceById[a.id] ?? Infinity) - (distanceById[b.id] ?? Infinity))
+      : cityPoints;
+  }, [cities, pointsByCity, selectedCity, user, distanceById]);
+  const mapPoints = useMemo(
+    () => visiblePoints.filter(hasCoordinates).map(p => ({
+      ...p, latitude: Number(p.latitude), longitude: Number(p.longitude), distanceKm: distanceById[p.id],
+    })),
+    [visiblePoints, distanceById],
+  );
+  const missingOnMap = visiblePoints.length - mapPoints.length;
+
+  const mapLabels = useMemo(() => ({
+    mapLabel: t.pickupMapLabel,
+    nearest: t.nearestPoint,
+    directions: t.directions,
+    you: t.yourPosition,
+    distance: (km) => formatDistance(km, language),
+  }), [t, language]);
+
+  const findNearest = () => {
+    if (!navigator.geolocation) {
+      setLocError(t.locationUnavailable);
+      return;
+    }
+    setLocating(true);
+    setLocError('');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUser({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        setSelectedCity('all');
+        setLocating(false);
+      },
+      (error) => {
+        setLocError(error.code === 1 ? t.locationDenied : t.locationUnavailable);
+        setLocating(false);
+      },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
+    );
+  };
+
+  // Clic sur une épingle : la carte du point correspondant est mise en avant
+  const onMarkerSelect = useCallback((id) => {
+    setHighlightId(id);
+    document.getElementById(`pickup-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, []);
+
+  const showOnMap = (id) => {
+    setHighlightId(id);
+    setFocus({ id, at: Date.now() });
+    document.getElementById('pickup-map')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   const chipClass = (active) => `shrink-0 inline-flex items-center gap-1.5 h-9 !min-h-0 px-4 rounded-full text-sm font-semibold border transition-colors ${
     active
@@ -131,12 +203,65 @@ export const PickupPointsMap = (props) => {
                 )}
               </div>
 
+              <section id="pickup-map" aria-labelledby="pickup-map-title" className="mb-8">
+                <h2 id="pickup-map-title" className="sr-only">{t.pickupMapLabel}</h2>
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={findNearest}
+                    disabled={locating}
+                    aria-busy={locating}
+                    className="inline-flex items-center gap-2 h-11 px-5 rounded-full bg-purple-700 text-white font-semibold hover:bg-purple-800 disabled:opacity-70"
+                  >
+                    <BusyLabel busy={locating} busyText={t.locating}>
+                      <span className="inline-flex items-center gap-2"><PinIcon className="w-5 h-5" />{t.findNearest}</span>
+                    </BusyLabel>
+                  </button>
+                  <p className="text-xs text-gray-500 max-w-sm">{t.locationPrivacy}</p>
+                </div>
+                {locError && <p className="mb-3 text-sm text-red-700" role="alert">{locError}</p>}
+                {nearest && (
+                  <p className="mb-3 px-4 py-3 rounded-xl bg-yellow-100 text-purple-950 text-sm font-semibold" role="status">
+                    {t.nearestIntro(nearest.name, formatDistance(nearest.distanceKm, language))}
+                  </p>
+                )}
+                <Suspense fallback={<div className="h-[22rem] sm:h-[28rem] rounded-xl loading-shimmer" />}>
+                  <PickupMap
+                    points={mapPoints}
+                    user={user}
+                    nearestId={nearest?.id}
+                    focusId={focus}
+                    onSelect={onMarkerSelect}
+                    labels={mapLabels}
+                  />
+                </Suspense>
+                {missingOnMap > 0 && <p className="mt-2 text-xs text-gray-500">{t.notOnMap(missingOnMap)}</p>}
+              </section>
+
               <ul className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
                       {visiblePoints.map(point => {
-                        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${point.address}, ${formatCity(point.city)}, Cameroun`)}`;
+                        const mapsUrl = hasCoordinates(point)
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${point.latitude},${point.longitude}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${point.address}, ${formatCity(point.city)}, Cameroun`)}`;
                         const whatsapp = whatsappUrl(point.managerWhatsApp);
                         return (
-                          <li key={point.id} className="flex flex-col bg-white rounded-xl border border-gray-200 p-5">
+                          <li
+                            key={point.id}
+                            id={`pickup-${point.id}`}
+                            className={`flex flex-col bg-white rounded-xl border p-5 transition-shadow ${
+                              highlightId === point.id ? 'border-purple-500 ring-2 ring-purple-300' : 'border-gray-200'
+                            }`}
+                          >
+                            {(point.id === nearest?.id || distanceById[point.id] != null) && (
+                              <p className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+                                {point.id === nearest?.id && (
+                                  <span className="px-2.5 py-0.5 rounded-full bg-yellow-300 text-purple-950 text-xs font-bold">{t.nearestPoint}</span>
+                                )}
+                                {distanceById[point.id] != null && (
+                                  <span className="font-semibold text-purple-800">{formatDistance(distanceById[point.id], language)}</span>
+                                )}
+                              </p>
+                            )}
                             <h2 className="text-xl font-bold leading-tight">{point.name}</h2>
                             <p className="text-sm font-semibold text-purple-700 mt-0.5">
                               {[formatCity(point.city), point.region].filter(Boolean).join(', ')}
@@ -184,6 +309,16 @@ export const PickupPointsMap = (props) => {
                                   <PhoneIcon className="w-4 h-4" />
                                   {t.call}
                                 </a>
+                              )}
+                              {hasCoordinates(point) && (
+                                <button
+                                  type="button"
+                                  onClick={() => showOnMap(point.id)}
+                                  className="flex-1 min-w-[7rem] inline-flex items-center justify-center gap-2 h-10 px-3 rounded-lg border border-gray-300 text-gray-900 text-sm font-semibold hover:border-purple-400 transition-colors"
+                                >
+                                  <PinIcon className="w-4 h-4" />
+                                  {t.showOnMap}
+                                </button>
                               )}
                               <a
                                 href={mapsUrl}
