@@ -11,6 +11,7 @@ import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
 import { CartIcon, WhatsAppIcon, PinIcon, InfoIcon } from '../ui/Icons';
 import ShopAboutDialog from '../product/ShopAboutDialog';
+import ShareButtons from '../product/ShareButtons';
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import { listImage, previewImage, cardImage, imageFallback, isLogoImage, NENGOO_IMAGE } from '../../lib/productImages';
@@ -721,25 +722,11 @@ const ProductDetail = (props) => {
               )}
 
               {/* Partage */}
-              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                <span className="text-gray-500">{t.share}</span>
-                <a
-                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(canonicalUrl)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-gray-800 hover:text-purple-700 hover:underline underline-offset-4"
-                >
-                  Facebook
-                </a>
-                <a
-                  href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`${name} ${canonicalUrl}`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-gray-800 hover:text-purple-700 hover:underline underline-offset-4"
-                >
-                  WhatsApp
-                </a>
-              </div>
+              <ShareButtons
+                url={canonicalUrl}
+                language={language}
+                text={`${name} – ${formatPrice(hasPromo ? product.promoPrice : product.price)}${language === 'en' ? ' on' : ' sur'} Nengoo`}
+              />
 
               {/* Description */}
               {product.description[language] && (
