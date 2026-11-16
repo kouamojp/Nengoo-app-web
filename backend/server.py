@@ -70,6 +70,8 @@ from pymongo.errors import DuplicateKeyError
 from category_tree import normalize_name, suggest_category_name
 from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
 from geocode import geocode, suggest as geocode_suggest, SuggestUnavailable
+from og_image import og_image_for
+import html as html_lib
 from promo import PromoError, compute_discounts as compute_promo_discounts, describe as promo_describe,     lines_by_seller as promo_lines_by_seller
 from product_search import normalize_query, search_products, search_products_detailed
 from image_variants import aligned_variants, refresh_product_variants
@@ -4236,16 +4238,23 @@ async def product_og_preview(id_or_slug: str):
 </head><body><script>window.location.href="{site_url}/product/{id_or_slug}";</script></body></html>"""
         return HTMLResponse(content=html)
 
-    name = _escape_html(product.get("name", "Produit Nengoo"))
-    raw_desc = product.get("description", "Découvrez ce produit sur Nengoo")
-    description = _escape_html(raw_desc[:160])
-    images = product.get("images", [])
-    image = images[0] if images else default_image
+    name = _escape_html((product.get("name") or "Produit Nengoo").strip())
+    # Description en texte simple (elle peut contenir du HTML mis en forme)
+    plain = html_lib.unescape(re.sub(r"<[^>]+>", " ", product.get("description") or ""))
+    plain = " ".join(plain.split()) or "Découvrez ce produit sur Nengoo"
+    description = _escape_html(plain[:157] + "…" if len(plain) > 160 else plain)
     price = product.get("promoPrice") or product.get("price") or 0
     currency = product.get("currency", "XAF")
     slug = product.get("slug") or product.get("id")
     url = f"{site_url}/product/{slug}"
     seller_name = _escape_html(product.get("sellerName", "Nengoo"))
+
+    # Image légère en JPEG, à une adresse sans espaces ni accents (og_image.py)
+    og = await og_image_for(db, product) or {"url": default_image, "width": 512, "height": 512}
+    image = _escape_html(og["url"])
+    image_size = (f'\n  <meta property="og:image:width" content="{og["width"]}">'
+                  f'\n  <meta property="og:image:height" content="{og["height"]}">') if og.get("width") else ""
+    image_type = "image/png" if og["url"].lower().endswith(".png") else "image/jpeg"
 
     html = f"""<!DOCTYPE html>
 <html lang="fr">
@@ -4260,8 +4269,9 @@ async def product_og_preview(id_or_slug: str):
   <meta property="og:title" content="{name} — Nengoo">
   <meta property="og:description" content="{description}">
   <meta property="og:image" content="{image}">
-  <meta property="og:image:width" content="800">
-  <meta property="og:image:height" content="800">
+  <meta property="og:image:secure_url" content="{image}">
+  <meta property="og:image:type" content="{image_type}">
+  <meta property="og:image:alt" content="{name}">{image_size}
   <meta property="og:site_name" content="Nengoo">
   <meta property="og:locale" content="fr_CM">
   <meta property="product:price:amount" content="{price}">
