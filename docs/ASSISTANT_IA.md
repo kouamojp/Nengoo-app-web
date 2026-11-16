@@ -101,6 +101,35 @@ ne garantit que l'article exact de la photo est en vente.
   les deux. Dans l'app, seules les miniatures des 6 dernières photos restent sur le
   téléphone ; la photo elle-même n'est jamais enregistrée.
 
+## Fiche produit rédigée par l'IA
+
+Dans le formulaire d'ajout (site vendeur et application), le vendeur ajoute ses photos,
+choisit la catégorie, saisit le prix, puis appuie sur « Générer la fiche ». L'IA propose
+le titre, la description, les caractéristiques, et si possible la marque (seulement si
+elle est lisible), l'état et les couleurs. Ces champs sont pré-remplis et restent
+modifiables ; un bandeau demande de les vérifier et une case « J'ai relu la fiche » est
+obligatoire avant l'ajout. **Rien n'est publié par l'IA** : l'ajout passe par
+`POST /api/products`, avec ses contrôles habituels.
+
+- API : `POST /api/products/ai-draft` (session vendeur, ou rôle moderator et plus) avec
+  `{images: [data URL, 3 au plus], price, category: id, kind, language}`. Réponse :
+  `{name, description, specs, brand, condition, colors, categoryMatches}`.
+  422 si la photo ne montre pas d'article, 429 au-delà du quota, 503 sans IA.
+- Modèle : celui du besoin `image` (`AI_PROVIDER_IMAGE`, puis les secours qui lisent
+  les photos). Photos vérifiées et réencodées comme pour la recherche par photo.
+- Relecture côté serveur : longueurs bornées, couleurs `#rrggbb`, état connu, liens,
+  numéros et e-mails retirés. Le prix et la catégorie restent ceux du vendeur.
+  `categoryMatches: false` affiche un avertissement sur la catégorie.
+- Coût compté dans `AI_DAILY_BUDGET_USD` et dans les statistiques (besoin
+  `product_draft`).
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `AI_PRODUCT_DRAFT_ENABLED` | `true` | `false` coupe la fonction (réponse 503) |
+| `AI_DRAFT_RATE_PER_SELLER_HOUR` | `20` | Fiches par heure et par vendeur |
+| `AI_DRAFT_MAX_OUTPUT_TOKENS` | `2000` | Longueur maximale de la réponse (réflexion comprise) |
+| `AI_DRAFT_TIMEOUT_SECONDS` | `45` | Attente totale, secours compris |
+
 ## Autres réglages
 
 | Variable | Défaut | Rôle |

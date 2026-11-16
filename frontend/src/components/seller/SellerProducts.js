@@ -4,6 +4,7 @@ import SellerHeader from './SellerHeader';
 import ColorPicker from './ColorPicker';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
 import ProductDetailsFields, { ProductKindField } from './ProductDetailsFields';
+import AiDraftPanel, { applyDraft } from './AiDraftPanel';
 import { isService, productFormError, productPayload, withSpecList } from '../../lib/productRules';
 import { numberFormat } from '../../lib/numberFormat';
 
@@ -32,6 +33,9 @@ const SellerProducts = (props) => {
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [selectedProducts, setSelectedProducts] = useState([]);
     const [availableCategories, setAvailableCategories] = useState([]);
+    // Brouillon de l'IA appliqué au formulaire d'ajout : relecture à confirmer
+    const [aiDraft, setAiDraft] = useState(null);
+    const [aiReviewed, setAiReviewed] = useState(false);
 
     const handleSelectProduct = (e, id) => {
         if (e.target.checked) {
@@ -212,8 +216,11 @@ const SellerProducts = (props) => {
             brand: '',
             condition: '',
             specList: [],
+            kind: 'product',
         });
         setSelectedFiles([]); // Clear selected files after successful upload
+        setAiDraft(null);
+        setAiReviewed(false);
       } catch (error) {
         alert(`Erreur: ${error.message}`);
       }
@@ -483,17 +490,25 @@ const SellerProducts = (props) => {
             <h2 className="adm-modal-title mb-5">{isService(newProduct) ? 'Nouveau service' : 'Nouveau produit'}</h2>
             <form onSubmit={handleAddProduct} className="space-y-6">
               <ProductKindField value={newProduct} onChange={setNewProduct} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="adm-label">Nom du produit</label>
+
+              <div>
+                  <label className="adm-label" htmlFor="new-product-images">Photos du produit</label>
                   <input
-                    type="text"
-                    required
-                    value={newProduct.name}
-                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                    id="new-product-images"
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
                     className="adm-input"
                   />
-                </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedFiles.map((file, index) => (
+                          <img key={index} src={URL.createObjectURL(file)} alt={`preview-${index}`} className="w-20 h-20 object-cover rounded-lg" />
+                      ))}
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="adm-label">Catégorie</label>
                   <select
@@ -513,6 +528,40 @@ const SellerProducts = (props) => {
                     required
                     value={newProduct.price}
                     onChange={(e) => setNewProduct({ ...newProduct, price: parseInt(e.target.value) || 0 })}
+                    className="adm-input"
+                  />
+                </div>
+              </div>
+
+              <AiDraftPanel
+                product={newProduct}
+                files={selectedFiles}
+                language={language}
+                onDraft={(draft) => {
+                  setNewProduct(p => applyDraft(p, draft));
+                  setAiDraft({ categoryMatches: draft.categoryMatches !== false });
+                  setAiReviewed(false);
+                }}
+              />
+
+              {aiDraft && (
+                <div className="rounded-xl border border-yellow-300 bg-yellow-50 p-4 text-sm text-gray-800" role="status">
+                  <p className="font-semibold text-purple-950">Fiche proposée par l'IA : vérifiez chaque champ.</p>
+                  <p className="mt-1">L'IA peut se tromper sur la matière, la taille ou la marque. Corrigez ce qui ne correspond pas à votre article.</p>
+                  {!aiDraft.categoryMatches && (
+                    <p className="mt-2 font-semibold text-red-700">La photo ne semble pas correspondre à la catégorie choisie. Vérifiez la catégorie.</p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="adm-label">Nom du produit</label>
+                  <input
+                    type="text"
+                    required
+                    value={newProduct.name}
+                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                     className="adm-input"
                   />
                 </div>
@@ -538,7 +587,19 @@ const SellerProducts = (props) => {
                   </div>
                 )}
               </div>
-              
+
+              <div>
+                <label className="adm-label">Description</label>
+                <textarea
+                  required
+                  value={newProduct.description}
+                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                  rows={aiDraft ? 5 : 3}
+                  className="adm-input"
+                />
+                <span className="block text-xs text-gray-500 mt-1">Au moins 20 caractères : matière, taille, usage… Une description précise aide les clients à trouver le produit.</span>
+              </div>
+
               {!isService(newProduct) && (
                 <ColorPicker
                   value={newProduct.colors}
@@ -548,32 +609,18 @@ const SellerProducts = (props) => {
 
               <ProductDetailsFields value={newProduct} onChange={setNewProduct} />
 
-              <div>
-                  <label className="adm-label">Images du produit</label>
+              {aiDraft && (
+                <label className="flex items-start gap-3 text-sm text-gray-800 cursor-pointer">
                   <input
-                    type="file"
-                    multiple
-                    onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
-                    className="adm-input"
+                    type="checkbox"
+                    required
+                    checked={aiReviewed}
+                    onChange={(e) => setAiReviewed(e.target.checked)}
+                    className="mt-0.5 h-5 w-5 accent-purple-700"
                   />
-                  <div className="mt-2 flex flex-wrap gap-2">
-                      {selectedFiles.map((file, index) => (
-                          <img key={index} src={URL.createObjectURL(file)} alt={`preview-${index}`} className="w-20 h-20 object-cover rounded-lg" />
-                      ))}
-                  </div>
-              </div>
-
-              <div>
-                <label className="adm-label">Description</label>
-                <textarea
-                  required
-                  value={newProduct.description}
-                  onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                  rows={3}
-                  className="adm-input"
-                />
-                <span className="block text-xs text-gray-500 mt-1">Au moins 20 caractères : matière, taille, usage… Une description précise aide les clients à trouver le produit.</span>
-              </div>
+                  <span>J'ai relu la fiche proposée par l'IA : le titre, la description et les caractéristiques correspondent à mon article.</span>
+                </label>
+              )}
               
               <div className="flex flex-wrap gap-3">
                 <button
@@ -584,7 +631,7 @@ const SellerProducts = (props) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddForm(false)}
+                  onClick={() => { setShowAddForm(false); setAiDraft(null); setAiReviewed(false); }}
                   className="adm-btn adm-btn-secondary"
                 >
                   Annuler

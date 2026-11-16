@@ -4160,6 +4160,7 @@ from routers.highlights import router as highlights_router
 from routers.nearby import router as nearby_router
 from routers.chat import router as chat_router, ensure_indexes as ensure_chat_indexes
 from routers.promo_codes import router as promo_codes_router, ensure_indexes as ensure_promo_indexes
+from routers.product_draft import router as product_draft_router
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
 api_router.include_router(support_router)
@@ -4169,6 +4170,7 @@ api_router.include_router(highlights_router)
 api_router.include_router(nearby_router)
 api_router.include_router(chat_router)
 api_router.include_router(promo_codes_router)
+api_router.include_router(product_draft_router)
 
 
 @app.on_event("startup")
