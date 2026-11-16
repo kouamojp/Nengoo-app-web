@@ -137,6 +137,11 @@ Côté client seulement ; l'équipe publie et valide depuis l'admin du site.
 
 - Téléchargement : le lien signé s'ouvre dans le navigateur du téléphone, qui
   enregistre le PDF (aucune dépendance ajoutée).
+- **iOS** : l'App Store impose son achat intégré pour le contenu numérique
+  (guideline 3.1.1). L'app iOS ne montre donc ni bouton d'achat, ni prix des
+  documents payants, ni tri par prix, ni historique des paiements ; les documents
+  gratuits, offerts ou déjà obtenus restent disponibles (`documentSalesAllowed()`).
+  Android et le site gardent le paiement Mobile Money.
 - Connexion depuis une fiche : `SignInScreen` ouvert avec
   `arguments: SignInScreen.returnArgument` revient à la fiche au lieu de l'accueil.
 - Notifications : `/profile?tab=documents` ouvre « Mes documents ».
