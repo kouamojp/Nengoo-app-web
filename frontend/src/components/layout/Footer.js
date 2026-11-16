@@ -44,6 +44,7 @@ const Footer = ({ language }) => {
             </p>
             <ul className="mt-6 space-y-2">
               <li><Link to="/catalog" className={linkClass}>{t.browseCatalog}</Link></li>
+              <li><Link to="/documents" className={linkClass}>{language === 'en' ? 'Downloadable digital documents' : 'Documents numériques téléchargeables'}</Link></li>
               <li><Link to="/pickup-points" className={linkClass}>{t.pickupPoints}</Link></li>
               <li><Link to="/about" className={linkClass}>{t.about}</Link></li>
             </ul>

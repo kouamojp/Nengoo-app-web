@@ -15,7 +15,9 @@ import ShippingSettingsManagement from './ShippingSettingsManagement';
 import HomepageManagement from './HomepageManagement';
 import AboutPageManagement from './AboutPageManagement';
 import WhatsAppAnalytics from './WhatsAppAnalytics';
-import AdminLayout, { CHAT_REPORT_ROLES, useAdminPendingCounts } from './AdminLayout';
+import AdminLayout, { CHAT_REPORT_ROLES, DOCUMENT_PAYMENT_ROLES, DOCUMENT_ROLES, useAdminPendingCounts } from './AdminLayout';
+import DocumentManagement from './DocumentManagement';
+import DocumentPayments from './DocumentPayments';
 import ChatReports from './ChatReports';
 import PromoCodesManager from '../promo/PromoCodesManager';
 import { SectionHeader } from './AdminUI';
@@ -25,7 +27,7 @@ import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SECTIONS = ['dashboard', 'support', 'chatReports', 'promoCodes', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping'];
+const SECTIONS = ['dashboard', 'support', 'chatReports', 'promoCodes', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping', 'documents', 'documentPayments'];
 
 const formatPrice = (price) => numberFormat('fr-FR', {
     style: 'currency',
@@ -149,6 +151,9 @@ const Overview = ({ user, orders, counts, onSelect }) => {
     );
 };
 
+// Le menu recompte les paiements à vérifier après une validation ou un refus
+const notifyDocumentPayments = () => window.dispatchEvent(new Event('nengoo:document-payments'));
+
 const AdminDashboard = (props) => {
     const { user, setUser } = props;
     const [searchParams, setSearchParams] = useSearchParams();
@@ -243,6 +248,10 @@ const AdminDashboard = (props) => {
         {activeSection === 'assistant' && <AssistantStats />}
         {activeSection === 'couriers' && <CourierManagement />}
         {activeSection === 'promotions' && ['super_admin', 'admin'].includes(user.role) && <PromotionManagement />}
+        {activeSection === 'documents' && DOCUMENT_ROLES.includes(user.role) && <DocumentManagement />}
+        {activeSection === 'documentPayments' && DOCUMENT_PAYMENT_ROLES.includes(user.role) && (
+            <DocumentPayments onCountChange={notifyDocumentPayments} />
+        )}
         {user.role === 'super_admin' && (
             <>
                 <div className={sectionClass('shipping')}>

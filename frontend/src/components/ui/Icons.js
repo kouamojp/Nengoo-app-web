@@ -199,6 +199,14 @@ export const SparkIcon = (props) => (
   </Icon>
 );
 
+export const BookIcon = (props) => (
+  <Icon {...props}>
+    <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z" />
+    <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z" />
+    <path d="M7 8h1.5M15.5 8H17" />
+  </Icon>
+);
+
 export const CameraIcon = (props) => (
   <Icon {...props}>
     <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.1l1.5-2h5.8l1.5 2h2.1A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />

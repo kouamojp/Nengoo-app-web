@@ -743,3 +743,8 @@ code {
   .ai-sparkle, .ai-step, .ai-bar > span, .ai-shimmer { animation: none; }
   .ai-bar > span { width: 100%; opacity: 0.5; }
 }
+
+/* Cercle d'attente des boutons : immobile mais visible si les animations sont réduites */
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; border-top-color: transparent; }
+}

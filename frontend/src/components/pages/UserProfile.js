@@ -12,6 +12,7 @@ import ChatInbox from '../chat/ChatInbox';
 import { useChatUnread } from '../../lib/chat';
 import { useSupportUnread } from '../../lib/support';
 import { numberFormat } from '../../lib/numberFormat';
+import MyDocuments from '../documents/MyDocuments';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -333,6 +334,18 @@ const UserProfile = (props) => {
                     <span className="font-medium">Mes commandes</span>
                   </button>
 
+                  {user.type === 'buyer' && (
+                    <button
+                      onClick={() => handleNavigate('documents')}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                        activeTab === 'documents' ? 'bg-purple-100 text-purple-700' : 'hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-xl">📚</span>
+                      <span className="font-medium">Mes documents</span>
+                    </button>
+                  )}
+
                   <button
                     onClick={() => handleNavigate('messages')}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
@@ -509,6 +522,12 @@ const UserProfile = (props) => {
                       </button>
                     )}
                   </form>
+                </div>
+              </div>
+
+              <div id="documents-section" className={`${activeTab === 'documents' ? '' : 'hidden'}`}>
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <MyDocuments user={user} language={language} active={activeTab === 'documents'} />
                 </div>
               </div>
 

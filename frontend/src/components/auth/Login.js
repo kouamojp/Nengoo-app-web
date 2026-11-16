@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import {
   AccountTypeChoice, accountTypeFrom, apiError, AuthLink, AuthShell, Field, FormError,
   PasswordInput, PhoneInput, rememberType, SubmitButton,
 } from './AuthLayout';
 import { PHONE_COUNTRIES, toInternational } from '../../lib/phoneCountries';
+import { safeNext } from '../../lib/documents';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -14,16 +15,20 @@ const Login = ({ language, setUser }) => {
   const { accountType } = useParams();
   const t = translations[language].loginPage;
   const type = accountTypeFrom(accountType);
+  // Page à retrouver après la connexion (ex. la fiche d'un document)
+  const [searchParams] = useSearchParams();
+  const next = safeNext(searchParams.get('next'));
+  const keep = next ? `?next=${encodeURIComponent(next)}` : '';
   const [whatsapp, setWhatsapp] = useState('');
   const [country, setCountry] = useState(PHONE_COUNTRIES[0]);
   const [password, setPassword] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const chooseType = (next) => {
-    rememberType(next);
+  const chooseType = (nextType) => {
+    rememberType(nextType);
     setError('');
-    navigate(`/login/${next}`, { replace: true });
+    navigate(`/login/${nextType}${keep}`, { replace: true });
   };
 
   const handleSubmit = async (event) => {
@@ -44,7 +49,7 @@ const Login = ({ language, setUser }) => {
       }
       rememberType(type);
       setUser(data);
-      navigate(type === 'seller' ? '/seller' : '/');
+      navigate(type === 'seller' ? '/seller' : next || '/');
     } catch {
       setError(t.offline);
       setSending(false);
@@ -99,7 +104,7 @@ const Login = ({ language, setUser }) => {
         <SubmitButton sending={sending} sendingLabel={t.signingIn}>{t.submit}</SubmitButton>
 
         <p className="text-sm text-gray-700">
-          {t.noAccount} <AuthLink to={`/signup/${type}`} strong>{t[`${type}Signup`]}</AuthLink>
+          {t.noAccount} <AuthLink to={`/signup/${type}${keep}`} strong>{t[`${type}Signup`]}</AuthLink>
         </p>
         <p className="text-sm"><AuthLink to="/">{t.home}</AuthLink></p>
       </form>

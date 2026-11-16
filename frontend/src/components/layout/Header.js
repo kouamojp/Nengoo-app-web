@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import NotificationList from '../ui/NotificationList';
 import { getUnreadNotificationsCount } from '../../lib/notifications';
-import { SearchIcon, CartIcon, UserIcon, BellIcon, StoreIcon, LogoutIcon, SparkIcon } from '../ui/Icons';
+import { SearchIcon, CartIcon, UserIcon, BellIcon, StoreIcon, LogoutIcon, SparkIcon, BookIcon } from '../ui/Icons';
 import { openAssistant } from '../../lib/assistant';
 import { numberFormat } from '../../lib/numberFormat';
 import { imageFallback, NENGOO_IMAGE } from '../../lib/productImages';
@@ -232,6 +232,11 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
                 )}
               </div>
             )}
+
+            <Link to="/documents" className={actionClass}>
+              <BookIcon />
+              <span>Documents</span>
+            </Link>
 
             <Link to="/cart" className={actionClass}>
               <span className="relative">

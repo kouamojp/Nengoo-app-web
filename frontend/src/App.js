@@ -35,6 +35,8 @@ const PickupPointsMap = lazy(() => import('./components/pages/PickupPointsMap'))
 const DeleteAccount = lazy(() => import('./components/pages/DeleteAccount'));
 const TrackOrder = lazy(() => import('./components/pages/TrackOrder'));
 const CourierPage = lazy(() => import('./components/pages/CourierPage'));
+const DocumentStore = lazy(() => import('./components/pages/DocumentStore'));
+const DocumentDetail = lazy(() => import('./components/pages/DocumentDetail'));
 
 const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-gray-50" role="status" aria-label="Chargement">
@@ -189,6 +191,8 @@ function App() {
             <Route path="/suivi-commande" element={<TrackOrder {...appProps} />} />
             <Route path="/track-order" element={<TrackOrder {...appProps} />} />
             <Route path="/livreur/:token" element={<CourierPage />} />
+            <Route path="/documents" element={<DocumentStore {...appProps} />} />
+            <Route path="/documents/:idOrSlug" element={<DocumentDetail {...appProps} />} />
 
             {/* Authentication Routes */}
             <Route path="/login/:accountType?" element={<Login {...appProps} />} />

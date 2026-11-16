@@ -6,6 +6,7 @@ import { translations } from '../../lib/translations';
 import PromoSlot from '../promotions/PromoSlot';
 import ProductGridWithPromos from '../promotions/ProductGridWithPromos';
 import HighlightsSection from './HighlightsSection';
+import DocumentsTeaser from '../documents/DocumentsTeaser';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
@@ -453,6 +454,9 @@ const Homepage = (props) => {
           </div>
         </section>
       )}
+
+      {/* Documents numériques téléchargeables (rien tant qu'aucun document n'est en ligne) */}
+      <DocumentsTeaser language={language} />
 
       {/* À la une : promus par l'équipe, puis les plus demandés */}
       <HighlightsSection language={language} addToCart={addToCart} />

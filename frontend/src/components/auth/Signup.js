@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import { CITIES } from '../../lib/cities';
 import {
@@ -7,6 +7,7 @@ import {
   PasswordInput, PhoneInput, rememberType, SubmitButton,
 } from './AuthLayout';
 import { isValidPhone, PHONE_COUNTRIES, toInternational } from '../../lib/phoneCountries';
+import { safeNext } from '../../lib/documents';
 import { RichTextEditor } from '../ui/RichText';
 import { isBlank } from '../../lib/richText';
 
@@ -28,15 +29,17 @@ const Signup = ({ language, setUser }) => {
   const common = translations[language].loginPage;
   const type = accountTypeFrom(accountType);
   const seller = type === 'seller';
+  const [searchParams] = useSearchParams();
+  const next = safeNext(searchParams.get('next'));
   const [form, setForm] = useState(EMPTY_FORM);
   const [country, setCountry] = useState(PHONE_COUNTRIES[0]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const chooseType = (next) => {
-    rememberType(next);
+  const chooseType = (nextType) => {
+    rememberType(nextType);
     setError('');
-    navigate(`/signup/${next}`, { replace: true });
+    navigate(`/signup/${nextType}${next ? `?next=${encodeURIComponent(next)}` : ''}`, { replace: true });
   };
 
   // Texte saisi conservé d'un type de compte à l'autre
@@ -81,7 +84,7 @@ const Signup = ({ language, setUser }) => {
         navigate('/pending-approval');
       } else {
         setUser(data);
-        navigate('/');
+        navigate(next || '/');
       }
     } catch {
       setError(common.offline);
@@ -173,7 +176,7 @@ const Signup = ({ language, setUser }) => {
         <SubmitButton sending={sending} sendingLabel={t.sending}>{t[`${type}Submit`]}</SubmitButton>
 
         <p className="text-sm text-gray-700">
-          {t.haveAccount} <AuthLink to={`/login/${type}`} strong>{common.submit}</AuthLink>
+          {t.haveAccount} <AuthLink to={`/login/${type}${next ? `?next=${encodeURIComponent(next)}` : ''}`} strong>{common.submit}</AuthLink>
         </p>
         <p className="text-sm"><AuthLink to="/">{common.home}</AuthLink></p>
       </form>

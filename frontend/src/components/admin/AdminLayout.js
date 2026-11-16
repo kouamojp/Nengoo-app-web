@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon, SearchIcon, RouteIcon,
   LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon, SparkIcon, ChatIcon,
-  MegaphoneIcon,
+  MegaphoneIcon, BookIcon,
 } from '../ui/Icons';
 import { useSupportUnread } from '../../lib/support';
 import { AdminFeedbackHost } from './adminFeedback';
@@ -81,6 +81,39 @@ const useChatReportsCount = (user) => {
   return count;
 };
 
+// Rôles qui gèrent les documents numériques, et ceux qui valident les paiements (comme le backend)
+export const DOCUMENT_ROLES = ['super_admin', 'admin', 'moderator'];
+export const DOCUMENT_PAYMENT_ROLES = ['super_admin', 'admin'];
+
+/** Paiements de documents à vérifier (pastille du menu). */
+const useDocumentPaymentsCount = (user) => {
+  const [count, setCount] = useState(0);
+  const enabled = Boolean(user?.type === 'admin' && DOCUMENT_PAYMENT_ROLES.includes(user.role));
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/admin/document-payments?status=pending`);
+        if (response.ok && !cancelled) setCount((await response.json()).counts?.pending || 0);
+      } catch {
+        // Compteur indicatif : on garde la dernière valeur
+      }
+    };
+    refresh();
+    const interval = setInterval(refresh, 120000);
+    window.addEventListener('nengoo:document-payments', refresh);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('nengoo:document-payments', refresh);
+    };
+  }, [enabled]);
+
+  return count;
+};
+
 const navGroups = (user, counts) => [
   {
     items: [
@@ -105,6 +138,15 @@ const navGroups = (user, counts) => [
       ] : []),
     ],
   },
+  ...(DOCUMENT_ROLES.includes(user.role) ? [{
+    label: 'Documents',
+    items: [
+      { id: 'documents', label: 'Documents numériques', Icon: BookIcon },
+      ...(DOCUMENT_PAYMENT_ROLES.includes(user.role) ? [
+        { id: 'documentPayments', label: 'Paiements à vérifier', Icon: CartIcon, count: counts.documentPayments, countLabel: 'à vérifier' },
+      ] : []),
+    ],
+  }] : []),
   {
     label: 'Site',
     items: [
@@ -136,7 +178,8 @@ const AdminLayout = ({ user, setUser, active, onSelect, title, description, acti
   const pending = useAdminPendingCounts(user);
   const support = useSupportUnread(user, 30000);
   const reports = useChatReportsCount(user);
-  const counts = { ...pending, support, reports };
+  const documentPayments = useDocumentPaymentsCount(user);
+  const counts = { ...pending, support, reports, documentPayments };
 
   // Les droits admin ne viennent que du jeton de session : une session
   // ouverte avant son introduction doit se reconnecter
@@ -246,7 +289,7 @@ const AdminLayout = ({ user, setUser, active, onSelect, title, description, acti
           className="relative !min-h-0 !min-w-0 w-10 h-10 rounded-lg flex items-center justify-center hover:bg-white/10"
         >
           <MenuIcon />
-          {counts.sellers + counts.orders + counts.support + counts.reports > 0 && (
+          {counts.sellers + counts.orders + counts.support + counts.reports + counts.documentPayments > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-yellow-300" aria-hidden="true" />
           )}
         </button>
