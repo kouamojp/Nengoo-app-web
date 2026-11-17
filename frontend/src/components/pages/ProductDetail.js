@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { chatApi } from '../../lib/chat';
@@ -16,6 +16,7 @@ import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import { listImage, previewImage, cardImage, imageFallback, isLogoImage, NENGOO_IMAGE } from '../../lib/productImages';
 import { numberFormat } from '../../lib/numberFormat';
+import { trackViewItem } from '../../lib/analytics';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const SITE_URL = 'https://www.nengoo.com';
@@ -109,6 +110,17 @@ const ProductDetail = (props) => {
       fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
     }
   }, [productId]);
+
+  // Pixel Google : une vue par fiche affichée (pas à chaque changement de langue)
+  const trackedProductRef = useRef(null);
+  useEffect(() => {
+    if (!product || trackedProductRef.current === product.id) return;
+    trackedProductRef.current = product.id;
+    trackViewItem({
+      ...product,
+      sellerName: product.sellerName || seller?.businessName,
+    });
+  }, [product, seller]);
   const [messageToSend, setMessageToSend] = useState('');
   const [messageError, setMessageError] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);

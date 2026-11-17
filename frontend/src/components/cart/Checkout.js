@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { trackBeginCheckout, trackPurchase } from '../../lib/analytics';
 import CityDatalist from '../ui/CityDatalist';
 import { CITIES_DATALIST_ID } from '../../lib/cities';
 import { Link, useNavigate } from 'react-router-dom';
@@ -53,6 +54,14 @@ const Checkout = (props) => {
   const [placedOrders, setPlacedOrders] = useState(null);
 
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+  // Pixel Google : début de commande, une fois par ouverture de la page
+  const checkoutTrackedRef = useRef(false);
+  useEffect(() => {
+    if (checkoutTrackedRef.current || cartItems.length === 0) return;
+    checkoutTrackedRef.current = true;
+    trackBeginCheckout(cartItems);
+  }, [cartItems]);
 
   useEffect(() => {
     if (user) {
@@ -192,6 +201,7 @@ const Checkout = (props) => {
       }
 
       setPlacedOrders(data);
+      trackPurchase(Array.isArray(data) ? data : [], appliedCode);
       clearCart();
       window.scrollTo({ top: 0 });
     } catch (error) {

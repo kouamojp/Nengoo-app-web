@@ -1,0 +1,34 @@
+import { toItem, trackAddToCart, trackPurchase, trackViewItem } from './analytics';
+
+beforeEach(() => { window.gtag = jest.fn(); });
+afterEach(() => { delete window.gtag; });
+
+test('toItem uses the promo price and keeps the discount', () => {
+  const item = toItem({ id: 7, name: { fr: 'Robe', en: 'Dress' }, price: 10000, promoPrice: 8000, brand: 'Kaba', sellerName: 'Marie' }, 2);
+  expect(item).toEqual({
+    item_id: '7', item_name: 'Robe', price: 8000, quantity: 2, discount: 2000, item_brand: 'Kaba', affiliation: 'Marie',
+  });
+});
+
+test('view_item and add_to_cart send XAF values', () => {
+  trackViewItem({ id: 'p1', name: 'Sac', price: 5000 });
+  trackAddToCart({ id: 'p1', name: 'Sac', price: 5000 }, 3);
+  expect(window.gtag).toHaveBeenNthCalledWith(1, 'event', 'view_item', expect.objectContaining({ currency: 'XAF', value: 5000 }));
+  expect(window.gtag).toHaveBeenNthCalledWith(2, 'event', 'add_to_cart', expect.objectContaining({ value: 15000 }));
+});
+
+test('purchase is sent once per order, shipping excluded from value', () => {
+  trackPurchase([
+    { id: 'ord_1', totalAmount: 12000, shippingCost: 2000, sellerName: 'A', products: [{ productId: 'p1', name: 'Sac', price: 5000, quantity: 2 }] },
+    { id: 'ord_2', totalAmount: 3000, shippingCost: 0, products: [] },
+  ], 'NOEL');
+  expect(window.gtag).toHaveBeenCalledTimes(2);
+  expect(window.gtag).toHaveBeenCalledWith('event', 'purchase', expect.objectContaining({
+    transaction_id: 'ord_1', value: 10000, shipping: 2000, coupon: 'NOEL',
+  }));
+});
+
+test('does nothing without the Google tag', () => {
+  delete window.gtag;
+  expect(() => trackViewItem({ id: 1, name: 'x', price: 1 })).not.toThrow();
+});
