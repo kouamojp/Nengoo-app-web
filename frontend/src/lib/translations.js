@@ -221,8 +221,8 @@ export const translations = {
     orderNotFound: "Aucune commande ne correspond à ce numéro et à ce téléphone.",
     orderedOn: "Commandée le",
     continueShopping: "Continuer mes achats",
-    deliveryCode: "Code de livraison",
-    deliveryCodeHint: "À donner au livreur quand il vous remet le colis",
+    deliveryCode: "Code de retrait",
+    deliveryCodeHint: "À donner au vendeur, au livreur ou au point de retrait pour récupérer votre commande. Ne le communiquez qu'à la remise du colis.",
     
     // Footer
     about: "À Propos",
@@ -601,8 +601,8 @@ phone: "Phone",
     orderNotFound: "No order matches this number and phone.",
     orderedOn: "Ordered on",
     continueShopping: "Continue shopping",
-    deliveryCode: "Delivery code",
-    deliveryCodeHint: "Give it to the courier when you receive your parcel",
+    deliveryCode: "Pickup code",
+    deliveryCodeHint: "Give it to the seller, the courier or the pickup point to collect your order. Only share it when you receive your parcel.",
     
     // Footer
     about: "About",

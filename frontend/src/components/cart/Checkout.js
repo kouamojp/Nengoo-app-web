@@ -227,8 +227,11 @@ const Checkout = (props) => {
                     <p className="text-xs text-gray-500">{t.orderNumber} · {order.sellerName}</p>
                     <p className="text-lg font-bold tabular-nums">{order.id}</p>
                     <p className="text-sm text-gray-600">{formatPrice(order.totalAmount)}</p>
-                    {order.deliveryCode && !order.pickupPointId && (
-                      <p className="mt-1 text-sm">{t.deliveryCode} : <strong className="tabular-nums tracking-widest">{order.deliveryCode}</strong></p>
+                    {order.deliveryCode && (
+                      <p className="mt-1 text-sm">
+                        {t.deliveryCode} : <strong className="text-base tabular-nums tracking-widest">{order.deliveryCode}</strong>
+                        <span className="block text-xs text-gray-500">{t.deliveryCodeHint}</span>
+                      </p>
                     )}
                   </div>
                   <Link to={trackUrl(order)} className="text-sm font-semibold text-purple-700 hover:underline underline-offset-4">

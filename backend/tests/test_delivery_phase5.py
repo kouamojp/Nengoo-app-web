@@ -50,7 +50,7 @@ def test_seller_fee_rules():
 
 def test_delivery_code():
     codes = {new_delivery_code() for _ in range(50)}
-    assert all(len(c) == 4 and c.isdigit() for c in codes) and len(codes) > 1
+    assert all(len(c) == 6 and c.isdigit() for c in codes) and len(codes) > 1
 
 
 def _local_mongo():
@@ -103,7 +103,7 @@ def test_quote_courier_and_proof(monkeypatch):
                 paymentMethod="cashOnDelivery", deliveryOption="home", cartItems=items), tasks)
             assert sorted(o.shippingCost for o in orders) == [700, 1000]
             order = next(o for o in orders if o.sellerId == "s1")
-            assert len(order.deliveryCode) == 4
+            assert len(order.deliveryCode) == 6
 
             # Livreur : création, attribution, page par lien secret
             courier = await server.create_courier(server.CourierInput(name="Jean", phone="690000002", city="douala"))

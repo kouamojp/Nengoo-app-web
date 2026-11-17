@@ -62,8 +62,9 @@ async def load_settings(db) -> Dict:
 
 
 def new_delivery_code() -> str:
-    """Code à 4 chiffres donné au client, demandé au livreur à la remise du colis."""
-    return f"{secrets.randbelow(10000):04d}"
+    """Code de retrait à 6 chiffres envoyé au client : il le donne au vendeur,
+    au livreur ou au point de retrait, qui le valide à la remise du colis."""
+    return f"{secrets.randbelow(1_000_000):06d}"
 
 
 def new_courier_token() -> str:

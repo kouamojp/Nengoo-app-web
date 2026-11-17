@@ -33,6 +33,64 @@ const WhatsAppButton = ({ phone, children }) => {
   );
 };
 
+const CLOSED = ['delivered', 'cancelled', 'refunded', 'payment_pending'];
+
+// Remise du colis : le vendeur saisit le code à 6 chiffres donné par le client
+const HandoverForm = ({ order, user, onDone }) => {
+  const [code, setCode] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  if (CLOSED.includes(order.status)) return null;
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setSending(true);
+    setError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/orders/${order.id}/handover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Seller-Id': user.id },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || 'La validation a échoué. Réessayez.');
+      setCode('');
+      onDone(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const id = `handover-${order.id}`;
+  return (
+    <form onSubmit={submit} className="mt-4 rounded-xl border border-purple-200 bg-purple-50 p-3">
+      <label htmlFor={id} className="block text-sm font-semibold text-purple-950">
+        {order.pickupPointName ? 'Retrait au point ' + order.pickupPointName : 'Remise du colis'} : code du client
+      </label>
+      <p className="text-xs text-purple-900">Demandez au client le code à 6 chiffres reçu par SMS à la commande.</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <input
+          id={id}
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="\d{6}"
+          placeholder="••••••"
+          aria-describedby={error ? `${id}-error` : undefined}
+          className="adm-input w-36 text-center text-lg tracking-[0.3em] tabular-nums"
+        />
+        <button type="submit" disabled={sending || code.length !== 6} className="adm-btn adm-btn-primary">
+          {sending ? 'Vérification…' : 'Valider la remise'}
+        </button>
+      </div>
+      {error && <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-red-700">{error}</p>}
+    </form>
+  );
+};
+
 const OrderDetail = ({ order, onClose }) => (
   <Modal title={`Commande ${order.id}`} onClose={onClose} size="max-w-lg">
     <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-sm">
@@ -215,6 +273,17 @@ const SellerOrders = (props) => {
                 </button>
                 <WhatsAppButton phone={order.shippingPhone || order.buyerWhatsapp}>Écrire au client</WhatsAppButton>
               </div>
+              <HandoverForm
+                order={order}
+                user={user}
+                onDone={(updated) => setOrders(list => list.map(o => (o.id === order.id ? { ...o, ...updated } : o)))}
+              />
+              {order.status === 'delivered' && order.handedOverAt && (
+                <p className="mt-3 text-sm text-green-800">
+                  Remise validée avec le code le {new Date(order.handedOverAt).toLocaleDateString('fr-FR')}
+                  {order.handedOverBy?.startsWith('courier:') ? ` par le livreur ${order.handedOverBy.slice(8)}` : ''}
+                </p>
+              )}
             </li>
           ))}
         </ul>

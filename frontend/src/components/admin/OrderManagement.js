@@ -443,7 +443,7 @@ const OrderManagement = ({ orders, user, onOrderUpdate }) => {
                                                             )}
                                                             {order.shippingLandmark && <dd className="text-gray-600">Repère : {order.shippingLandmark}</dd>}
                                                             {order.courierName && <dd className="text-gray-600">Livreur : {order.courierName}</dd>}
-                                                            {order.deliveryCode && <dd className="text-gray-600">Code de livraison : {order.deliveryCode}</dd>}
+                                                            {order.deliveryCode && <dd className="text-gray-600">Code de retrait : {order.deliveryCode}</dd>}
                                                         </div>
                                                         <div>
                                                             <dt className="text-gray-500">Suivi</dt>

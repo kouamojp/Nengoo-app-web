@@ -104,7 +104,9 @@ def test_checkout_flow(monkeypatch):
 
         # Étapes : un vendeur ne saute pas d'étape, l'annulation rend le stock
         update = server.OrderUpdate
-        assert "ne peut pas" in await rejects(server.update_order(order.id, update(status="delivered"), tasks, None, "s1"))
+        assert "ne peut pas" in await rejects(server.update_order(order.id, update(status="shipped"), tasks, None, "s1"))
+        # « Livrée » : seulement avec le code de retrait du client
+        assert "code de retrait" in await rejects(server.update_order(order.id, update(status="delivered"), tasks, None, "s1"))
         await server.update_order(order.id, update(status="confirmed"), tasks, None, "s1")
         await server.update_order(order.id, update(status="cancelled"), tasks, None, "s1")
         assert (await db.products.find_one({"id": "p1"}))["stock"] == 2

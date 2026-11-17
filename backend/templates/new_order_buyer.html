@@ -14,6 +14,12 @@
             <li><strong>Numéro de commande :</strong> {{order_id}}</li>
             <li><strong>Montant total :</strong> {{total_amount}} XAF</li>
         </ul>
+        {% if delivery_code %}
+        <p style="padding: 12px; background: #f3e8ff; border-radius: 8px;">
+            <strong>Code de retrait : <span style="font-size: 20px; letter-spacing: 4px;">{{delivery_code}}</span></strong><br>
+            Donnez-le au vendeur, au livreur ou au point de retrait pour récupérer votre commande. Ne le communiquez qu'à la remise du colis.
+        </p>
+        {% endif %}
         <p>Vous recevrez une notification par email lorsque le statut de votre commande sera mis à jour. Vous pouvez également suivre votre commande depuis votre profil sur notre site.</p>
         <a href="https://nengoo.com/profile" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 5px;">Voir ma commande</a>
         <p>Merci de faire confiance à Nengoo !</p>

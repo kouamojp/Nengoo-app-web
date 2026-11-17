@@ -46,7 +46,8 @@ export const nextOrderStatuses = (status, { isAdmin = false } = {}) => {
   const current = normalizeOrderStatus(status);
   const next = isAdmin
     ? ORDER_STATUSES.map((s) => s.value).filter((s) => s !== current)
-    : (TRANSITIONS[current] || []).filter((s) => !PAYMENT_STEPS.includes(s));
+    // « Livrée » : le vendeur valide la remise avec le code de retrait du client, pas ici
+    : (TRANSITIONS[current] || []).filter((s) => !PAYMENT_STEPS.includes(s) && s !== 'delivered');
   return [current, ...next];
 };
 

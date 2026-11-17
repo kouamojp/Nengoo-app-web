@@ -563,6 +563,9 @@ class Order(BaseModel):
     courierId: Optional[str] = None
     courierName: Optional[str] = None
     deliveryCode: Optional[str] = None
+    # Remise validée avec le code de retrait : quand et par qui (seller, courier:<nom>)
+    handedOverAt: Optional[datetime] = None
+    handedOverBy: Optional[str] = None
     deliveryAttempts: List[dict] = []
     paymentStatus: str
     pickupPointId: Optional[str] = None # Changed to Optional
@@ -2719,6 +2722,9 @@ async def list_orders(request: Request, seller_id: Optional[str] = None, buyer_i
                 product["image"] = None
                 product["images"] = []
 
+        # Le code de retrait prouve la remise : le vendeur le reçoit du client, il ne le voit jamais
+        if seller_id and not buyer_id and not staff:
+            order_data["deliveryCode"] = None
         enriched_orders.append(Order(**order_data))
 
     return enriched_orders
@@ -2740,6 +2746,9 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
     if "status" in update_data:
         update_data["status"] = normalize_status(update_data["status"])
         previous = normalize_status(order_before_update.get("status"))
+        # Un vendeur ne déclare la commande remise qu'avec le code de retrait du client
+        if update_data["status"] == "delivered" and previous != "delivered" and not role:
+            raise HTTPException(status_code=400, detail="Pour terminer la commande, validez la remise avec le code de retrait à 6 chiffres que le client a reçu.")
         error = check_transition(previous, update_data["status"], role in ["super_admin", "admin"])
         if error:
             raise HTTPException(status_code=400, detail=error)
@@ -2858,7 +2867,55 @@ async def update_order(order_id: str, order_data: OrderUpdate, background_tasks:
                 )
                 background_tasks.add_task(fm.send_message, review_message, template_name="review_request_buyer.html")
 
+    if not role:
+        updated_order["deliveryCode"] = None  # jamais montré au vendeur
     return Order(**updated_order)
+
+
+class HandoverCode(BaseModel):
+    code: str
+
+
+@api_router.post("/orders/{order_id}/handover", response_model=Order,
+                 dependencies=[Depends(order_owner_or_support_required)])
+async def confirm_handover(order_id: str, data: HandoverCode, request: Request, background_tasks: BackgroundTasks,
+                           x_seller_id: Optional[str] = Depends(get_current_seller_optional)):
+    """Le vendeur saisit le code de retrait donné par le client : la commande est remise (livrée)."""
+    if not x_seller_id:
+        raise HTTPException(status_code=403, detail="Seul le vendeur de la commande valide le code de retrait.")
+    order = await db.orders.find_one({"id": order_id})
+    current = normalize_status(order.get("status"))
+    if current in ("delivered", "cancelled", "refunded"):
+        raise HTTPException(status_code=400, detail="Cette commande est déjà terminée.")
+    if current == "payment_pending":
+        raise HTTPException(status_code=400, detail="Le paiement de cette commande est encore en attente.")
+    if not order.get("deliveryCode"):
+        # Commande d'avant les codes : un code est créé et envoyé au client
+        code = new_delivery_code()
+        await db.orders.update_one({"id": order_id}, {"$set": {"deliveryCode": code, "updatedAt": datetime.utcnow()}})
+        background_tasks.add_task(send_sms, order.get("shippingPhone"),
+                                  order_created_text(order_id, order.get("totalAmount") or 0,
+                                                     order.get("sellerName") or "", code))
+        raise HTTPException(status_code=400, detail="Cette commande n'avait pas encore de code : il vient d'être envoyé au client par SMS. Demandez-le-lui.")
+    # Même protection que pour le livreur : on ne devine pas un code par essais successifs
+    login_limiter.check("delivery-code", request, order_id)
+    if "".join((data.code or "").split()) != order["deliveryCode"]:
+        login_limiter.record_failure("delivery-code", request, order_id)
+        raise HTTPException(status_code=400, detail="Code de retrait incorrect : demandez au client le code à 6 chiffres reçu à la commande.")
+    # Mêmes effets qu'un changement de statut (historique, SMS, stock, avis)
+    await update_order(order_id, OrderUpdate(status="delivered"), background_tasks, "admin", x_seller_id)
+    history = (await db.orders.find_one({"id": order_id}, {"statusHistory": 1})).get("statusHistory") or []
+    changes = {"handedOverAt": datetime.utcnow(), "handedOverBy": "seller"}
+    if order.get("pickupPointId"):
+        changes["pickupStatus"] = "picked_up"
+    if history and history[-1].get("status") == "delivered":
+        changes[f"statusHistory.{len(history) - 1}.by"] = "seller"
+    await db.orders.update_one({"id": order_id}, {"$set": changes})
+    updated = await db.orders.find_one({"id": order_id})
+    updated["status"] = normalize_status(updated.get("status"))
+    updated["deliveryCode"] = None
+    updated.setdefault("pickupStatus", "pending")
+    return Order(**updated)
 
 @api_router.delete("/orders", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
 async def bulk_delete_orders(request: BulkDeleteRequest):
@@ -3170,6 +3227,9 @@ async def courier_update(token: str, order_id: str, data: CourierAction, request
     if history and history[-1].get("status") == new_status:
         await db.orders.update_one({"id": order_id},
                                    {"$set": {f"statusHistory.{len(history) - 1}.by": f"courier:{courier['name']}"}})
+    if new_status == "delivered":
+        await db.orders.update_one({"id": order_id}, {"$set": {
+            "handedOverAt": datetime.utcnow(), "handedOverBy": f"courier:{courier['name']}"}})
     return _courier_view(await db.orders.find_one({"id": order_id}))
 
 
@@ -3415,7 +3475,8 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
                 template_body={
                     "buyer_name": buyer_name,
                     "order_id": new_order.id,
-                    "total_amount": total_amount
+                    "total_amount": total_amount,
+                    "delivery_code": new_order.deliveryCode,
                 },
                 subtype="html"
             )

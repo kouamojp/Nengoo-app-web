@@ -37,8 +37,9 @@ def _plain(text: str) -> str:
 
 
 def order_created_text(order_id: str, total: float, seller: str, delivery_code: Optional[str] = None) -> str:
-    # Le code de remise est demandé par le livreur : il tient dans le même SMS
-    code = f" Code livraison: {delivery_code}." if delivery_code else ""
+    # Code de retrait demandé à la remise du colis : il tient dans le même SMS
+    # (court : le SMS doit rester sous 160 caractères avec un long nom de boutique)
+    code = f" Code retrait: {delivery_code}." if delivery_code else ""
     return _plain(f"Nengoo: commande {order_id} recue ({int(total)} FCFA, {seller.strip()}).{code} "
                   f"Suivi: nengoo.com/suivi-commande")
 
