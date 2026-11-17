@@ -48,6 +48,21 @@ test('page_view waits for the new page title', async () => {
   expect(window.gtag).toHaveBeenCalledTimes(1);
 });
 
+test('a page left before its title arrives is still counted', async () => {
+  const { trackPageView } = jest.requireActual('./analytics');
+  window.history.pushState({}, '', '/product/lente');
+  const first = trackPageView();
+  // Le visiteur part avant la fin du chargement
+  window.history.pushState({}, '', '/catalog');
+  const second = trackPageView();
+  await first;
+  expect(window.gtag).toHaveBeenCalledWith('event', 'page_view', expect.objectContaining({ page_path: '/product/lente' }));
+  document.dispatchEvent(new Event('visibilitychange'));
+  window.dispatchEvent(new Event('pagehide')); // onglet fermé : la vue en attente part
+  await second;
+  expect(window.gtag).toHaveBeenCalledWith('event', 'page_view', expect.objectContaining({ page_path: '/catalog' }));
+});
+
 test('does nothing without the Google tag', () => {
   delete window.gtag;
   expect(() => trackViewItem({ id: 1, name: 'x', price: 1 })).not.toThrow();

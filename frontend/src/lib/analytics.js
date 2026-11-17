@@ -17,34 +17,58 @@ const textOf = (value) => String(
   (value && typeof value === 'object' ? value.fr || value.en : value) || '',
 ).replace(/\s+/g, ' ').trim();
 
-// Le titre est mis à jour par Helmet après le changement d'adresse, et
-// seulement une fois les données chargées (fiche produit) : on attend qu'il
-// change, puis qu'il ne bouge plus (300 ms) ; 3 s au plus (page au même titre)
-const waitForNewTitle = (previous) => new Promise((resolve) => {
-  let quiet;
-  const done = () => { observer.disconnect(); clearTimeout(quiet); clearTimeout(limit); resolve(document.title); };
-  const observer = new MutationObserver(() => {
-    if (document.title === previous) return;
-    clearTimeout(quiet);
-    quiet = setTimeout(done, 300);
-  });
-  observer.observe(document.head, { subtree: true, childList: true, characterData: true });
-  const limit = setTimeout(done, 3000);
-});
-
 // Une vue de page par changement d'adresse, avec le bon titre. Le tag Google
-// n'envoie plus la sienne (send_page_view: false dans public/index.html).
+// n'envoie plus la sienne (send_page_view: false dans public/index.html, et
+// « changements de pages selon l'historique » désactivé dans Analytics).
+//
+// Le titre est mis à jour par Helmet après le changement d'adresse, et
+// seulement une fois les données chargées (une fiche produit peut mettre
+// plusieurs secondes) : on attend qu'il change puis ne bouge plus (300 ms),
+// 10 s au plus. La vue part aussitôt, avec le titre du moment, si le visiteur
+// change de page ou quitte l'onglet avant : elle n'est jamais perdue.
+const TITLE_QUIET_MS = 300;
+const TITLE_MAX_MS = 10000;
+
 let lastPage = null;
 let lastTitle = null;
-export const trackPageView = async () => {
+let pending = null; // vue en attente de son titre : { flush }
+
+const flushPending = () => pending?.flush();
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPending(); });
+  window.addEventListener('pagehide', flushPending);
+}
+
+export const trackPageView = () => {
   const page = window.location.pathname + window.location.search;
-  if (page === lastPage) return;
+  if (page === lastPage) return Promise.resolve();
+  flushPending(); // la page précédente part avec son titre actuel
   lastPage = page;
+  const location = window.location.href;
   // Titre de la page précédente (au 1er chargement : celui de index.html)
-  const title = await waitForNewTitle(lastTitle ?? document.title);
-  lastTitle = title;
-  if (lastPage !== page) return; // le visiteur est déjà ailleurs
-  send('page_view', { page_title: title, page_location: window.location.href, page_path: page });
+  const previous = lastTitle ?? document.title;
+
+  return new Promise((resolve) => {
+    let quiet;
+    const flush = () => {
+      observer.disconnect();
+      clearTimeout(quiet);
+      clearTimeout(limit);
+      if (pending?.flush === flush) pending = null;
+      lastTitle = document.title;
+      send('page_view', { page_title: document.title, page_location: location, page_path: page });
+      resolve();
+    };
+    const observer = new MutationObserver(() => {
+      if (document.title === previous) return;
+      clearTimeout(quiet);
+      quiet = setTimeout(flush, TITLE_QUIET_MS);
+    });
+    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
+    const limit = setTimeout(flush, TITLE_MAX_MS);
+    pending = { flush };
+  });
 };
 
 // Prix réellement payé : le prix promo quand il existe
