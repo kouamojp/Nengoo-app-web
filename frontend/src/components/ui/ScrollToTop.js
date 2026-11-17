@@ -1,14 +1,15 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import ReactGA from "react-ga4"; // Import ReactGA
+import { trackPageView } from '../../lib/analytics';
 
+// À chaque changement de page : retour en haut, et une vue de page Google
 const ScrollToTop = () => {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    ReactGA.send({ hitType: "pageview", page: pathname }); // Send pageview on route change
-  }, [pathname]);
+    trackPageView();
+  }, [pathname, search]);
 
   return null;
 };

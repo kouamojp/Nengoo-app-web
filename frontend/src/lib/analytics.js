@@ -12,7 +12,40 @@ const send = (event, params) => {
   }
 };
 
-const textOf = (value) => (value && typeof value === 'object' ? value.fr || value.en || '' : value || '');
+// Noms nettoyés : « Robe » et « Robe  » ne doivent pas faire deux lignes dans les rapports
+const textOf = (value) => String(
+  (value && typeof value === 'object' ? value.fr || value.en : value) || '',
+).replace(/\s+/g, ' ').trim();
+
+// Le titre est mis à jour par Helmet après le changement d'adresse, et
+// seulement une fois les données chargées (fiche produit) : on attend qu'il
+// change, puis qu'il ne bouge plus (300 ms) ; 3 s au plus (page au même titre)
+const waitForNewTitle = (previous) => new Promise((resolve) => {
+  let quiet;
+  const done = () => { observer.disconnect(); clearTimeout(quiet); clearTimeout(limit); resolve(document.title); };
+  const observer = new MutationObserver(() => {
+    if (document.title === previous) return;
+    clearTimeout(quiet);
+    quiet = setTimeout(done, 300);
+  });
+  observer.observe(document.head, { subtree: true, childList: true, characterData: true });
+  const limit = setTimeout(done, 3000);
+});
+
+// Une vue de page par changement d'adresse, avec le bon titre. Le tag Google
+// n'envoie plus la sienne (send_page_view: false dans public/index.html).
+let lastPage = null;
+let lastTitle = null;
+export const trackPageView = async () => {
+  const page = window.location.pathname + window.location.search;
+  if (page === lastPage) return;
+  lastPage = page;
+  // Titre de la page précédente (au 1er chargement : celui de index.html)
+  const title = await waitForNewTitle(lastTitle ?? document.title);
+  lastTitle = title;
+  if (lastPage !== page) return; // le visiteur est déjà ailleurs
+  send('page_view', { page_title: title, page_location: window.location.href, page_path: page });
+};
 
 // Prix réellement payé : le prix promo quand il existe
 export const paidPrice = (product) => (
@@ -61,7 +94,7 @@ export const trackPurchase = (orders, couponCode) => {
   orders.forEach(order => {
     const items = (order.products || []).map(p => ({
       item_id: String(p.productId),
-      item_name: p.name,
+      item_name: textOf(p.name),
       price: p.price,
       quantity: p.quantity,
       ...(order.sellerName && { affiliation: order.sellerName }),

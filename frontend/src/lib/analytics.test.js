@@ -28,6 +28,26 @@ test('purchase is sent once per order, shipping excluded from value', () => {
   }));
 });
 
+test('product names are trimmed', () => {
+  expect(toItem({ id: 1, name: { fr: '  Tablette   iPhone ' }, price: 1 }).item_name).toBe('Tablette iPhone');
+});
+
+test('page_view waits for the new page title', async () => {
+  document.head.innerHTML = '<title>Ancienne page</title>';
+  window.history.pushState({}, '', '/product/robe');
+  const { trackPageView } = jest.requireActual('./analytics');
+  const sent = trackPageView();
+  // Fiche produit : le titre n'arrive qu'après le chargement des données
+  setTimeout(() => { document.title = 'Robe — Nengoo'; }, 900);
+  await sent;
+  expect(window.gtag).toHaveBeenCalledWith('event', 'page_view', expect.objectContaining({
+    page_title: 'Robe — Nengoo', page_path: '/product/robe',
+  }));
+  // Même adresse : pas de seconde vue
+  await trackPageView();
+  expect(window.gtag).toHaveBeenCalledTimes(1);
+});
+
 test('does nothing without the Google tag', () => {
   delete window.gtag;
   expect(() => trackViewItem({ id: 1, name: 'x', price: 1 })).not.toThrow();

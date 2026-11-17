@@ -107,7 +107,9 @@
       }
       gtag("js", new Date());
 
-      gtag("config", "G-FQ349LRGNQ");
+      // Vues de page envoyées par le site une fois le titre à jour
+      // (trackPageView, src/lib/analytics.js)
+      gtag("config", "G-FQ349LRGNQ", { send_page_view: false });
     </script>
   </head>
   <body>
