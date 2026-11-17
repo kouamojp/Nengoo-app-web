@@ -240,9 +240,19 @@ const AssistantPanel = ({ open, language, productId, prompt, onClose }) => {
         ))}
 
         {sending && (
-          <p role="status" className="w-fit text-sm text-gray-600 bg-white border border-gray-200 rounded-2xl rounded-tl-md px-3 py-2">
-            {t.searching}
-          </p>
+          <div role="status" className="w-fit flex items-center gap-2 text-sm text-gray-600 bg-white border border-gray-200 rounded-2xl rounded-tl-md px-3 py-2">
+            <SparkIcon className="w-4 h-4 text-purple-700 shrink-0 motion-safe:animate-pulse" />
+            <span>{t.searching}</span>
+            <span className="flex items-end gap-1 h-4" aria-hidden="true">
+              {[0, 150, 300].map(delay => (
+                <span
+                  key={delay}
+                  className="w-1.5 h-1.5 rounded-full bg-purple-600 motion-safe:animate-bounce"
+                  style={{ animationDelay: `${delay}ms` }}
+                />
+              ))}
+            </span>
+          </div>
         )}
         {error && (
           <div role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
