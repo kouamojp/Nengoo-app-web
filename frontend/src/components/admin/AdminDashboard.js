@@ -12,6 +12,7 @@ import SearchMisses from './SearchMisses';
 import AssistantStats from './AssistantStats';
 import CourierManagement from './CourierManagement';
 import ShippingSettingsManagement from './ShippingSettingsManagement';
+import AppVersionManagement from './AppVersionManagement';
 import HomepageManagement from './HomepageManagement';
 import AboutPageManagement from './AboutPageManagement';
 import WhatsAppAnalytics from './WhatsAppAnalytics';
@@ -27,7 +28,7 @@ import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SECTIONS = ['dashboard', 'support', 'chatReports', 'promoCodes', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping', 'documents', 'documentPayments'];
+const SECTIONS = ['dashboard', 'support', 'chatReports', 'promoCodes', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping', 'appVersion', 'documents', 'documentPayments'];
 
 const formatPrice = (price) => numberFormat('fr-FR', {
     style: 'currency',
@@ -256,6 +257,9 @@ const AdminDashboard = (props) => {
             <>
                 <div className={sectionClass('shipping')}>
                     <ShippingSettingsManagement {...props} />
+                </div>
+                <div className={sectionClass('appVersion')}>
+                    <AppVersionManagement {...props} />
                 </div>
                 <div className={sectionClass('homepage')}>
                     <HomepageManagement {...props} />

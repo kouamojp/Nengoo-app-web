@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon, SearchIcon, RouteIcon,
   LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon, SparkIcon, ChatIcon,
-  MegaphoneIcon, BookIcon,
+  MegaphoneIcon, BookIcon, SmartphoneIcon,
 } from '../ui/Icons';
 import { useSupportUnread } from '../../lib/support';
 import { AdminFeedbackHost } from './adminFeedback';
@@ -162,6 +162,7 @@ const navGroups = (user, counts) => [
         { id: 'homepage', label: 'Page d\'accueil', Icon: LayoutIcon },
         { id: 'about', label: 'Page À propos', Icon: InfoIcon },
         { id: 'shipping', label: 'Frais de livraison', Icon: TruckIcon },
+        { id: 'appVersion', label: "Mise à jour de l'app", Icon: SmartphoneIcon },
         { id: 'privacy', label: 'Confidentialité', Icon: LockIcon, to: '/admin/privacy-policy' },
       ] : []),
     ],

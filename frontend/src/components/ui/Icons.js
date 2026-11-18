@@ -98,6 +98,13 @@ export const ClockIcon = (props) => (
   </Icon>
 );
 
+export const SmartphoneIcon = (props) => (
+  <Icon {...props}>
+    <rect x="6.5" y="2.5" width="11" height="19" rx="2.2" />
+    <path d="M10.5 18.5h3" />
+  </Icon>
+);
+
 export const PhoneIcon = (props) => (
   <Icon {...props}>
     <path d="M5 4h3.2l1.6 4-2 1.3a11 11 0 0 0 4.9 4.9l1.3-2 4 1.6V17a2 2 0 0 1-2 2A15 15 0 0 1 3 6a2 2 0 0 1 2-2z" />
