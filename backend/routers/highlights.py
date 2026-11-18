@@ -18,7 +18,7 @@ from typing import Annotated, Dict, List
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from routers.ads import BOT_UA
-from server import Product, db, with_seller_details
+from server import Product, db, whatsapp_only, with_seller_details
 
 router = APIRouter(tags=["highlights"])
 
@@ -44,7 +44,7 @@ def sellable(p: dict) -> bool:
     return (
         p.get("status") == "approved"
         and (p.get("price") or 0) > 0
-        and (p.get("kind") == "service" or (p.get("stock") or 0) > 0)
+        and (whatsapp_only(p) or (p.get("stock") or 0) > 0)
     )
 
 

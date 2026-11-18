@@ -17,6 +17,7 @@ import PrivacyPolicy from './components/pages/PrivacyPolicy';
 import BottomNav from './components/layout/BottomNav';
 import AssistantWidget from './components/assistant/AssistantWidget';
 import { trackAddToCart } from './lib/analytics';
+import { isWhatsappOnly } from './lib/productRules';
 
 // Chargés à la demande : la plupart des visiteurs n'ouvrent jamais l'espace
 // vendeur ou admin, et la connexion embarque Firebase (lourd)
@@ -91,8 +92,8 @@ function App() {
   }, [cartItems]);
 
   const addToCart = (product, quantity = 1) => {
-    // Un service se réserve auprès du vendeur (WhatsApp), pas par le panier
-    if (product?.kind === 'service') return;
+    // Service ou plat « whatsapp » : auprès du vendeur (WhatsApp), pas par le panier
+    if (isWhatsappOnly(product)) return;
     trackAddToCart(product, quantity);
     setCartItems(prev => {
       const existingItem = prev.find(item => item.id === product.id);

@@ -17,6 +17,7 @@ import "yet-another-react-lightbox/styles.css";
 import { listImage, previewImage, cardImage, imageFallback, isLogoImage, NENGOO_IMAGE } from '../../lib/productImages';
 import { numberFormat } from '../../lib/numberFormat';
 import { trackViewItem } from '../../lib/analytics';
+import { isAvailable, isMeal, isWhatsappOnly } from '../../lib/productRules';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const SITE_URL = 'https://www.nengoo.com';
@@ -72,7 +73,7 @@ const adaptProduct = (p, language) => ({
   description: { [language]: p.description },
   image: cardImage(p),
   images: p.images || [],
-  inStock: p.kind === 'service' || p.stock > 0,
+  inStock: isAvailable(p),
   reviews: p.reviewsCount || 0,
   rating: p.rating || 0,
 });
@@ -346,7 +347,9 @@ const ProductDetail = (props) => {
   const images = product.images.length > 0 ? product.images : [product.sellerLogo || NENGOO_IMAGE];
   const lightboxSlides = images.map(img => ({ src: img }));
 
-  const isService = product.kind === 'service';
+  // Service ou plat « whatsapp » : contact WhatsApp au lieu du panier
+  const isService = isWhatsappOnly(product);
+  const meal = isMeal(product);
   const hasPromo = product.promoPrice && product.promoPrice > 0;
   const discountPercentage = hasPromo && product.price > product.promoPrice
     ? Math.round(((product.price - product.promoPrice) / product.price) * 100)
@@ -554,12 +557,14 @@ const ProductDetail = (props) => {
 
               {isService ? (
                 <p className="mt-3 inline-flex items-center px-2.5 py-1 rounded-md bg-purple-100 text-purple-900 text-sm font-semibold">
-                  {t.serviceBadge}
+                  {meal ? t.mealBadge : t.serviceBadge}
                 </p>
               ) : (
                 <p className={`mt-3 inline-flex items-center gap-2 text-sm font-semibold ${product.inStock ? 'text-green-700' : 'text-gray-500'}`}>
                   <span className={`w-2 h-2 rounded-full ${product.inStock ? 'bg-green-600' : 'bg-gray-400'}`} aria-hidden="true" />
-                  {product.inStock ? t.inStock : t.outOfStock}
+                  {meal
+                    ? `${t.mealBadge} · ${product.inStock ? t.mealAvailable : t.mealSoldOut}`
+                    : (product.inStock ? t.inStock : t.outOfStock)}
                 </p>
               )}
 
@@ -603,7 +608,7 @@ const ProductDetail = (props) => {
 
               {isService ? (
                 <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
-                  <p className="text-sm text-green-950">{t.serviceHint}</p>
+                  <p className="text-sm text-green-950">{meal ? t.mealHint : t.serviceHint}</p>
                   <div className="mt-3 grid sm:grid-cols-2 gap-2">
                     {seller?.whatsapp && (
                       <button

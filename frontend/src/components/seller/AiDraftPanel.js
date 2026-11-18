@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { isService } from '../../lib/productRules';
+import { isArticle, isMeal, isService } from '../../lib/productRules';
 
 // Étapes affichées pendant la génération : la dernière reste jusqu'à la réponse
 const STEPS = [
@@ -91,7 +91,7 @@ const AiDraftPanel = ({ product, files, language = 'fr', onDraft }) => {
           images,
           price,
           category: product.category,
-          kind: isService(product) ? 'service' : 'product',
+          kind: isService(product) ? 'service' : isMeal(product) ? 'meal' : 'product',
           language: language === 'en' ? 'en' : 'fr',
         }),
       });
@@ -143,8 +143,8 @@ export const applyDraft = (product, draft) => ({
   description: draft.description || product.description,
   specList: Object.entries(draft.specs || {}),
   brand: draft.brand || '',
-  condition: isService(product) ? '' : (draft.condition || product.condition || ''),
-  colors: isService(product) ? [] : (draft.colors?.length ? draft.colors : product.colors),
+  condition: !isArticle(product) ? '' : (draft.condition || product.condition || ''),
+  colors: !isArticle(product) ? [] : (draft.colors?.length ? draft.colors : product.colors),
 });
 
 export default AiDraftPanel;

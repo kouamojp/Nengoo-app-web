@@ -360,9 +360,13 @@ def _normalize_colors(colors: Optional[List[str]]) -> List[str]:
 
 # État d'un produit : neuf, occasion, reconditionné
 ProductCondition = Literal["new", "used", "refurbished"]
-# Produit vendu en ligne (panier, stock) ou service (prestation : le client
-# contacte le vendeur sur WhatsApp ; ni panier, ni stock, ni état)
-ProductKind = Literal["product", "service"]
+# Produit vendu en ligne (panier, stock), service (prestation : le client
+# contacte le vendeur sur WhatsApp ; ni panier, ni stock, ni état) ou plat
+# (restaurants seulement : commandé en ligne ou sur WhatsApp, voir MealOrder)
+ProductKind = Literal["product", "service", "meal"]
+# Plat : « online » = panier et portions disponibles (stock) ; « whatsapp » =
+# le client contacte le restaurant, comme pour un service
+MealOrder = Literal["online", "whatsapp"]
 
 class Product(BaseModel):
     id: str = Field(default_factory=lambda: f"prod_{str(uuid.uuid4())[:8]}")
@@ -393,6 +397,7 @@ class Product(BaseModel):
     brand: Optional[str] = None
     condition: Optional[ProductCondition] = None
     kind: ProductKind = "product"
+    mealOrder: Optional[MealOrder] = None
     # Services : numéro WhatsApp du vendeur, ajouté aux réponses (non stocké)
     sellerWhatsapp: Optional[str] = None
     # Logo de la boutique, ajouté aux réponses (non stocké) : image de
@@ -424,6 +429,7 @@ class ProductCreate(BaseModel):
     condition: Optional[ProductCondition] = None
     specs: Optional[Dict[str, str]] = {}
     kind: ProductKind = "product"
+    mealOrder: Optional[MealOrder] = None
 
     @field_validator("colors")
     @classmethod
@@ -446,6 +452,7 @@ class ProductUpdate(BaseModel):
     condition: Optional[ProductCondition] = None
     specs: Optional[Dict[str, str]] = None
     kind: Optional[ProductKind] = None
+    mealOrder: Optional[MealOrder] = None
 
     @field_validator("colors")
     @classmethod
@@ -467,6 +474,14 @@ class Seller(BaseModel):
     status: str = "pending"
     type: str = "seller"
     deliveryPrice: Optional[float] = None
+    # Restaurant : peut publier des plats (coché à l'inscription, modifiable
+    # ensuite par l'admin seulement)
+    restaurant: bool = False
+    # Position GPS de la boutique : choisie parmi les adresses proposées, sinon
+    # calculée depuis l'adresse (locate_seller)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+    geocodedAt: Optional[datetime] = None
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     logoUrl: Optional[str] = None
     socialMedia: Optional[dict] = None
@@ -492,6 +507,9 @@ class SellerCreate(BaseModel):
     address: str
     categories: List[str] = []
     description: str
+    restaurant: bool = False
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 
     @field_validator("description")
     @classmethod
@@ -513,6 +531,9 @@ class SellerUpdate(BaseModel):
     socialMedia: Optional[dict] = None
     deliveryPrice: Optional[float] = None
     password: Optional[str] = None
+    restaurant: Optional[bool] = None
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
 
     @field_validator("description")
     @classmethod
@@ -681,6 +702,17 @@ async def locate_pickup_point(point: "PickupPoint") -> None:
     found = await geocode(point.address, point.city, point.region)
     point.latitude, point.longitude = found if found else (None, None)
     point.geocodedAt = datetime.utcnow()
+
+async def locate_seller(seller_id: str) -> None:
+    """Position de la boutique depuis son adresse, après la réponse (le
+    géocodage attend jusqu'à quelques secondes)."""
+    seller = await db.sellers.find_one({"id": seller_id}, {"address": 1, "city": 1, "region": 1})
+    if not seller:
+        return
+    found = await geocode(seller.get("address"), seller.get("city"), seller.get("region"))
+    latitude, longitude = found if found else (None, None)
+    await db.sellers.update_one({"id": seller_id}, {"$set": {
+        "latitude": latitude, "longitude": longitude, "geocodedAt": datetime.utcnow()}})
 
 class PickupPointCreate(BaseModel):
     name: str
@@ -1418,11 +1450,37 @@ PRODUCT_SORTS = {
 }
 
 
+def whatsapp_only(product: dict) -> bool:
+    """Se commande sur WhatsApp, pas au panier : service, ou plat « whatsapp »."""
+    kind = product.get("kind")
+    return kind == "service" or (kind == "meal" and product.get("mealOrder") == "whatsapp")
+
+
 def service_fields(data: dict) -> dict:
-    """Un service n'a ni stock, ni état, ni couleurs : on les vide."""
-    if data.get("kind") == "service":
-        data.update({"stock": 0, "condition": None, "colors": []})
+    """Un service n'a ni stock, ni état, ni couleurs ; un plat ni état ni
+    couleurs, et pas de stock s'il se commande sur WhatsApp."""
+    kind = data.get("kind")
+    if kind == "meal":
+        data["mealOrder"] = data.get("mealOrder") or "online"
+        data.update({"condition": None, "colors": []})
+        if data["mealOrder"] == "whatsapp":
+            data["stock"] = 0
+    elif kind in ("service", "product"):
+        data["mealOrder"] = None
+        if kind == "service":
+            data.update({"stock": 0, "condition": None, "colors": []})
     return data
+
+
+MEAL_NOT_ALLOWED = ("Seuls les restaurants peuvent publier des plats. Demandez à l'équipe Nengoo "
+                    "d'activer la restauration pour votre boutique.")
+
+
+async def check_meal_allowed(seller_id: Optional[str]):
+    """Plats réservés aux vendeurs « restaurant »."""
+    seller = await db.sellers.find_one({"id": seller_id}, {"restaurant": 1}) if seller_id else None
+    if not (seller or {}).get("restaurant"):
+        raise HTTPException(status_code=400, detail=MEAL_NOT_ALLOWED)
 
 
 async def with_seller_details(products: List[dict]) -> List[dict]:
@@ -1438,7 +1496,7 @@ async def with_seller_details(products: List[dict]) -> List[dict]:
     for p in products:
         seller = by_id.get(p.get("sellerId")) or {}
         p["sellerLogo"] = seller.get("logoUrl") or None
-        if p.get("kind") == "service":
+        if whatsapp_only(p):
             p["sellerWhatsapp"] = seller.get("whatsapp")
     return products
 
@@ -1885,6 +1943,8 @@ async def create_product(product_data: ProductCreate, background_tasks: Backgrou
     if issues:
         raise HTTPException(status_code=400, detail=" ".join(issues))
 
+    if product_data.kind == "meal":
+        await check_meal_allowed(seller_id_to_use)
     product_dict = service_fields(product_data.dict())
     product_dict["slug"] = await get_unique_slug(product_data.name)
     product = Product(**product_dict)
@@ -1903,6 +1963,19 @@ async def update_product(product_id: str, product_data: ProductUpdate, backgroun
         raise HTTPException(status_code=400, detail="No update data provided.")
     if update_data.get("kind") is None:
         update_data.pop("kind", None)
+    if update_data.get("mealOrder") is None:
+        update_data.pop("mealOrder", None)
+    if "kind" in update_data or "mealOrder" in update_data:
+        current = await db.products.find_one({"id": product_id}, {"kind": 1, "mealOrder": 1, "sellerId": 1}) or {}
+        kind = update_data.get("kind") or current.get("kind") or "product"
+        if kind == "meal":
+            if current.get("kind") != "meal":
+                await check_meal_allowed(current.get("sellerId"))
+            update_data["kind"] = "meal"
+            update_data.setdefault("mealOrder", current.get("mealOrder") or "online")
+        elif "kind" not in update_data:
+            # Mode de commande sans objet hors des plats
+            update_data.pop("mealOrder", None)
     service_fields(update_data)
     # « À la une » : décidé par l'équipe, jamais par le vendeur lui-même
     if "featured" in update_data:
@@ -2323,7 +2396,8 @@ SELLER_PRIVATE_FIELDS = {"password", "reset_token", "reset_token_expiry"}
 SELLER_HIDDEN_FROM_PUBLIC = SELLER_PRIVATE_FIELDS | {"email", "oauth_provider", "oauth_uid", "last_login"}
 
 @api_router.post("/sellers", response_model=Seller, response_model_exclude=SELLER_PRIVATE_FIELDS)
-async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends(get_current_admin_role)):
+async def create_seller(seller_data: SellerCreate, background_tasks: BackgroundTasks,
+                        role: Optional[str] = Depends(get_current_admin_role)):
     if not whatsapp_digits(seller_data.whatsapp):
         raise HTTPException(status_code=400, detail="Numéro WhatsApp invalide : indiquez un numéro avec l'indicatif du pays, par exemple +237 6XX XX XX XX.")
     seller_data.city = normalize_city(seller_data.city)
@@ -2350,6 +2424,9 @@ async def create_seller(seller_data: SellerCreate, role: Optional[str] = Depends
     seller = Seller(**seller_dict)
 
     await db.sellers.insert_one(seller.dict())
+    # Adresse saisie sans choisir de proposition : position calculée ensuite
+    if not has_coordinates(seller_dict):
+        background_tasks.add_task(locate_seller, seller.id)
     return seller
 
 
@@ -2537,6 +2614,7 @@ async def update_seller(
     seller_id: str, 
     seller_data: SellerUpdate, 
     request: Request,
+    background_tasks: BackgroundTasks,
     role: str = Depends(get_current_admin_role)
 ):
     # Profil, e-mail et mot de passe : le vendeur de la session ou un admin.
@@ -2557,9 +2635,13 @@ async def update_seller(
     if "password" in update_data and update_data["password"]:
         update_data["password"] = hash_password(update_data["password"])
     
-    # Un vendeur ne valide pas lui-même son compte
+    # Un vendeur ne valide pas lui-même son compte, et la restauration se
+    # change par l'équipe après l'inscription
     if role not in ["super_admin", "admin"]:
         update_data.pop("status", None)
+        update_data.pop("restaurant", None)
+    if update_data.get("restaurant") is None:
+        update_data.pop("restaurant", None)
     if update_data.get("email"):
         update_data["email"] = await ensure_email_free(db.sellers, update_data["email"], "seller", seller_id)
     if update_data.get("whatsapp") is not None:
@@ -2569,7 +2651,21 @@ async def update_seller(
     if "city" in update_data:
         update_data["city"] = normalize_city(update_data["city"])
 
+    # Adresse modifiée sans nouvelle position, ou position effacée : recalculée
+    # depuis l'adresse après la réponse
+    relocate = False
+    if any(k in update_data for k in ("address", "city", "region", "latitude", "longitude")):
+        current = await db.sellers.find_one({"id": seller_id}, {"address": 1, "city": 1, "region": 1,
+                                                                 "latitude": 1, "longitude": 1}) or {}
+        moved = any(k in update_data and update_data[k] != current.get(k) for k in ("address", "city", "region"))
+        coords_edited = any(k in update_data and update_data[k] != current.get(k) for k in ("latitude", "longitude"))
+        if moved and not coords_edited:
+            update_data.update(latitude=None, longitude=None)
+        relocate = not has_coordinates({**current, **update_data})
+
     await db.sellers.update_one({"id": seller_id}, {"$set": update_data})
+    if relocate:
+        background_tasks.add_task(locate_seller, seller_id)
     updated_seller = await db.sellers.find_one({"id": seller_id})
     if not updated_seller:
         raise HTTPException(status_code=404, detail="Seller not found")
@@ -3297,8 +3393,9 @@ async def process_checkout(checkout_data: CheckoutRequest, background_tasks: Bac
         if not product_info or product_info.get("status") != "approved" or not (product_info.get("price") or 0) > 0:
             name = product_info["name"].strip() if product_info else "Un produit"
             raise HTTPException(status_code=400, detail=f"« {name} » n'est plus en vente : retirez-le de votre panier.")
-        if product_info.get("kind") == "service":
-            raise HTTPException(status_code=400, detail=f"« {product_info['name'].strip()} » est un service : contactez le vendeur sur WhatsApp et retirez-le de votre panier.")
+        if whatsapp_only(product_info):
+            what = "un service" if product_info.get("kind") == "service" else "un plat à commander sur WhatsApp"
+            raise HTTPException(status_code=400, detail=f"« {product_info['name'].strip()} » est {what} : contactez le vendeur sur WhatsApp et retirez-le de votre panier.")
         if item.quantity > (product_info.get("stock") or 0):
             raise HTTPException(status_code=400, detail=f"Stock insuffisant pour « {product_info['name'].strip()} » : {product_info.get('stock') or 0} disponible(s).")
 

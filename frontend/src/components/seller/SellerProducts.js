@@ -5,7 +5,7 @@ import ColorPicker from './ColorPicker';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
 import ProductDetailsFields, { ProductKindField } from './ProductDetailsFields';
 import AiDraftPanel, { applyDraft } from './AiDraftPanel';
-import { isService, productFormError, productPayload, withSpecList } from '../../lib/productRules';
+import { isArticle, isMeal, isService, isWhatsappOnly, kindLabel, listingText, productFormError, productPayload, stockLabel, withKind, withSpecList } from '../../lib/productRules';
 import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
@@ -108,6 +108,22 @@ const SellerProducts = (props) => {
     useEffect(() => {
       fetchProducts();
     }, [props.user, language]);
+
+    // Restaurant : la fiche du vendeur fait foi (la session enregistrée peut
+    // dater d'avant l'activation par l'équipe)
+    const [restaurant, setRestaurant] = useState(Boolean(user?.restaurant));
+    useEffect(() => {
+      if (!user?.id) return;
+      fetch(`${API_BASE_URL}/sellers/${user.id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((seller) => {
+          if (!seller) return;
+          setRestaurant(Boolean(seller.restaurant));
+          // Restaurant : nouvelle annonce en « Plat » par défaut, tant que rien n'est saisi
+          if (seller.restaurant) setNewProduct((p) => (p.kind === 'product' && !p.name ? withKind(p, 'meal') : p));
+        })
+        .catch(() => {});
+    }, [user?.id]);
 
     useEffect(() => {
         const fetchCategories = async () => {
@@ -217,6 +233,7 @@ const SellerProducts = (props) => {
             condition: '',
             specList: [],
             kind: 'product',
+            ...(restaurant ? withKind({ specList: [] }, 'meal') : {}),
         });
         setSelectedFiles([]); // Clear selected files after successful upload
         setAiDraft(null);
@@ -337,7 +354,7 @@ const SellerProducts = (props) => {
           description={`${products.length} produit${products.length > 1 ? 's' : ''} dans votre boutique`}
           actions={(
             <button type="button" onClick={() => setShowAddForm(!showAddForm)} className="adm-btn adm-btn-primary">
-              Ajouter un produit
+              {restaurant ? 'Ajouter un plat' : 'Ajouter un produit'}
             </button>
           )}
         />
@@ -357,12 +374,12 @@ const SellerProducts = (props) => {
         {/* Edit Product Form */}
         {editingProduct && (
           <div className="adm-card p-5 sm:p-6 mb-6">
-            <h2 className="adm-modal-title mb-5">{isService(editingProduct) ? 'Modifier le service' : 'Modifier le produit'}</h2>
+            <h2 className="adm-modal-title mb-5">{isService(editingProduct) ? 'Modifier le service' : isMeal(editingProduct) ? 'Modifier le plat' : 'Modifier le produit'}</h2>
             <form onSubmit={handleUpdateProduct} className="space-y-6">
-              <ProductKindField value={editingProduct} onChange={setEditingProduct} />
+              <ProductKindField value={editingProduct} onChange={setEditingProduct} restaurant={restaurant} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="adm-label">Nom du produit</label>
+                  <label className="adm-label">{listingText(editingProduct).name}</label>
                   <input
                     type="text"
                     required
@@ -402,9 +419,9 @@ const SellerProducts = (props) => {
                     className="adm-input"
                   />
                 </div>
-                {!isService(editingProduct) && (
+                {!isWhatsappOnly(editingProduct) && (
                   <div>
-                    <label className="adm-label">Stock</label>
+                    <label className="adm-label">{stockLabel(editingProduct)}</label>
                     <input
                       type="number"
                       required
@@ -416,7 +433,7 @@ const SellerProducts = (props) => {
                 )}
               </div>
               
-              {!isService(editingProduct) && (
+              {isArticle(editingProduct) && (
                 <ColorPicker
                   value={editingProduct.colors || []}
                   onChange={(colors) => setEditingProduct({ ...editingProduct, colors })}
@@ -439,7 +456,7 @@ const SellerProducts = (props) => {
               </div>
 
               <div>
-                  <label className="adm-label">Images du produit</label>
+                  <label className="adm-label">{listingText(editingProduct).photos}</label>
                   <input
                     type="file"
                     multiple
@@ -462,7 +479,7 @@ const SellerProducts = (props) => {
                   rows={3}
                   className="adm-input"
                 />
-                <span className="block text-xs text-gray-500 mt-1">Au moins 20 caractères : matière, taille, usage… Une description précise aide les clients à trouver le produit.</span>
+                <span className="block text-xs text-gray-500 mt-1">{listingText(editingProduct).descriptionHint}</span>
               </div>
               
               <div className="flex flex-wrap gap-3">
@@ -487,12 +504,12 @@ const SellerProducts = (props) => {
         {/* Add Product Form */}
         {showAddForm && (
           <div className="adm-card p-5 sm:p-6 mb-6">
-            <h2 className="adm-modal-title mb-5">{isService(newProduct) ? 'Nouveau service' : 'Nouveau produit'}</h2>
+            <h2 className="adm-modal-title mb-5">{isService(newProduct) ? 'Nouveau service' : isMeal(newProduct) ? 'Nouveau plat' : 'Nouveau produit'}</h2>
             <form onSubmit={handleAddProduct} className="space-y-6">
-              <ProductKindField value={newProduct} onChange={setNewProduct} />
+              <ProductKindField value={newProduct} onChange={setNewProduct} restaurant={restaurant} />
 
               <div>
-                  <label className="adm-label" htmlFor="new-product-images">Photos du produit</label>
+                  <label className="adm-label" htmlFor="new-product-images">{listingText(newProduct).photos}</label>
                   <input
                     id="new-product-images"
                     type="file"
@@ -556,10 +573,11 @@ const SellerProducts = (props) => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="adm-label">Nom du produit</label>
+                  <label className="adm-label">{listingText(newProduct).name}</label>
                   <input
                     type="text"
                     required
+                    placeholder={listingText(newProduct).namePlaceholder}
                     value={newProduct.name}
                     onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                     className="adm-input"
@@ -574,9 +592,9 @@ const SellerProducts = (props) => {
                     className="adm-input"
                   />
                 </div>
-                {!isService(newProduct) && (
+                {!isWhatsappOnly(newProduct) && (
                   <div>
-                    <label className="adm-label">Stock</label>
+                    <label className="adm-label">{stockLabel(newProduct)}</label>
                     <input
                       type="number"
                       required
@@ -595,12 +613,13 @@ const SellerProducts = (props) => {
                   value={newProduct.description}
                   onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
                   rows={aiDraft ? 5 : 3}
+                  placeholder={listingText(newProduct).descriptionPlaceholder}
                   className="adm-input"
                 />
-                <span className="block text-xs text-gray-500 mt-1">Au moins 20 caractères : matière, taille, usage… Une description précise aide les clients à trouver le produit.</span>
+                <span className="block text-xs text-gray-500 mt-1">{listingText(newProduct).descriptionHint}</span>
               </div>
 
-              {!isService(newProduct) && (
+              {isArticle(newProduct) && (
                 <ColorPicker
                   value={newProduct.colors}
                   onChange={(colors) => setNewProduct({ ...newProduct, colors })}
@@ -627,7 +646,7 @@ const SellerProducts = (props) => {
                   type="submit"
                   className="adm-btn adm-btn-primary"
                 >
-                  Ajouter le produit
+                  {listingText(newProduct).submit}
                 </button>
                 <button
                   type="button"
@@ -649,7 +668,7 @@ const SellerProducts = (props) => {
             <h2 className="text-lg font-extrabold text-purple-950">Aucun produit pour l'instant</h2>
             <p className="mt-1 text-gray-600">Ajoutez un premier produit : il sera visible dans le catalogue dès sa création.</p>
             <button type="button" onClick={() => setShowAddForm(true)} className="adm-btn adm-btn-primary mt-5">
-              Ajouter un produit
+              {restaurant ? 'Ajouter un plat' : 'Ajouter un produit'}
             </button>
           </div>
         ) : (
@@ -689,11 +708,14 @@ const SellerProducts = (props) => {
                       {hasPromo && <span className="text-sm text-gray-500 line-through">{formatPrice(product.price)}</span>}
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                      {isService(product) ? (
-                        <span className="px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-900">Service</span>
+                      {kindLabel(product) && (
+                        <span className="px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-900">{kindLabel(product)}</span>
+                      )}
+                      {isWhatsappOnly(product) ? (
+                        isMeal(product) && <span className="px-2 py-0.5 rounded-full font-semibold bg-green-100 text-green-800">Sur WhatsApp</span>
                       ) : (
                         <span className={`px-2 py-0.5 rounded-full font-semibold ${product.stock > 0 ? (product.stock < 5 ? 'bg-yellow-100 text-yellow-900' : 'bg-green-100 text-green-800') : 'bg-red-100 text-red-800'}`}>
-                          {product.stock > 0 ? `Stock : ${product.stock}` : 'Rupture'}
+                          {product.stock > 0 ? `${isMeal(product) ? 'Portions' : 'Stock'} : ${product.stock}` : (isMeal(product) ? 'Épuisé' : 'Rupture')}
                         </span>
                       )}
                       {categoryName && <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-800">{categoryName}</span>}

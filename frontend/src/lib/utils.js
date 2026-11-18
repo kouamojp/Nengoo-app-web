@@ -45,6 +45,9 @@ export const generateProductWhatsAppMessage = (product, language) => {
   const productName = typeof product.name === 'object' ? product.name[language] : product.name;
   const slug = product.slug || product.id;
   const productUrl = `${SITE_URL}/product/${slug}`;
+  if (product.kind === 'meal') {
+    return `Bonjour ! Je souhaite commander « ${productName} » sur Nengoo : ${productUrl}. Quantité : … Heure et lieu de livraison ou de retrait : … Merci !`;
+  }
   if (product.kind === 'service') {
     return `Bonjour ! Je suis intéressé(e) par votre service "${productName}" sur Nengoo : ${productUrl}. Pourriez-vous me donner vos disponibilités et vos conditions ? Merci !`;
   }

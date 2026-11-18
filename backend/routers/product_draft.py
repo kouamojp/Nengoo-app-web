@@ -23,7 +23,7 @@ class DraftRequest(BaseModel):
     images: List[str] = Field(min_length=1, max_length=drafts.MAX_IMAGES)
     price: float = Field(gt=0)
     category: str = Field(min_length=1, max_length=120)
-    kind: Literal["product", "service"] = "product"
+    kind: Literal["product", "service", "meal"] = "product"
     language: Literal["fr", "en"] = "fr"
 
 

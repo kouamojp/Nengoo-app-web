@@ -5,9 +5,14 @@ import { RichTextEditor } from '../ui/RichText';
 import { CITIES_DATALIST_ID } from '../../lib/cities';
 import { Link } from 'react-router-dom';
 import { notify, confirmAction, statusLabel } from './adminFeedback';
+import AddressAutocomplete from './AddressAutocomplete';
 import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusSelect, EmptyRow, LoadingRows, Modal, Field, formatXAF, DateSortSelect, sortByDate } from './AdminUI';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
+
+// Champ GPS vide → null : le serveur calcule la position depuis l'adresse
+const toCoordinate = (value) => (value === '' || value == null || Number.isNaN(Number(value)) ? null : Number(value));
+const withCoordinates = (data) => ({ ...data, latitude: toCoordinate(data.latitude), longitude: toCoordinate(data.longitude) });
 
 const SellerManagement = (props) => {
     const { user } = props;
@@ -32,7 +37,8 @@ const SellerManagement = (props) => {
         region: '',
         deliveryPrice: 0,
         description: '',
-        categories: []
+        categories: [],
+        restaurant: false
     });
 
     const handleCreateInputChange = (e) => {
@@ -49,7 +55,7 @@ const SellerManagement = (props) => {
                     'Content-Type': 'application/json',
                     'X-Admin-Role': user.role,
                 },
-                body: JSON.stringify(newSeller),
+                body: JSON.stringify(withCoordinates(newSeller)),
             });
             if (!response.ok) {
                 const err = await response.json();
@@ -68,7 +74,8 @@ const SellerManagement = (props) => {
                 region: '',
                 deliveryPrice: 0,
                 description: '',
-                categories: []
+                categories: [],
+                restaurant: false
             });
             notify('Vendeur créé avec succès.', 'success');
         } catch (error) {
@@ -186,6 +193,7 @@ const SellerManagement = (props) => {
     const handleEditClick = (seller) => {
         setCurrentSeller(seller);
         setNewPassword('');
+        setSuggested(null);
         setShowEditModal(true);
     };
 
@@ -198,7 +206,7 @@ const SellerManagement = (props) => {
         e.preventDefault();
         if (!currentSeller) return;
 
-        const updatedData = { ...currentSeller };
+        const updatedData = withCoordinates(currentSeller);
         if (newPassword) {
             updatedData.password = newPassword;
         }
@@ -265,7 +273,11 @@ const SellerManagement = (props) => {
         );
     });
 
-    const sellerFields = (data, onChange, isEdit) => (
+    // Coordonnées venues de la dernière adresse proposée choisie : effacées si
+    // l'adresse est ensuite retouchée à la main (le serveur les recalcule)
+    const [suggested, setSuggested] = useState(null);
+
+    const sellerFields = (data, onChange, isEdit, setData) => (
         <>
             <div className="grid sm:grid-cols-2 gap-4">
                 <Field label="Nom de la boutique" required>
@@ -290,8 +302,29 @@ const SellerManagement = (props) => {
                     <input type="password" name="password" value={data.password} onChange={onChange} className="adm-input" autoComplete="new-password" required />
                 </Field>
             )}
-            <Field label="Adresse" required>
-                <input type="text" name="address" value={data.address} onChange={onChange} className="adm-input" required />
+            <Field label="Adresse" required hint="Tapez au moins 3 lettres, puis choisissez une proposition : la ville, la région et la position GPS se remplissent.">
+                <AddressAutocomplete
+                    value={data.address}
+                    required
+                    onChange={(e) => {
+                        const address = e.target.value;
+                        const stale = suggested && address !== suggested.address
+                            && data.latitude === suggested.latitude && data.longitude === suggested.longitude;
+                        setData(d => ({ ...d, address, ...(stale ? { latitude: '', longitude: '' } : {}) }));
+                        if (stale) setSuggested(null);
+                    }}
+                    onSelect={(item) => {
+                        setSuggested(item);
+                        setData(d => ({
+                            ...d,
+                            address: item.address,
+                            city: item.city || d.city,
+                            region: item.region || d.region,
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                        }));
+                    }}
+                />
             </Field>
             <div className="grid sm:grid-cols-3 gap-4">
                 <Field label="Ville" required>
@@ -305,6 +338,14 @@ const SellerManagement = (props) => {
                     <input type="number" name="deliveryPrice" value={data.deliveryPrice} onChange={onChange} min="0" className="adm-input" required />
                 </Field>
             </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+                <Field label="Latitude" hint="Vide : calculée depuis l'adresse.">
+                    <input type="number" step="any" min="-90" max="90" name="latitude" value={data.latitude ?? ''} onChange={onChange} placeholder="Ex. : 4.0511" className="adm-input" />
+                </Field>
+                <Field label="Longitude" hint="Position de la boutique sur la carte.">
+                    <input type="number" step="any" min="-180" max="180" name="longitude" value={data.longitude ?? ''} onChange={onChange} placeholder="Ex. : 9.7679" className="adm-input" />
+                </Field>
+            </div>
             <div>
                 <span id={`seller-description-${isEdit ? 'edit' : 'new'}`} className="adm-label">Description de la boutique</span>
                 <RichTextEditor
@@ -314,6 +355,19 @@ const SellerManagement = (props) => {
                     minHeight="7rem"
                 />
             </div>
+            <label className="flex items-start gap-3 rounded-xl border border-gray-300 p-4 cursor-pointer has-[:checked]:border-purple-600 has-[:checked]:bg-purple-50">
+                <input
+                    type="checkbox"
+                    name="restaurant"
+                    checked={Boolean(data.restaurant)}
+                    onChange={(e) => onChange({ target: { name: 'restaurant', value: e.target.checked } })}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-purple-700"
+                />
+                <span>
+                    <span className="block font-semibold text-gray-900">Restaurant</span>
+                    <span className="block text-sm text-gray-600">Peut publier des plats, commandés en ligne ou sur WhatsApp au choix pour chaque plat.</span>
+                </span>
+            </label>
         </>
     );
 
@@ -361,7 +415,7 @@ const SellerManagement = (props) => {
             {showCreateModal && (
                 <Modal title="Ajouter un vendeur" onClose={() => setShowCreateModal(false)}>
                     <form onSubmit={handleCreateSeller} className="space-y-4">
-                        {sellerFields(newSeller, handleCreateInputChange, false)}
+                        {sellerFields(newSeller, handleCreateInputChange, false, setNewSeller)}
                         <div className="flex justify-end gap-2 pt-2">
                             <button type="button" onClick={() => setShowCreateModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
                             <button type="submit" className="adm-btn adm-btn-primary">Créer le vendeur</button>
@@ -373,7 +427,7 @@ const SellerManagement = (props) => {
             {showEditModal && currentSeller && (
                 <Modal title={`Modifier ${currentSeller.businessName}`} onClose={() => setShowEditModal(false)}>
                     <form onSubmit={handleUpdateSeller} className="space-y-4">
-                        {sellerFields(currentSeller, handleEditInputChange, true)}
+                        {sellerFields(currentSeller, handleEditInputChange, true, setCurrentSeller)}
                         <div className="flex justify-end gap-2 pt-2">
                             <button type="button" onClick={() => setShowEditModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>
                             <button type="submit" className="adm-btn adm-btn-primary">Enregistrer</button>
@@ -419,7 +473,10 @@ const SellerManagement = (props) => {
                                     />
                                 </td>
                                 <td className="adm-td">
-                                    <p className="font-semibold">{seller.businessName}</p>
+                                    <p className="font-semibold">
+                                        {seller.businessName}
+                                        {seller.restaurant && <span className="ml-2 align-middle px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-900">Restaurant</span>}
+                                    </p>
                                     <p className="text-xs text-gray-500">{[seller.name, seller.city].filter(Boolean).join(', ')}</p>
                                 </td>
                                 <td className="adm-td">

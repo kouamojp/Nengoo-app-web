@@ -11,6 +11,7 @@ import { openWhatsApp } from '../../lib/utils';
 import { translations } from '../../lib/translations';
 import { cardImage } from '../../lib/productImages';
 import { isBlank, safeLink, toPlainText } from '../../lib/richText';
+import { isAvailable } from '../../lib/productRules';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const SITE_URL = 'https://www.nengoo.com';
@@ -74,7 +75,7 @@ const SellerShop = (props) => {
             name: { [language]: p.name },
             description: { [language]: p.description },
             image: cardImage(p),
-            inStock: p.kind === 'service' || p.stock > 0,
+            inStock: isAvailable(p),
             sellerWhatsApp: p.sellerWhatsapp,
             reviews: p.reviewsCount || 0,
             rating: p.rating || 0,

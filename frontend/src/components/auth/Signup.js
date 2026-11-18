@@ -16,7 +16,7 @@ const MIN_PASSWORD_LENGTH = 6; // comme le serveur (password_reset.py)
 
 const EMPTY_FORM = {
   name: '', whatsapp: '', email: '', password: '',
-  businessName: '', city: '', region: '', address: '', description: '',
+  businessName: '', city: '', region: '', address: '', description: '', restaurant: false,
 };
 
 const groupClass = 'grid gap-5 sm:grid-cols-2';
@@ -167,6 +167,20 @@ const Signup = ({ language, setUser }) => {
                     minHeight="7rem"
                   />
                 </div>
+                <label className="sm:col-span-2 flex items-start gap-3 rounded-xl border border-gray-300 p-4 cursor-pointer has-[:checked]:border-purple-600 has-[:checked]:bg-purple-50">
+                  <input
+                    id="signup-restaurant"
+                    type="checkbox"
+                    checked={form.restaurant}
+                    onChange={(event) => setForm(current => ({ ...current, restaurant: event.target.checked }))}
+                    aria-describedby="signup-restaurant-hint"
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-purple-700"
+                  />
+                  <span>
+                    <span className="block font-semibold text-gray-900">{t.restaurant}</span>
+                    <span id="signup-restaurant-hint" className="block text-sm text-gray-600">{t.restaurantHint}</span>
+                  </span>
+                </label>
               </div>
             </fieldset>
           </>

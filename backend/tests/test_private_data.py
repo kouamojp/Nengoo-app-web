@@ -9,7 +9,7 @@ import sys
 import uuid
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -108,9 +108,9 @@ def test_private_routes(monkeypatch):
             # Profil vendeur (e-mail, mot de passe) : pas de prise de compte par en-tête
             update = server.SellerUpdate(email="pirate@evil.cm")
             with pytest.raises(SessionRequired):
-                await server.update_seller("s1", update, fake_request(headers={"X-Seller-Id": "s1"}), role=None)
+                await server.update_seller("s1", update, fake_request(headers={"X-Seller-Id": "s1"}), BackgroundTasks(), role=None)
             with pytest.raises(HTTPException) as err:
-                await server.update_seller("s1", update, session("seller", "s2"), role=None)
+                await server.update_seller("s1", update, session("seller", "s2"), BackgroundTasks(), role=None)
             assert err.value.status_code == 403
             assert (await db.sellers.find_one({"id": "s1"}))["email"] == "secret@shop.cm"
         finally:

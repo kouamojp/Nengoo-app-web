@@ -20,11 +20,12 @@ MAX_DETAILS = 4
 DESCRIPTION_LENGTH = 220
 MAX_SPECS = 12
 
-# Un produit visible par les clients : en stock, ou service (sans stock)
+# Un produit visible par les clients : en stock, ou commandé sur WhatsApp
+# (service, plat « whatsapp » : sans stock)
 FOR_SALE = {
     "status": "approved",
     "price": {"$gt": 0},
-    "$or": [{"stock": {"$gt": 0}}, {"kind": "service"}],
+    "$or": [{"stock": {"$gt": 0}}, {"kind": "service"}, {"kind": "meal", "mealOrder": "whatsapp"}],
 }
 
 TOOLS = [

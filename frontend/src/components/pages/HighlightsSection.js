@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ProductCard from '../product/ProductCard';
 import { translations } from '../../lib/translations';
 import { cardImage } from '../../lib/productImages';
+import { isAvailable } from '../../lib/productRules';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const LIMIT = 8;
@@ -28,7 +29,7 @@ const HighlightsSection = ({ language, addToCart }) => {
             name: { [language]: p.name },
             description: { [language]: p.description },
             image: cardImage(p),
-            inStock: p.kind === 'service' || p.stock > 0,
+            inStock: isAvailable(p),
             sellerWhatsApp: p.sellerWhatsapp,
             reviews: p.reviewsCount || 0,
             rating: p.rating || 0,

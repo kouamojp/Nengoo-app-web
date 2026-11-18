@@ -5,6 +5,7 @@ import { translations } from '../../lib/translations';
 import { contactSellerOnWhatsApp } from '../../lib/utils';
 import { CartIcon, WhatsAppIcon } from '../ui/Icons';
 import { imageFallback, isLogoImage } from '../../lib/productImages';
+import { isMeal, isWhatsappOnly } from '../../lib/productRules';
 import { numberFormat } from '../../lib/numberFormat';
 
 const formatPrice = (price) => {
@@ -27,7 +28,9 @@ const ProductCard = ({ product, language, addToCart, ribbon, promoted = false })
   const productUrl = `/product/${product.slug || product.id}`;
   const name = product.name[language];
 
-  const service = product.kind === 'service';
+  // Service ou plat « whatsapp » : bouton WhatsApp au lieu du panier
+  const service = isWhatsappOnly(product);
+  const meal = isMeal(product);
   const handleWhatsAppContact = () =>
     contactSellerOnWhatsApp({ product, whatsapp: product.sellerWhatsApp, language });
 
@@ -48,13 +51,13 @@ const ProductCard = ({ product, language, addToCart, ribbon, promoted = false })
           loading="lazy"
           onError={imageFallback(product)}
         />
-        {service ? (
+        {service || (meal && product.inStock) ? (
           <span className="absolute top-2 left-2 bg-purple-900/90 text-white px-2 py-0.5 text-xs font-semibold rounded-md">
-            {t.serviceBadge}
+            {meal ? t.mealBadge : t.serviceBadge}
           </span>
         ) : !product.inStock ? (
           <span className="absolute top-2 left-2 bg-gray-900/80 text-white px-2 py-0.5 text-xs font-semibold rounded-md">
-            {t.outOfStock}
+            {meal ? t.mealSoldOut : t.outOfStock}
           </span>
         ) : isNew(product.createdAt) && (
           <span className="absolute top-2 left-2 bg-yellow-300 text-purple-950 px-2 py-0.5 text-xs font-bold rounded-md">
@@ -118,7 +121,7 @@ const ProductCard = ({ product, language, addToCart, ribbon, promoted = false })
                 to={productUrl}
                 className="w-full h-10 px-2 rounded-lg border border-purple-700 text-purple-800 hover:bg-purple-50 text-[0.8rem] sm:text-sm font-semibold flex items-center justify-center"
               >
-                {t.seeService}
+                {meal ? t.seeMeal : t.seeService}
               </Link>
             )}
           </div>

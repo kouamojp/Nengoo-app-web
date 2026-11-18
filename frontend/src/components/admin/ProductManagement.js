@@ -4,7 +4,7 @@ import { notify, confirmAction } from './adminFeedback';
 import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusBadge, EmptyRow, LoadingRows, Modal, Field, ChoiceCards, DateSortSelect, sortByDate } from './AdminUI';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
 import ProductDetailsFields, { ProductKindField } from '../seller/ProductDetailsFields';
-import { productFormError, productPayload, productDetailsPayload, withSpecList, isService } from '../../lib/productRules';
+import { productFormError, productPayload, productDetailsPayload, withSpecList, isMeal, isWhatsappOnly, kindLabel, listingText, stockLabel, withKind } from '../../lib/productRules';
 import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
@@ -164,8 +164,12 @@ const ProductManagement = (props) => {
         const { name, value } = e.target;
         if (name === 'sellerId') {
             const selectedSeller = sellers.find(s => s.id === value);
+            const restaurant = Boolean(selectedSeller?.restaurant);
+            // Restaurant : « Plat » par défaut ; un plat n'est possible que chez un restaurant
+            const kind = restaurant && newProductData.kind === 'product' ? 'meal'
+                : !restaurant && isMeal(newProductData) ? 'product' : newProductData.kind;
             setNewProductData({
-                ...newProductData,
+                ...withKind(newProductData, kind || 'product'),
                 sellerId: value,
                 sellerName: selectedSeller ? selectedSeller.businessName : ''
             });
@@ -473,10 +477,11 @@ const ProductManagement = (props) => {
 
             {/* Edit Product Modal */}
             {editingProduct && (
-                <Modal title="Modifier le produit" onClose={closeEditModal}>
+                <Modal title={isMeal(editingProduct) ? "Modifier le plat" : "Modifier le produit"} onClose={closeEditModal}>
                     <form onSubmit={handleUpdateProduct} className="space-y-4">
-                        <ProductKindField value={editingProduct} onChange={setEditingProduct} />
-                        <Field label="Nom du produit">
+                        <ProductKindField value={editingProduct} onChange={setEditingProduct}
+                            restaurant={Boolean(sellers.find(s => s.id === editingProduct.sellerId)?.restaurant)} />
+                        <Field label={listingText(editingProduct).name}>
                             <input type="text" name="name" value={editingProduct.name} onChange={handleEditInputChange} className="adm-input" />
                         </Field>
                         <Field label="Description">
@@ -525,8 +530,8 @@ const ProductManagement = (props) => {
                             <Field label="Prix promo (FCFA)">
                                 <input type="number" name="promoPrice" value={editingProduct.promoPrice || ''} onChange={handleEditInputChange} min="0" className="adm-input" />
                             </Field>
-                            {!isService(editingProduct) && (
-                                <Field label="Stock">
+                            {!isWhatsappOnly(editingProduct) && (
+                                <Field label={stockLabel(editingProduct)}>
                                     <input type="number" name="stock" value={editingProduct.stock} onChange={handleEditInputChange} min="0" className="adm-input" />
                                 </Field>
                             )}
@@ -550,11 +555,23 @@ const ProductManagement = (props) => {
             )}
 
             {showAddModal && (
-                <Modal title="Ajouter un produit" onClose={() => setShowAddModal(false)}>
+                <Modal title={isMeal(newProductData) ? "Ajouter un plat" : "Ajouter un produit"} onClose={() => setShowAddModal(false)}>
                     <form onSubmit={handleAddProduct} className="space-y-4">
-                        <ProductKindField value={newProductData} onChange={setNewProductData} />
-                        <Field label="Nom du produit" required>
-                            <input type="text" name="name" value={newProductData.name} onChange={handleInputChange} placeholder="Ex. : Smartphone Samsung Galaxy" className="adm-input" required />
+                        {/* En premier : le vendeur décide des types d'annonce possibles (plat pour un restaurant) */}
+                        <Field label="Vendeur" hint="Sans vendeur choisi, le produit est attribué à l'administration.">
+                            <select name="sellerId" value={newProductData.sellerId} onChange={handleInputChange} className="adm-input">
+                                <option value="">Administration</option>
+                                {sellers.map((seller) => (
+                                    <option key={seller.id} value={seller.id}>
+                                        {seller.businessName} ({seller.city}){seller.restaurant ? ' · Restaurant' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                        <ProductKindField value={newProductData} onChange={setNewProductData}
+                            restaurant={Boolean(sellers.find(s => s.id === newProductData.sellerId)?.restaurant)} />
+                        <Field label={listingText(newProductData).name} required>
+                            <input type="text" name="name" value={newProductData.name} onChange={handleInputChange} placeholder={listingText(newProductData).namePlaceholder || "Ex. : Smartphone Samsung Galaxy"} className="adm-input" required />
                         </Field>
                         <Field label="Description" required hint="Au moins 20 caractères.">
                             <textarea name="description" value={newProductData.description} onChange={handleInputChange} className="adm-input" rows="3" required />
@@ -576,23 +593,13 @@ const ProductManagement = (props) => {
                             <Field label="Prix promo (FCFA)">
                                 <input type="number" name="promoPrice" value={newProductData.promoPrice} onChange={handleInputChange} min="0" className="adm-input" />
                             </Field>
-                            {!isService(newProductData) && (
-                                <Field label="Stock" required>
+                            {!isWhatsappOnly(newProductData) && (
+                                <Field label={stockLabel(newProductData)} required>
                                     <input type="number" name="stock" value={newProductData.stock} onChange={handleInputChange} min="0" className="adm-input" required />
                                 </Field>
                             )}
                         </div>
                         <ProductDetailsFields value={newProductData} onChange={setNewProductData} />
-                        <Field label="Vendeur" hint="Sans vendeur choisi, le produit est attribué à l'administration.">
-                            <select name="sellerId" value={newProductData.sellerId} onChange={handleInputChange} className="adm-input">
-                                <option value="">Administration</option>
-                                {sellers.map((seller) => (
-                                    <option key={seller.id} value={seller.id}>
-                                        {seller.businessName} ({seller.city})
-                                    </option>
-                                ))}
-                            </select>
-                        </Field>
 
                         <fieldset className="space-y-3">
                             <legend className="adm-label">Image du produit (facultative)</legend>
@@ -701,8 +708,9 @@ const ProductManagement = (props) => {
                                         <span className="price">{formatPrice(product.price)}</span>
                                     )}
                                 </td>
-                                <td className={`adm-td text-right tabular-nums ${isService(product) || product.stock > 0 ? '' : 'text-red-600 font-semibold'}`}>
-                                    {isService(product) ? <span className="text-sm text-purple-800 font-semibold">Service</span> : product.stock}
+                                <td className={`adm-td text-right tabular-nums ${isWhatsappOnly(product) || product.stock > 0 ? '' : 'text-red-600 font-semibold'}`}>
+                                    {kindLabel(product) && <span className="text-sm text-purple-800 font-semibold">{kindLabel(product)}{isWhatsappOnly(product) ? '' : ' · '}</span>}
+                                    {!isWhatsappOnly(product) && product.stock}
                                 </td>
                                 <td className="adm-td"><StatusBadge status={product.status} /></td>
                                 <td className="adm-td whitespace-nowrap text-right">

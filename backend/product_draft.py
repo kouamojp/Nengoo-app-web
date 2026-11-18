@@ -72,6 +72,8 @@ LANGUAGE = {
 
 SERVICE_HINT = ("C'est un service (prestation), pas un objet : décris la prestation montrée, "
                 "sans état ni couleurs.")
+MEAL_HINT = ("C'est un plat de restaurant : décris le plat montré (ingrédients visibles, "
+             "accompagnement, portion), sans état, couleurs ni marque.")
 
 
 class DraftUnavailable(Exception):
@@ -173,7 +175,7 @@ def parse_draft(text: str, kind: str = "product") -> Draft:
     for color in data.get("colors") if isinstance(data.get("colors"), list) else []:
         if isinstance(color, str) and _HEX.match(color.strip()) and color.strip().lower() not in colors:
             colors.append(color.strip().lower())
-    if kind == "service":
+    if kind in ("service", "meal"):
         condition, colors = None, []
 
     return Draft(
@@ -202,6 +204,8 @@ def build_messages(images: List[str], price: float, category: str, kind: str, la
     ]
     if kind == "service":
         details.append(SERVICE_HINT)
+    elif kind == "meal":
+        details.append(MEAL_HINT)
     content = [{"type": "text", "text": "\n".join(details)}]
     content += [{"type": "image_url", "image_url": {"url": image}} for image in images]
     return [
