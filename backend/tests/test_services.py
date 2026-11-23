@@ -68,13 +68,13 @@ def test_service_contact_and_checkout(monkeypatch):
                 {**BASE, "id": "p_article", "name": "Coque", "status": "approved"},
             ])
 
-            # Le WhatsApp du vendeur accompagne les services, pas les articles
+            # Le WhatsApp du vendeur accompagne tous les produits (bouton de contact)
             listed = {p.id: p for p in await server.get_products(
                 Response(), search=None, seller_id=None, category=None, status_filter="approved", limit=None,
                 skip=0, sort=None, min_price=None, max_price=None, track=False)}
             assert listed["p_service"].kind == "service"
             assert listed["p_service"].sellerWhatsapp == "+237690000001"
-            assert listed["p_article"].sellerWhatsapp is None
+            assert listed["p_article"].sellerWhatsapp == "+237690000001"
             assert (await server.get_product("p_service")).sellerWhatsapp == "+237690000001"
             assert "sellerWhatsapp" not in (await db.products.find_one({"id": "p_service"}))
             # Logo de la boutique sur tous les produits : image de secours

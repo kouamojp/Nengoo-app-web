@@ -162,6 +162,7 @@ export const translations = {
     
     // Product
     addToCart: "Ajouter au Panier",
+    addShort: "Ajouter",
     buyNow: "Acheter Maintenant",
     inStock: "En Stock",
     availableColors: "Couleurs disponibles",
@@ -549,6 +550,7 @@ pendingApproval: "En attente d'approbation",
     
     // Product
     addToCart: "Add to Cart",
+    addShort: "Add",
     buyNow: "Buy Now",
     inStock: "In Stock",
     availableColors: "Available colours",

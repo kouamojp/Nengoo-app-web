@@ -28,11 +28,15 @@ const ProductCard = ({ product, language, addToCart, ribbon, promoted = false })
   const productUrl = `/product/${product.slug || product.id}`;
   const name = product.name[language];
 
-  // Service ou plat « whatsapp » : bouton WhatsApp au lieu du panier
+  // Comme l'app mobile : « Ajouter » + bouton WhatsApp carré ; service, plat
+  // « whatsapp » ou rupture de stock : seul « Contacter le vendeur » reste.
   const service = isWhatsappOnly(product);
   const meal = isMeal(product);
+  // Certaines listes passent la fiche brute de l'API (sellerWhatsapp)
+  const whatsapp = product.sellerWhatsApp || product.sellerWhatsapp;
+  const contactOnly = service || (!product.inStock && Boolean(whatsapp));
   const handleWhatsAppContact = () =>
-    contactSellerOnWhatsApp({ product, whatsapp: product.sellerWhatsApp, language });
+    contactSellerOnWhatsApp({ product, whatsapp, language });
 
   const hasPromo = product.promoPrice && product.promoPrice > 0;
   const discountPercentage = hasPromo && product.price > product.promoPrice
@@ -104,9 +108,9 @@ const ProductCard = ({ product, language, addToCart, ribbon, promoted = false })
           )}
         </div>
 
-        {service ? (
+        {contactOnly ? (
           <div className="mt-auto">
-            {product.sellerWhatsApp ? (
+            {whatsapp ? (
               <button
                 type="button"
                 onClick={handleWhatsAppContact}
@@ -128,19 +132,22 @@ const ProductCard = ({ product, language, addToCart, ribbon, promoted = false })
         ) : (
         <div className="mt-auto flex gap-2">
           <button
+            type="button"
             onClick={() => addToCart(product)}
             disabled={!product.inStock}
+            aria-label={`${t.addToCart} : ${name}`}
             className="flex-1 !min-w-0 h-10 !min-h-0 px-2 rounded-lg bg-purple-700 hover:bg-purple-800 disabled:bg-gray-300 disabled:text-gray-600 text-white text-[0.8rem] sm:text-sm font-semibold leading-tight flex items-center justify-center gap-1.5 transition-colors"
           >
             <CartIcon className="w-[1.1rem] h-[1.1rem] shrink-0 max-sm:hidden" strokeWidth={2.2} />
-            <span>{t.addToCart}</span>
+            <span>{t.addShort}</span>
           </button>
-          {product.sellerWhatsApp && (
+          {whatsapp && (
             <button
+              type="button"
               onClick={handleWhatsAppContact}
-              aria-label={`Contacter le vendeur sur WhatsApp à propos de ${name}`}
-              title="Contacter sur WhatsApp"
-              className="shrink-0 !min-w-0 !min-h-0 w-10 h-10 rounded-lg border border-green-600 text-green-700 hover:bg-green-50 flex items-center justify-center transition-colors"
+              aria-label={`${t.contactWhatsApp} : ${name}`}
+              title={t.contactWhatsApp}
+              className="shrink-0 !min-w-0 !min-h-0 w-10 h-10 rounded-lg border-[1.5px] border-gray-300 text-green-600 hover:border-green-600 hover:bg-green-50 flex items-center justify-center transition-colors"
             >
               <WhatsAppIcon className="w-5 h-5" />
             </button>

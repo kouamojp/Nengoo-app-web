@@ -119,13 +119,13 @@ def test_meals_reserved_to_restaurants_and_checkout(monkeypatch):
             stored = await db.products.find_one({"id": online.id})
             assert (stored["mealOrder"], stored["stock"]) == ("online", 8)
 
-            # WhatsApp du restaurant sur les plats « whatsapp » seulement
+            # WhatsApp du restaurant sur tous ses plats (bouton de contact des cartes)
             await db.products.update_many({}, {"$set": {"status": "approved"}})
             listed = {p.id: p for p in await server.get_products(
                 Response(), search=None, seller_id=None, category=None, status_filter="approved", limit=None,
                 skip=0, sort=None, min_price=None, max_price=None, track=False)}
             assert listed[whatsapp.id].sellerWhatsapp == "+237690000001"
-            assert listed[online.id].sellerWhatsapp is None
+            assert listed[online.id].sellerWhatsapp == "+237690000001"
 
             # Plat « whatsapp » : pas de panier, même envoyé directement à l'API
             request = server.CheckoutRequest(

@@ -1484,8 +1484,9 @@ async def check_meal_allowed(seller_id: Optional[str]):
 
 
 async def with_seller_details(products: List[dict]) -> List[dict]:
-    """Ajoute le logo de la boutique (image de secours) à chaque produit, et
-    le WhatsApp du vendeur aux services (bouton « Contacter »)."""
+    """Ajoute à chaque produit le logo de la boutique (image de secours) et le
+    WhatsApp du vendeur (bouton de contact des cartes, comme dans l'app ; ce
+    numéro est déjà public sur la page de la boutique)."""
     seller_ids = {p.get("sellerId") for p in products if p.get("sellerId")}
     if not seller_ids:
         return products
@@ -1496,8 +1497,7 @@ async def with_seller_details(products: List[dict]) -> List[dict]:
     for p in products:
         seller = by_id.get(p.get("sellerId")) or {}
         p["sellerLogo"] = seller.get("logoUrl") or None
-        if whatsapp_only(p):
-            p["sellerWhatsapp"] = seller.get("whatsapp")
+        p["sellerWhatsapp"] = seller.get("whatsapp") or None
     return products
 
 
