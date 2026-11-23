@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   HomeIcon, CartIcon, BoxIcon, StoreIcon, UsersIcon, TagIcon, PinIcon, ChartIcon, FilterIcon, SearchIcon, RouteIcon,
   LayoutIcon, InfoIcon, TruckIcon, LockIcon, ShieldIcon, LogoutIcon, MenuIcon, ExternalIcon, SparkIcon, ChatIcon,
-  MegaphoneIcon, BookIcon, SmartphoneIcon,
+  MegaphoneIcon, BookIcon, SmartphoneIcon, ImageIcon,
 } from '../ui/Icons';
 import { useSupportUnread } from '../../lib/support';
 import { AdminFeedbackHost } from './adminFeedback';
@@ -150,6 +150,7 @@ const navGroups = (user, counts) => [
   {
     label: 'Site',
     items: [
+      { id: 'media', label: 'Médiathèque', Icon: ImageIcon },
       { id: 'categories', label: 'Catégories', Icon: TagIcon },
       { id: 'reclassify', label: 'Reclassement', Icon: FilterIcon },
       { id: 'searchMisses', label: 'Recherches sans résultat', Icon: SearchIcon },

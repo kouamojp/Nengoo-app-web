@@ -24,11 +24,12 @@ import PromoCodesManager from '../promo/PromoCodesManager';
 import { SectionHeader } from './AdminUI';
 import SupportInbox from './SupportInbox';
 import PromotionManagement from './PromotionManagement';
+import { MediaLibraryPage } from './MediaLibrary';
 import { numberFormat } from '../../lib/numberFormat';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-const SECTIONS = ['dashboard', 'support', 'chatReports', 'promoCodes', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping', 'appVersion', 'documents', 'documentPayments'];
+const SECTIONS = ['dashboard', 'support', 'chatReports', 'promoCodes', 'orders', 'products', 'sellers', 'buyers', 'whatsappAnalytics', 'categories', 'reclassify', 'searchMisses', 'assistant', 'couriers', 'pickupPoints', 'promotions', 'homepage', 'about', 'shipping', 'appVersion', 'documents', 'documentPayments', 'media'];
 
 const formatPrice = (price) => numberFormat('fr-FR', {
     style: 'currency',
@@ -244,6 +245,7 @@ const AdminDashboard = (props) => {
                 )}
             />
         )}
+        {activeSection === 'media' && <MediaLibraryPage />}
         {activeSection === 'reclassify' && <ProductReclassification />}
         {activeSection === 'searchMisses' && <SearchMisses />}
         {activeSection === 'assistant' && <AssistantStats />}

@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { notify, confirmAction } from './adminFeedback';
-import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusBadge, EmptyRow, LoadingRows, Modal, Field, ChoiceCards, DateSortSelect, sortByDate } from './AdminUI';
+import { SectionHeader, Toolbar, SearchInput, SelectionBar, StatusBadge, EmptyRow, LoadingRows, Modal, Field, DateSortSelect, sortByDate } from './AdminUI';
 import { categorySelectOptions, categoryPath } from '../../lib/categories';
 import ProductDetailsFields, { ProductKindField } from '../seller/ProductDetailsFields';
 import { productFormError, productPayload, productDetailsPayload, withSpecList, isMeal, isWhatsappOnly, kindLabel, listingText, stockLabel, withKind } from '../../lib/productRules';
 import { numberFormat } from '../../lib/numberFormat';
+import { ImagePicker } from './MediaLibrary';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -34,20 +35,11 @@ const ProductManagement = (props) => {
         sellerId: '',
         sellerName: '',
         stock: 0,
-        images: [''],
+        images: [],
         brand: '',
         condition: '',
         specList: [],
     });
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [imageUrl, setImageUrl] = useState('');
-    const [uploadMethod, setUploadMethod] = useState('url');
-
-    // State for editing product image
-    const [editingSelectedFile, setEditingSelectedFile] = useState(null);
-    const [editingImageUrl, setEditingImageUrl] = useState('');
-    const [editingUploadMethod, setEditingUploadMethod] = useState('url');
-
 
     const handleSelectAll = (e) => {
         if (e.target.checked) {
@@ -194,40 +186,9 @@ const ProductManagement = (props) => {
 
         setUploading(true);
         try {
-            let finalImageUrl = editingProduct.images[0] || '';
-            let imageUpdated = false;
-
-            // Check if a new image URL is provided
-            if (editingUploadMethod === 'url' && editingImageUrl.trim() && editingImageUrl !== finalImageUrl) {
-                finalImageUrl = editingImageUrl.trim();
-                imageUpdated = true;
-            } 
-            // Check if a new file is selected for upload
-            else if (editingUploadMethod === 'file' && editingSelectedFile) {
-                const presignedResponse = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Admin-Role': user?.role || 'admin' },
-                    body: JSON.stringify({ fileName: editingSelectedFile.name, fileType: editingSelectedFile.type }),
-                });
-
-                if (!presignedResponse.ok) {
-                    const err = await presignedResponse.json();
-                    throw new Error(err.detail || 'Failed to get pre-signed URL for update.');
-                }
-                const { uploadUrl, publicUrl } = await presignedResponse.json();
-
-                const uploadToS3Response = await fetch(uploadUrl, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': editingSelectedFile.type },
-                    body: editingSelectedFile,
-                });
-
-                if (!uploadToS3Response.ok) {
-                    throw new Error('Failed to upload new image to S3.');
-                }
-                finalImageUrl = publicUrl;
-                imageUpdated = true;
-            }
+            const images = (editingProduct.images || []).filter(Boolean);
+            const previous = (products.find(p => p.id === editingProduct.id)?.images || []).filter(Boolean);
+            const imagesChanged = JSON.stringify(images) !== JSON.stringify(previous);
 
             const updatedProductData = {
                 name: editingProduct.name,
@@ -238,7 +199,7 @@ const ProductManagement = (props) => {
                 stock: parseInt(editingProduct.stock, 10),
                 category: editingProduct.category,
                 status: editingProduct.status,
-                ...(imageUpdated && { images: [finalImageUrl] }),
+                ...(imagesChanged && { images }),
             };
             
             const response = await fetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
@@ -257,9 +218,6 @@ const ProductManagement = (props) => {
 
             await fetchProducts();
             setEditingProduct(null);
-            // Reset editing image state
-            setEditingImageUrl('');
-            setEditingSelectedFile(null);
             notify('Produit mis à jour avec succès.', 'success');
 
         } catch (error) {
@@ -268,14 +226,6 @@ const ProductManagement = (props) => {
         } finally {
             setUploading(false);
         }
-    };
-
-    const handleFileChange = (e) => {
-        setSelectedFile(e.target.files[0]);
-    };
-    
-    const handleEditingFileChange = (e) => {
-        setEditingSelectedFile(e.target.files[0]);
     };
 
     const handleAddProduct = async (e) => {
@@ -289,42 +239,7 @@ const ProductManagement = (props) => {
         }
 
         setUploading(true);
-        let finalImageUrl = '';
-
         try {
-            if (uploadMethod === 'url' || !selectedFile) {
-                finalImageUrl = uploadMethod === 'url' ? imageUrl.trim() : '';
-            } else {
-                const presignedResponse = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Role': user?.role || 'admin',
-                    },
-                    body: JSON.stringify({
-                        fileName: selectedFile.name,
-                        fileType: selectedFile.type,
-                    }),
-                });
-
-                if (!presignedResponse.ok) {
-                    const err = await presignedResponse.json();
-                    throw new Error(err.detail || 'Failed to get pre-signed URL');
-                }
-                const { uploadUrl, publicUrl } = await presignedResponse.json();
-
-                const uploadToS3Response = await fetch(uploadUrl, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': selectedFile.type },
-                    body: selectedFile,
-                });
-
-                if (!uploadToS3Response.ok) {
-                    throw new Error('Failed to upload file to S3');
-                }
-                finalImageUrl = publicUrl;
-            }
-
             const finalSellerId = newProductData.sellerId || (user ? user.id : 'admin_default');
             const finalSellerName = newProductData.sellerName || (user ? user.name : 'Admin');
 
@@ -332,7 +247,7 @@ const ProductManagement = (props) => {
                 ...productPayload(newProductData),
                 sellerId: finalSellerId,
                 sellerName: finalSellerName,
-                images: finalImageUrl ? [finalImageUrl] : [],
+                images: (newProductData.images || []).filter(Boolean),
             };
 
             const response = await fetch(`${API_BASE_URL}/products`, {
@@ -350,11 +265,9 @@ const ProductManagement = (props) => {
             await fetchProducts();
             setShowAddModal(false);
             setNewProductData({
-                name: '', description: '', category: '', price: 0, promoPrice: 0, sellerId: '', sellerName: '', stock: 0, images: [''],
+                name: '', description: '', category: '', price: 0, promoPrice: 0, sellerId: '', sellerName: '', stock: 0, images: [],
                 brand: '', condition: '', specList: [],
             });
-            setSelectedFile(null);
-            setImageUrl('');
             notify('Produit ajouté avec succès.', 'success');
         } catch (error) {
             console.error('Error adding product:', error);
@@ -419,11 +332,7 @@ const ProductManagement = (props) => {
         </>
     );
 
-    const closeEditModal = () => {
-        setEditingProduct(null);
-        setEditingImageUrl('');
-        setEditingSelectedFile(null);
-    };
+    const closeEditModal = () => setEditingProduct(null);
 
     const COLUMNS = 7;
 
@@ -488,35 +397,11 @@ const ProductManagement = (props) => {
                             <textarea name="description" value={editingProduct.description} onChange={handleEditInputChange} className="adm-input" rows="3" />
                         </Field>
 
-                        <fieldset className="space-y-3">
-                            <legend className="adm-label">Image</legend>
-                            <div className="flex items-center gap-3">
-                                <img src={editingProduct.images[0]} alt="" className="w-16 h-16 rounded-lg object-cover bg-gray-100" />
-                                <p className="text-sm text-gray-600">Image actuelle. Pour la remplacer, indiquez une nouvelle URL ou un fichier.</p>
-                            </div>
-                            <ChoiceCards
-                                name="editingUploadMethod"
-                                value={editingUploadMethod}
-                                onChange={setEditingUploadMethod}
-                                options={[
-                                    { value: 'url', label: 'Adresse (URL) d\'une image' },
-                                    { value: 'file', label: 'Fichier depuis l\'ordinateur' },
-                                ]}
-                            />
-                            {editingUploadMethod === 'url' ? (
-                                <input
-                                    type="url"
-                                    value={editingImageUrl}
-                                    onChange={(e) => setEditingImageUrl(e.target.value)}
-                                    placeholder="https://exemple.com/nouvelle-image.jpg"
-                                    aria-label="Nouvelle URL d'image"
-                                    className="adm-input"
-                                />
-                            ) : (
-                                <input type="file" onChange={handleEditingFileChange} className="adm-input py-2" accept="image/*" aria-label="Nouveau fichier image" />
-                            )}
-                            <p className="text-xs text-gray-500">Laissez vide pour conserver l'image actuelle.</p>
-                        </fieldset>
+                        <ImagePicker
+                            value={editingProduct.images || []}
+                            onChange={(images) => setEditingProduct((p) => ({ ...p, images }))}
+                            label={listingText(editingProduct).photos || 'Photos'}
+                        />
 
                         <Field label="Catégorie">
                             <select name="category" value={editingProduct.category} onChange={handleEditInputChange} className="adm-input">
@@ -601,38 +486,11 @@ const ProductManagement = (props) => {
                         </div>
                         <ProductDetailsFields value={newProductData} onChange={setNewProductData} />
 
-                        <fieldset className="space-y-3">
-                            <legend className="adm-label">Image du produit (facultative)</legend>
-                            <p className="-mt-2 text-xs text-gray-500">Sans image, le logo de la boutique s'affiche à la place.</p>
-                            <ChoiceCards
-                                name="uploadMethod"
-                                value={uploadMethod}
-                                onChange={setUploadMethod}
-                                options={[
-                                    { value: 'url', label: 'Adresse (URL) d\'une image', hint: 'Recommandé : rien à configurer.' },
-                                    { value: 'file', label: 'Fichier depuis l\'ordinateur', hint: 'JPG, PNG ou WEBP, 5 Mo maximum. Nécessite le stockage S3.' },
-                                ]}
-                            />
-                            {uploadMethod === 'url' ? (
-                                <input
-                                    type="url"
-                                    value={imageUrl}
-                                    onChange={(e) => setImageUrl(e.target.value)}
-                                    placeholder="https://exemple.com/image.jpg"
-                                    aria-label="URL de l'image"
-                                    className="adm-input"
-                                />
-                            ) : (
-                                <input
-                                    type="file"
-                                    name="imageFile"
-                                    onChange={handleFileChange}
-                                    className="adm-input py-2"
-                                    accept="image/*"
-                                    aria-label="Fichier image"
-                                />
-                            )}
-                        </fieldset>
+                        <ImagePicker
+                            value={newProductData.images}
+                            onChange={(images) => setNewProductData((p) => ({ ...p, images }))}
+                            label={`${listingText(newProductData).photos || 'Photos'} (facultatives)`}
+                        />
 
                         <div className="flex justify-end gap-2 pt-2">
                             <button type="button" onClick={() => setShowAddModal(false)} className="adm-btn adm-btn-secondary">Annuler</button>

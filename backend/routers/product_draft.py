@@ -14,13 +14,16 @@ import assistant as core
 import product_draft as drafts
 import server
 from login_limiter import client_ip
+from routers import media
 
 router = APIRouter(tags=["products"])
 
 
 class DraftRequest(BaseModel):
     # Photos en data URL (JPEG, PNG ou WebP, 8 Mo au plus chacune)
-    images: List[str] = Field(min_length=1, max_length=drafts.MAX_IMAGES)
+    images: List[str] = Field(default_factory=list, max_length=drafts.MAX_IMAGES)
+    # Ou photos déjà dans la médiathèque (notre bucket uniquement)
+    imageUrls: List[str] = Field(default_factory=list, max_length=drafts.MAX_IMAGES)
     price: float = Field(gt=0)
     category: str = Field(min_length=1, max_length=120)
     kind: Literal["product", "service", "meal"] = "product"
@@ -55,8 +58,17 @@ async def ai_draft(payload: DraftRequest, request: Request,
         category.get(label_key) or category.get("name"),
     ]))
 
+    sources = list(payload.images)
+    for url in payload.imageUrls:
+        try:
+            sources.append(await media.image_data_url(url))
+        except ValueError:  # adresse externe (ajoutée par URL) : l'IA ne la lit pas
+            continue
+    sources = sources[:drafts.MAX_IMAGES]
+    if not sources:
+        raise HTTPException(status_code=422, detail="Ajoutez une photo depuis la médiathèque pour que l'IA puisse l'analyser.")
     try:
-        images = [await asyncio.to_thread(core.prepare_image, image) for image in payload.images]
+        images = [await asyncio.to_thread(core.prepare_image, image) for image in sources]
     except ValueError:
         raise HTTPException(status_code=422, detail="Photo illisible. Essayez avec une image JPEG ou PNG.") from None
 

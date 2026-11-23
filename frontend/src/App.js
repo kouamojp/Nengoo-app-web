@@ -210,7 +210,7 @@ function App() {
             {/* Seller Routes */}
             {/* Chaque section de l'espace vendeur a son URL, dans la même coque */}
             <Route path="/seller" element={<SellerDashboard {...appProps} />} />
-            {['products', 'orders', 'analytics', 'profile', 'messages', 'support', 'promos'].map(section => (
+            {['products', 'media', 'orders', 'analytics', 'profile', 'messages', 'support', 'promos'].map(section => (
               <Route key={section} path={`/seller/${section}`} element={<SellerDashboard {...appProps} section={section} />} />
             ))}
             

@@ -214,6 +214,14 @@ export const BookIcon = (props) => (
   </Icon>
 );
 
+export const ImageIcon = (props) => (
+  <Icon {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="9" cy="10" r="1.8" />
+    <path d="M21 16l-5-5-9 9" />
+  </Icon>
+);
+
 export const CameraIcon = (props) => (
   <Icon {...props}>
     <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.1l1.5-2h5.8l1.5 2h2.1A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />

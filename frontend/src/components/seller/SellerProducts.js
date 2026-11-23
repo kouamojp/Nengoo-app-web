@@ -7,6 +7,7 @@ import ProductDetailsFields, { ProductKindField } from './ProductDetailsFields';
 import AiDraftPanel, { applyDraft } from './AiDraftPanel';
 import { isArticle, isMeal, isService, isWhatsappOnly, kindLabel, listingText, productFormError, productPayload, stockLabel, withKind, withSpecList } from '../../lib/productRules';
 import { numberFormat } from '../../lib/numberFormat';
+import { ImagePicker } from '../admin/MediaLibrary';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -30,7 +31,6 @@ const SellerProducts = (props) => {
       specList: [],
       kind: 'product',
     });
-    const [selectedFiles, setSelectedFiles] = useState([]);
     const [selectedProducts, setSelectedProducts] = useState([]);
     const [availableCategories, setAvailableCategories] = useState([]);
     // Brouillon de l'IA appliqué au formulaire d'ajout : relecture à confirmer
@@ -154,53 +154,17 @@ const SellerProducts = (props) => {
         alert("Vous devez être connecté en tant que vendeur pour ajouter un produit.");
         return;
       }
-      const formError = productFormError(newProduct, selectedFiles.length);
+      const formError = productFormError(newProduct, (newProduct.images || []).filter(Boolean).length);
       if (formError) {
         alert(formError);
         return;
-      }
-
-      const uploadedImageUrls = [];
-      for (const file of selectedFiles) {
-        try {
-          // 1. Get presigned URL from your backend
-          const presignedResponse = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-Seller-Id': props.user.id,
-            },
-            body: JSON.stringify({ fileName: file.name, fileType: file.type }),
-          });
-          if (!presignedResponse.ok) {
-            throw new Error('Failed to get presigned URL');
-          }
-          const { uploadUrl, publicUrl } = await presignedResponse.json();
-  
-          // 2. Upload image directly to S3 using the presigned URL
-          const uploadResult = await fetch(uploadUrl, {
-            method: 'PUT',
-            body: file,
-            headers: {
-              'Content-Type': file.type,
-            },
-          });
-          if (!uploadResult.ok) {
-            throw new Error('Failed to upload image to S3');
-          }
-          uploadedImageUrls.push(publicUrl);
-        } catch (error) {
-          console.error("Error uploading file:", error);
-          alert(`Erreur lors du téléchargement de l'image ${file.name}: ${error.message}`);
-          return; // Stop the process if any upload fails
-        }
       }
 
       const productData = {
           ...productPayload(newProduct),
           sellerId: props.user.id,
           sellerName: props.user.businessName,
-          images: uploadedImageUrls,
+          images: (newProduct.images || []).filter(Boolean),
       };
 
       try {
@@ -235,7 +199,6 @@ const SellerProducts = (props) => {
             kind: 'product',
             ...(restaurant ? withKind({ specList: [] }, 'meal') : {}),
         });
-        setSelectedFiles([]); // Clear selected files after successful upload
         setAiDraft(null);
         setAiReviewed(false);
       } catch (error) {
@@ -247,54 +210,16 @@ const SellerProducts = (props) => {
       e.preventDefault();
 
       if (!editingProduct) return;
-      const imageCount = selectedFiles.length || (editingProduct.images || []).filter(Boolean).length;
+      const imageCount = (editingProduct.images || []).filter(Boolean).length;
       const formError = productFormError(editingProduct, imageCount, products.find(p => p.id === editingProduct.id));
       if (formError) {
         alert(formError);
         return;
       }
 
-      const uploadedImageUrls = [];
-      if (selectedFiles.length > 0) {
-        for (const file of selectedFiles) {
-          try {
-            // 1. Get presigned URL from your backend
-            const presignedResponse = await fetch(`${API_BASE_URL}/generate-presigned-url`, {
-              method: 'POST',
-              headers: { 
-                  'Content-Type': 'application/json',
-                  'X-Seller-Id': props.user.id,
-              },
-              body: JSON.stringify({ fileName: file.name, fileType: file.type }),
-            });
-            if (!presignedResponse.ok) {
-              throw new Error('Failed to get presigned URL');
-            }
-            const { uploadUrl, publicUrl } = await presignedResponse.json();
-    
-            // 2. Upload image directly to S3 using the presigned URL
-            const uploadResult = await fetch(uploadUrl, {
-              method: 'PUT',
-              body: file,
-              headers: {
-                'Content-Type': file.type,
-              },
-            });
-            if (!uploadResult.ok) {
-              throw new Error('Failed to upload image to S3');
-            }
-            uploadedImageUrls.push(publicUrl);
-          } catch (error) {
-            console.error("Error uploading file:", error);
-            alert(`Erreur lors du téléchargement de l'image ${file.name}: ${error.message}`);
-            return; // Stop the process if any upload fails
-          }
-        }
-      }
-
       const productData = {
           ...productPayload(editingProduct),
-          images: uploadedImageUrls.length > 0 ? uploadedImageUrls : editingProduct.images,
+          images: (editingProduct.images || []).filter(Boolean),
       };
 
       try {
@@ -314,7 +239,6 @@ const SellerProducts = (props) => {
   
         await fetchProducts(); // Refetch products to include the updated one
         setEditingProduct(null);
-        setSelectedFiles([]); // Clear selected files after successful upload
       } catch (error) {
         alert(`Erreur: ${error.message}`);
       }
@@ -455,20 +379,12 @@ const SellerProducts = (props) => {
                 </select>
               </div>
 
-              <div>
-                  <label className="adm-label">{listingText(editingProduct).photos}</label>
-                  <input
-                    type="file"
-                    multiple
-                    onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
-                    className="adm-input"
-                  />
-                  <div className="mt-2 flex flex-wrap gap-2">
-                      {selectedFiles.map((file, index) => (
-                          <img key={index} src={URL.createObjectURL(file)} alt={`preview-${index}`} className="w-20 h-20 object-cover rounded-lg" />
-                      ))}
-                  </div>
-              </div>
+              <ImagePicker
+                value={editingProduct.images || []}
+                onChange={(images) => setEditingProduct((p) => ({ ...p, images }))}
+                label={listingText(editingProduct).photos}
+                imagesOnly
+              />
 
               <div>
                 <label className="adm-label">Description</label>
@@ -508,22 +424,12 @@ const SellerProducts = (props) => {
             <form onSubmit={handleAddProduct} className="space-y-6">
               <ProductKindField value={newProduct} onChange={setNewProduct} restaurant={restaurant} />
 
-              <div>
-                  <label className="adm-label" htmlFor="new-product-images">{listingText(newProduct).photos}</label>
-                  <input
-                    id="new-product-images"
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={(e) => setSelectedFiles(Array.from(e.target.files))}
-                    className="adm-input"
-                  />
-                  <div className="mt-2 flex flex-wrap gap-2">
-                      {selectedFiles.map((file, index) => (
-                          <img key={index} src={URL.createObjectURL(file)} alt={`preview-${index}`} className="w-20 h-20 object-cover rounded-lg" />
-                      ))}
-                  </div>
-              </div>
+              <ImagePicker
+                value={newProduct.images || []}
+                onChange={(images) => setNewProduct((p) => ({ ...p, images }))}
+                label={listingText(newProduct).photos}
+                imagesOnly
+              />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -552,7 +458,7 @@ const SellerProducts = (props) => {
 
               <AiDraftPanel
                 product={newProduct}
-                files={selectedFiles}
+                imageUrls={(newProduct.images || []).filter(Boolean)}
                 language={language}
                 onDraft={(draft) => {
                   setNewProduct(p => applyDraft(p, draft));

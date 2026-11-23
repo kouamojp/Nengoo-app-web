@@ -4332,6 +4332,7 @@ from routers.promo_codes import router as promo_codes_router, ensure_indexes as 
 from routers.product_draft import router as product_draft_router
 from routers.documents import router as documents_router, ensure_indexes as ensure_document_indexes
 from routers.app_version import router as app_version_router
+from routers.media import router as media_router, ensure_indexes as ensure_media_indexes
 api_router.include_router(buyers_router)
 api_router.include_router(assistant_router)
 api_router.include_router(support_router)
@@ -4344,6 +4345,7 @@ api_router.include_router(promo_codes_router)
 api_router.include_router(product_draft_router)
 api_router.include_router(documents_router)
 api_router.include_router(app_version_router)
+api_router.include_router(media_router)
 
 
 @app.on_event("startup")
@@ -4364,6 +4366,10 @@ async def create_ad_indexes():
         await ensure_document_indexes()
     except Exception as error:
         logger.warning("Index des documents non créés : %s", error)
+    try:
+        await ensure_media_indexes()
+    except Exception as error:
+        logger.warning("Index de la médiathèque non créés : %s", error)
 
 
 # --- OG / Social Preview SSR ---

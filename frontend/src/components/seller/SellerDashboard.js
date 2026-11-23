@@ -9,6 +9,8 @@ import SellerMessages from './SellerMessages';
 import SellerProfile from './SellerProfile';
 import SellerSupport from './SellerSupport';
 import SellerPromoCodes from './SellerPromoCodes';
+import SellerMedia from './SellerMedia';
+import { AdminFeedbackHost } from '../admin/adminFeedback';
 import { StatusBadge } from '../admin/AdminUI';
 import { numberFormat } from '../../lib/numberFormat';
 
@@ -130,6 +132,7 @@ const SECTIONS = {
   analytics: SellerAnalytics,
   messages: SellerMessages,
   promos: SellerPromoCodes,
+  media: SellerMedia,
   support: SellerSupport,
   profile: SellerProfile,
 };
@@ -176,6 +179,8 @@ const SellerDashboard = (props) => {
       {Section
         ? <Section {...props} />
         : <Overview user={user} orders={orders} analytics={analytics} loading={loading} />}
+      {/* Notifications et confirmations de la médiathèque (même rendu que l'admin) */}
+      <AdminFeedbackHost />
     </SellerSidebar>
   );
 };

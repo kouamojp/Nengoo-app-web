@@ -35,43 +35,18 @@ const AiThinking = () => {
 };
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
-// Le serveur en lit 3 au plus et les réduit à 1024 px : inutile d'envoyer plus lourd
+// Le serveur lit les 3 premières photos (déjà sur la médiathèque) et les réduit lui-même
 const MAX_PHOTOS = 3;
-const MAX_SIDE = 1280;
-
-/** Photo réduite en JPEG (data URL), pour un envoi rapide même en 3G. */
-const toJpegDataUrl = (file) => new Promise((resolve, reject) => {
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.onload = () => {
-    const scale = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
-    const ctx = canvas.getContext('2d');
-    // Fond blanc : un PNG transparent ne doit pas devenir noir
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    URL.revokeObjectURL(url);
-    resolve(canvas.toDataURL('image/jpeg', 0.85));
-  };
-  img.onerror = () => {
-    URL.revokeObjectURL(url);
-    reject(new Error('Photo illisible.'));
-  };
-  img.src = url;
-});
 
 /**
  * Brouillon de fiche par l'IA : à partir des photos, du prix et de la catégorie,
  * propose titre, description et caractéristiques. Rien n'est publié : onDraft
  * reçoit le brouillon, le formulaire le montre au vendeur qui le vérifie.
  */
-const AiDraftPanel = ({ product, files, language = 'fr', onDraft }) => {
+const AiDraftPanel = ({ product, imageUrls = [], language = 'fr', onDraft }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const photos = files.filter((f) => f.type?.startsWith('image/')).slice(0, MAX_PHOTOS);
+  const photos = imageUrls.filter(Boolean).slice(0, MAX_PHOTOS);
   const price = Number(product.price) || 0;
   const missing = [
     !photos.length && 'une photo',
@@ -83,12 +58,11 @@ const AiDraftPanel = ({ product, files, language = 'fr', onDraft }) => {
     setLoading(true);
     setError('');
     try {
-      const images = await Promise.all(photos.map(toJpegDataUrl));
       const response = await fetch(`${API_BASE_URL}/products/ai-draft`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images,
+          imageUrls: photos,
           price,
           category: product.category,
           kind: isService(product) ? 'service' : isMeal(product) ? 'meal' : 'product',
@@ -113,7 +87,7 @@ const AiDraftPanel = ({ product, files, language = 'fr', onDraft }) => {
       <p className="mt-1 text-sm text-gray-700">
         À partir de la photo, du prix et de la catégorie, l'IA propose le titre, la description et les
         caractéristiques. Vous relisez et corrigez avant de publier.
-        {files.length > MAX_PHOTOS && ` Seules les ${MAX_PHOTOS} premières photos sont analysées.`}
+        {imageUrls.length > MAX_PHOTOS && ` Seules les ${MAX_PHOTOS} premières photos sont analysées.`}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button
