@@ -74,7 +74,8 @@ from og_image import og_image_for
 import html as html_lib
 from promo import PromoError, compute_discounts as compute_promo_discounts, describe as promo_describe,     lines_by_seller as promo_lines_by_seller
 from product_search import normalize_query, search_products, search_products_detailed
-from image_variants import aligned_variants, refresh_product_variants
+from image_variants import (aligned_variants, refresh_product_variants, refresh_hero_variants,
+                            hero_variants_missing, known_hero_sources, hero_sources)
 from sms import order_created_text, order_status_text, send_sms
 from delivery import load_settings as load_delivery_settings, new_courier_token, new_delivery_code, seller_fee
 from order_flow import RELEASES_STOCK, STATUSES as ORDER_STATUSES, check_transition, normalize_status, status_label
@@ -1201,6 +1202,10 @@ class HomepageSettings(BaseModel):
     # Séparé de heroImages pour que les clients qui lisent une liste de chaînes
     # (app Flutter) continuent de fonctionner. Même ordre, "" = image non cliquable.
     heroLinks: List[str] = Field(default=[], description="Lien de chaque image du carrousel, dans le même ordre que heroImages")
+    # Versions réduites (AVIF et WebP, 400/700/1000 px) créées par le serveur, même
+    # ordre : {"avif": srcset, "webp": srcset, "src": url}, {} = pas encore créées
+    # (le site affiche alors l'originale). Lecture seule (image_variants.py).
+    heroSources: List[Dict[str, str]] = Field(default=[], description="Versions réduites de chaque image du carrousel")
 
     @field_validator("heroLinks")
     @classmethod
@@ -1235,10 +1240,27 @@ async def update_shipping_price(settings: ShippingSettings):
     )
     return settings
 
+# Une seule création de versions réduites du carrousel à la fois
+_hero_refresh = {"running": False}
+
+
+async def _refresh_hero_once():
+    if _hero_refresh["running"]:
+        return
+    _hero_refresh["running"] = True
+    try:
+        await refresh_hero_variants(db)
+    finally:
+        _hero_refresh["running"] = False
+
+
 @api_router.get("/settings/homepage", response_model=HomepageSettings)
-async def get_homepage_settings():
+async def get_homepage_settings(background_tasks: BackgroundTasks):
     homepage_settings = await db.settings.find_one({"_id": "homepage_settings"})
     if homepage_settings:
+        # Images enregistrées avant les versions réduites : créées en arrière-plan
+        if hero_variants_missing(homepage_settings):
+            background_tasks.add_task(_refresh_hero_once)
         return HomepageSettings(**homepage_settings)
     # Images par défaut pour le carrousel hero
     return HomepageSettings(heroImages=[
@@ -1248,13 +1270,17 @@ async def get_homepage_settings():
     ])
 
 @api_router.put("/settings/homepage", response_model=HomepageSettings, dependencies=[Depends(super_admin_required)])
-async def update_homepage_settings(settings: HomepageSettings):
+async def update_homepage_settings(settings: HomepageSettings, background_tasks: BackgroundTasks):
+    # Versions réduites : celles déjà créées sont gardées, les autres créées en arrière-plan
+    current = await db.settings.find_one({"_id": "homepage_settings"}) or {}
+    data = {**settings.dict(), "heroSources": hero_sources(settings.heroImages, known_hero_sources(current))}
     await db.settings.update_one(
         {"_id": "homepage_settings"},
-        {"$set": settings.dict()},
+        {"$set": data},
         upsert=True
     )
-    return settings
+    background_tasks.add_task(_refresh_hero_once)
+    return HomepageSettings(**data)
 
 # --- Buyer Management ---
 @api_router.post("/buyers/register", response_model=BuyerAuthResponse, response_model_exclude=BUYER_PRIVATE_FIELDS)

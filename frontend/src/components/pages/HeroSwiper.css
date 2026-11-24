@@ -1,56 +1,105 @@
-/* Carrousel du hero de l'accueil */
+/* Carrousel du hero de l'accueil (HeroCarousel.js) */
 
-.hero-swiper .swiper-slide {
-  height: 100%;
+/* Fondu enchaîné : seule la diapositive active est visible et cliquable */
+.hero-carousel .hero-slide {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.6s ease, visibility 0s linear 0.6s;
+}
+
+.hero-carousel .hero-slide.is-active {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.6s ease, visibility 0s;
+  z-index: 1;
 }
 
 /* Flèches : pastilles blanches, flèche violette */
-.hero-swiper .swiper-button-next,
-.hero-swiper .swiper-button-prev {
-  color: #6b21a8;
-  background: rgba(255, 255, 255, 0.92);
+.hero-carousel .hero-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 40px;
   height: 40px;
+  min-width: 0;
+  min-height: 0;
+  margin-top: -20px;
+  color: #6b21a8;
+  background: rgba(255, 255, 255, 0.92);
   border-radius: 9999px;
   transition: background-color 0.2s ease;
 }
 
-.hero-swiper .swiper-button-next:hover,
-.hero-swiper .swiper-button-prev:hover {
+.hero-carousel .hero-arrow:hover {
   background: #fde047;
 }
 
-.hero-swiper .swiper-button-next:after,
-.hero-swiper .swiper-button-prev:after {
-  font-size: 16px;
-  font-weight: 800;
+.hero-carousel .hero-arrow-prev {
+  left: 10px;
 }
 
-.hero-swiper .swiper-button-next svg,
-.hero-swiper .swiper-button-prev svg {
-  width: 14px;
-  height: 14px;
+.hero-carousel .hero-arrow-next {
+  right: 10px;
 }
 
-/* Puces : la puce active s'allonge et passe en jaune */
-.hero-swiper .swiper-pagination-bullet {
-  background: #fff;
-  opacity: 0.6;
+/* Puces : la puce active s'allonge et passe en jaune. La zone cliquable
+   (24 px) est plus grande que la puce dessinée. */
+.hero-carousel .hero-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0; /* centre des puces à 12 px du bas, comme avant (Swiper) */
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+}
+
+.hero-carousel .hero-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+.hero-carousel .hero-dot::before {
+  content: "";
+  display: block;
   width: 8px;
   height: 8px;
+  border-radius: 9999px;
+  background: #fff;
+  opacity: 0.6;
   transition: width 0.3s ease, background-color 0.3s ease;
 }
 
-.hero-swiper .swiper-pagination-bullet-active {
-  opacity: 1;
-  background: #fde047;
+.hero-carousel .hero-dot.is-active {
+  width: 36px;
+}
+
+.hero-carousel .hero-dot.is-active::before {
   width: 24px;
   border-radius: 4px;
+  background: #fde047;
+  opacity: 1;
 }
 
 @media (max-width: 640px) {
-  .hero-swiper .swiper-button-next,
-  .hero-swiper .swiper-button-prev {
+  .hero-carousel .hero-arrow {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-carousel .hero-slide,
+  .hero-carousel .hero-slide.is-active,
+  .hero-carousel .hero-dot::before {
+    transition: none;
   }
 }

@@ -13,18 +13,24 @@ RewriteRule ^sitemap\.xml$ og-proxy.php?type=sitemap [L,QSA]
 RewriteCond %{HTTP_USER_AGENT} (facebookexternalhit|facebot|whatsapp|telegrambot|twitterbot|slackbot|linkedinbot|pinterestbot|discordbot|vkshare|googlebot|bingbot|yandexbot|duckduckbot|applebot|bot|crawler|spider|preview) [NC]
 RewriteRule ^product/([A-Za-z0-9_-]+)/?$ og-proxy.php?type=product&slug=$1 [L,QSA]
 
+# Accueil : index.html avec les réglages du carrousel intégrés (home.php),
+# pour que la première image se charge dès la lecture du HTML
+RewriteRule ^$ home.php [L]
+
 # Application React (SPA) : tout ce qui n'est pas un fichier réel → index.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.html [L]
 
-# Cache : fichiers versionnés longtemps, index.html et service worker jamais
+# Cache : fichiers versionnés longtemps, index.html et service worker revalidés
 <IfModule mod_headers.c>
   <FilesMatch "\.(js|css|png|jpg|jpeg|webp|svg|woff2?)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
+  # « no-cache » : toujours revalidé auprès du serveur, mais sans « no-store »
+  # qui empêche le retour instantané (cache avant/arrière du navigateur)
   <FilesMatch "^(index\.html|sw\.js|manifest\.json)$">
-    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Cache-Control "no-cache"
   </FilesMatch>
 </IfModule>
 

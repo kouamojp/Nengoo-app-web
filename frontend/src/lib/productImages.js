@@ -14,14 +14,14 @@ export const listImage = (product, index = 0) => variant(product, 'thumbnails', 
 /** Photo affichée en grand sur la fiche produit. */
 export const previewImage = (product, index = 0) => variant(product, 'previews', index);
 
-export const NENGOO_IMAGE = `${process.env.PUBLIC_URL || ''}/images/logo-nengoo.png`;
+export const NENGOO_IMAGE = `${process.env.PUBLIC_URL || ''}/images/logo-nengoo-600.webp`;
 
 /** Image d'une carte : photo, sinon logo de la boutique, sinon logo Nengoo. */
 export const cardImage = (product) => listImage(product) || product?.sellerLogo || NENGOO_IMAGE;
 
 /** Vrai si l'image affichée est un logo (affiché en entier, sans recadrage). */
 export const isLogoImage = (product, src) =>
-  !!src && (src === product?.sellerLogo || /\/images\/logo-nengoo[\w-]*\.png$/.test(src));
+  !!src && (src === product?.sellerLogo || /\/images\/logo-nengoo[\w-]*\.(png|webp)$/.test(src));
 
 /**
  * Gestionnaire onError d'une photo produit : logo de la boutique, puis logo

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../../lib/axiosAuth';
 import { confirmAction } from './adminFeedback';
 import { SectionHeader, Field } from './AdminUI';
 

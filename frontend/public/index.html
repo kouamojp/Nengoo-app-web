@@ -2,12 +2,93 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- En tête : les préchargements d'images (home.php) en dépendent -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Police Archivo (variable) servie par le site : pas de feuille de style
+         externe qui bloque le premier affichage. Fichiers Google Fonts réduits
+         aux plages utilisées (graisse 400–900, largeur 62–100 %) :
+         python -m fontTools.varLib.instancer <fichier> wght=400:900 wdth=62:100 -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="%PUBLIC_URL%/fonts/archivo-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
+    <style>
+      @font-face {
+        font-family: "Archivo";
+        font-style: normal;
+        font-weight: 400 900;
+        font-stretch: 62% 100%;
+        font-display: swap;
+        src: url("%PUBLIC_URL%/fonts/archivo-latin.woff2") format("woff2");
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+          U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+          U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: "Archivo";
+        font-style: normal;
+        font-weight: 400 900;
+        font-stretch: 62% 100%;
+        font-display: swap;
+        src: url("%PUBLIC_URL%/fonts/archivo-latin-ext.woff2") format("woff2");
+        unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+          U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+          U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F,
+          U+A720-A7FF;
+      }
+    </style>
+    <!-- Accueil : réglages du carrousel demandés dès le HTML, sans attendre le
+         script de l'application, et première image préchargée aussitôt connue.
+         Lu par Homepage.js (window.__nengooHome). srcset et sizes doivent rester
+         identiques à ceux de HeroCarousel.js pour que le préchargement serve.
+         En production, home.php a déjà mis les réglages et le préchargement
+         dans la page (window.__nengooHomeData) : rien à demander. -->
+    <script>
+      (function () {
+        if (location.pathname !== "/") return;
+        if (window.__nengooHomeData) {
+          window.__nengooHome = Promise.resolve(window.__nengooHomeData);
+          return;
+        }
+        if (!window.fetch) return;
+        var api = "%REACT_APP_API_BASE_URL%";
+        if (api.charAt(0) === "%") api = "http://127.0.0.1:8001/api";
+        var home = fetch(api + "/settings/homepage").then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        });
+        window.__nengooHome = home;
+        home
+          .then(function (d) {
+            // Versions réduites (backend/image_variants.py) : AVIF, sinon WebP
+            var s = (d.heroSources || [])[0] || {};
+            var link = document.createElement("link");
+            link.rel = "preload";
+            link.as = "image";
+            link.setAttribute("fetchpriority", "high");
+            if (s.avif || s.webp) {
+              if (s.avif) link.type = "image/avif";
+              link.setAttribute("imagesrcset", s.avif || s.webp);
+              link.setAttribute(
+                "imagesizes",
+                "(min-width: 1024px) 46vw, (min-width: 640px) 576px, calc(100vw - 2rem)"
+              );
+            } else if ((d.heroImages || [])[0]) {
+              link.href = d.heroImages[0];
+            } else {
+              return;
+            }
+            document.head.appendChild(link);
+          })
+          .catch(function () {});
+      })();
+    </script>
+    <!-- API et photos : connexion ouverte pendant le chargement du script -->
+    <link rel="preconnect" href="https://backend.nengoo.com" crossorigin />
+    <link rel="preconnect" href="https://nengoo-bucket.s3.us-east-1.amazonaws.com" />
     <!-- Icônes et métadonnées PWA -->
     <link
       rel="icon"
@@ -15,14 +96,7 @@
       sizes="192x192"
       href="%PUBLIC_URL%/favicon.png"
     />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="512x512"
-      href="%PUBLIC_URL%/icons/logo-512x512.png"
-    />
     <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#6B21A8" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -88,18 +162,15 @@
 
     <title>Nengoo - Marketplace Cameroun</title>
 
-    <!-- Google tag (gtag.js) -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=G-FQ349LRGNQ"
-    ></script>
-
-    <!-- Google Analytics -->
+    <!-- Bandeau cookies (CookieYes) : asynchrone, il ne retarde plus l'affichage -->
     <script
       id="cookieyes"
       type="text/javascript"
+      async
       src="https://cdn-cookieyes.com/client_data/14e3832d1d36fb7259602876/script.js"
     ></script>
+
+    <!-- Google Analytics -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag() {
@@ -110,6 +181,17 @@
       // Vues de page envoyées par le site une fois le titre à jour
       // (trackPageView, src/lib/analytics.js)
       gtag("config", "G-FQ349LRGNQ", { send_page_view: false });
+
+      // gtag.js (180 Ko) chargé une fois la page affichée : les événements
+      // envoyés avant attendent dans dataLayer, rien n'est perdu
+      window.addEventListener("load", function () {
+        setTimeout(function () {
+          var s = document.createElement("script");
+          s.async = true;
+          s.src = "https://www.googletagmanager.com/gtag/js?id=G-FQ349LRGNQ";
+          document.head.appendChild(s);
+        }, 1500);
+      });
     </script>
   </head>
   <body>

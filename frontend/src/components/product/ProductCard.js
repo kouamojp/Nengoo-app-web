@@ -115,7 +115,7 @@ const ProductCard = ({ product, language, addToCart, ribbon, promoted = false })
                 type="button"
                 onClick={handleWhatsAppContact}
                 aria-label={`${t.contactWhatsApp} : ${name}`}
-                className="w-full !min-w-0 h-10 !min-h-0 px-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-[0.8rem] sm:text-sm font-semibold leading-tight flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full !min-w-0 h-10 !min-h-0 px-2 rounded-lg bg-green-700 hover:bg-green-800 text-white text-[0.8rem] sm:text-sm font-semibold leading-tight flex items-center justify-center gap-1.5 transition-colors"
               >
                 <WhatsAppIcon className="w-[1.1rem] h-[1.1rem] shrink-0" />
                 <span>{t.contactSeller}</span>

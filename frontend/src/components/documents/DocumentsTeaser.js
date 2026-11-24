@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, TEXT } from '../../lib/documents';
 import { BookIcon } from '../ui/Icons';
+import { afterHero } from '../../lib/heroGate';
 
 const LABELS = {
   fr: { cta: 'Voir les documents' },
@@ -14,7 +15,8 @@ const DocumentsTeaser = ({ language = 'fr' }) => {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api('/documents?limit=1'), api('/documents/filters')])
+    afterHero()
+      .then(() => Promise.all([api('/documents?limit=1'), api('/documents/filters')]))
       .then(([list, filters]) => !cancelled && list.total > 0 && setInfo({ total: list.total, free: filters.freeDownloads }))
       .catch(() => {});
     return () => { cancelled = true; };

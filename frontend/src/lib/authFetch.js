@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 /**
  * Joint le jeton d'accès (JWT) à toutes les requêtes vers l'API Nengoo.
  *
@@ -16,7 +14,7 @@ const API_ORIGIN = (() => {
   }
 })();
 
-const readToken = () => {
+export const readToken = () => {
   try {
     return JSON.parse(localStorage.getItem('nengoo-user') || 'null')?.accessToken || null;
   } catch {
@@ -25,7 +23,7 @@ const readToken = () => {
 };
 
 // Seules les requêtes vers l'API reçoivent le jeton (jamais S3, Firebase…)
-const isApiUrl = (url) => {
+export const isApiUrl = (url) => {
   if (!API_ORIGIN || !url) return false;
   try {
     return new URL(url, window.location.href).origin === API_ORIGIN;
@@ -35,7 +33,7 @@ const isApiUrl = (url) => {
 };
 
 // Session expirée ou invalide : on déconnecte et on renvoie vers la connexion
-const handleAuthFailure = async (response) => {
+export const handleAuthFailure = async (response) => {
   if (response.status !== 401) return;
   let code;
   try {
@@ -75,21 +73,6 @@ export const installAuthFetch = () => {
     handleAuthFailure(response);
     return response;
   };
-
-  axios.interceptors.request.use((config) => {
-    const token = readToken();
-    const url = config.baseURL ? new URL(config.url || '', config.baseURL).href : config.url;
-    if (token && isApiUrl(url)) {
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  });
-  axios.interceptors.response.use(undefined, (error) => {
-    const res = error?.response;
-    if (res?.status === 401 && ['token_expired', 'token_invalid', 'auth_required'].includes(res.data?.code)) {
-      handleAuthFailure(new Response(JSON.stringify(res.data), { status: 401 }));
-    }
-    return Promise.reject(error);
-  });
+  // axios (quelques écrans seulement) : même jeton via lib/axiosAuth.js, chargé
+  // avec ces écrans plutôt que dans le paquet principal
 };

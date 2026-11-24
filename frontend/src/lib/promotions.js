@@ -1,6 +1,8 @@
 // Bannières publicitaires (backend/routers/ads.py). Chemins « /promotions » :
 // les bloqueurs de publicité filtrent les adresses contenant « ads ».
 
+import { afterHero } from './heroGate';
+
 export const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
 // Rapport largeur / hauteur de l'image, par emplacement (comme le serveur)
@@ -27,7 +29,9 @@ export const fetchPromotions = async (placement, categories = []) => {
   if (hit && hit.expires > Date.now()) return hit.promise;
   const params = new URLSearchParams({ placement });
   if (category) params.set('category', category);
-  const promise = fetch(`${API_BASE_URL}/promotions?${params}`)
+  // Accueil : après la première image du carrousel (lib/heroGate.js)
+  const promise = afterHero()
+    .then(() => fetch(`${API_BASE_URL}/promotions?${params}`))
     .then((r) => (r.ok ? r.json() : []))
     .catch(() => []);
   cache.set(key, { promise, expires: Date.now() + CACHE_MS });

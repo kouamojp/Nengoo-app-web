@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
@@ -11,39 +11,19 @@ import Header from '../layout/Header';
 import Footer from '../layout/Footer';
 import ProductCard from '../product/ProductCard';
 import PWAInstallPrompt from '../pwa/PWAInstallPrompt';
-import InstallAppButton from '../pwa/InstallAppButton';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation, Pagination, Autoplay, EffectFade } from 'swiper/modules';
-import 'swiper/css';
-import 'swiper/css/navigation';
-import 'swiper/css/pagination';
-import 'swiper/css/effect-fade';
-import './HeroSwiper.css';
+import HeroCarousel from './HeroCarousel';
 import { PinIcon } from '../ui/Icons';
 import ProductGridSkeleton from '../ui/ProductGridSkeleton';
 import { topLevelCategories, categoryFamilyIds, categoryName } from '../../lib/categories';
 import { cardImage } from '../../lib/productImages';
 import { isAvailable } from '../../lib/productRules';
+import { afterHero, heroDone } from '../../lib/heroGate';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
-// Lien d'une image du carrousel : navigation SPA pour nos propres pages
-// (/chemin ou URL complète vers notre domaine), nouvel onglet sinon.
-const resolveHeroLink = (raw) => {
-  const value = (raw || '').trim();
-  if (!value) return null;
-  if (value.startsWith('/') && !value.startsWith('//')) return { internal: true, href: value };
-  try {
-    const url = new URL(value);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-    if (url.host === window.location.host || url.host.replace(/^www\./, '') === 'nengoo.com') {
-      return { internal: true, href: url.pathname + url.search + url.hash };
-    }
-    return { internal: false, href: url.href };
-  } catch {
-    return null;
-  }
-};
+// Grille « Tous les produits » : affichée par paquets pendant le défilement
+// (le catalogue complet d'un coup faisait plus de 10 000 éléments à l'écran)
+const PRODUCTS_STEP = 12;
 
 const Homepage = (props) => {
   const { language, addToCart } = props;
@@ -57,6 +37,10 @@ const Homepage = (props) => {
   const [newsletterFeedback, setNewsletterFeedback] = useState({ message: '', isError: false });
   const [heroImages, setHeroImages] = useState([]);
   const [heroLinks, setHeroLinks] = useState([]);
+  const [heroSources, setHeroSources] = useState([]);
+  const [heroLoaded, setHeroLoaded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PRODUCTS_STEP);
+  const moreRef = useRef(null);
 
   // Icônes des catégories
   const categoryIcons = {
@@ -114,21 +98,32 @@ const Homepage = (props) => {
   useEffect(() => {
     const fetchHomepageSettings = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/settings/homepage`);
-        if (!response.ok) {
-          throw new Error('Could not fetch homepage settings');
-        }
-        const data = await response.json();
+        // Demande déjà partie depuis public/index.html au premier affichage
+        const early = window.__nengooHome;
+        window.__nengooHome = null;
+        const load = async () => {
+          const response = await fetch(`${API_BASE_URL}/settings/homepage`);
+          if (!response.ok) {
+            throw new Error('Could not fetch homepage settings');
+          }
+          return response.json();
+        };
+        const data = early ? await early.catch(load) : await load();
         setHeroImages(data.heroImages || []);
         setHeroLinks(data.heroLinks || []);
+        // Rien à afficher dans le carrousel : la suite de la page n'attend pas
+        if (!(data.heroImages || []).length) heroDone();
+        setHeroSources(data.heroSources || []);
       } catch (error) {
         console.error("Erreur lors de la récupération des images hero:", error);
         // Fallback to default images if the fetch fails
         setHeroImages([
-          "https://images.unsplash.com/photo-1550041499-4c5857d2b508",
-          "https://images.unsplash.com/photo-1441986300917-64674bd600d8",
-          "https://images.unsplash.com/photo-1483985988355-763728e1935b"
+          "https://images.unsplash.com/photo-1550041499-4c5857d2b508?w=1000&fm=webp&q=75",
+          "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1000&fm=webp&q=75",
+          "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1000&fm=webp&q=75"
         ]);
+      } finally {
+        setHeroLoaded(true);
       }
     };
 
@@ -139,6 +134,7 @@ const Homepage = (props) => {
     const fetchCategories = async () => {
       try {
         setCategoriesLoading(true);
+        await afterHero(); // après la première image du carrousel (lib/heroGate.js)
         const response = await fetch(`${API_BASE_URL}/categories`);
 
         if (!response.ok) {
@@ -162,6 +158,7 @@ const Homepage = (props) => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
+        await afterHero();
         const response = await fetch(`${API_BASE_URL}/products?status=approved`);
 
         if (!response.ok) {
@@ -198,8 +195,20 @@ const Homepage = (props) => {
     fetchProducts();
   }, [language]);
 
+  // Paquet suivant quand le bas de la grille approche de l'écran
+  const hasMore = visibleCount < products.length;
+  useEffect(() => {
+    const node = moreRef.current;
+    if (!node || !hasMore || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) setVisibleCount(n => n + PRODUCTS_STEP);
+    }, { rootMargin: '800px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, visibleCount]);
+
   // Sélection des produits pour les différentes sections
-  const featuredProducts = products;
+  const featuredProducts = products.slice(0, visibleCount);
   const localProducts = products.filter(p => p.category === 'cat_340d7906').slice(0, 3);
 
   const handleNewsletterSubmit = async (e) => {
@@ -277,6 +286,8 @@ const Homepage = (props) => {
       
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
+
+      <main>
       
       {/* Hero Section */}
       <section className="on-dark relative overflow-hidden bg-gradient-to-br from-purple-700 via-purple-700 to-red-600 text-white">
@@ -307,47 +318,22 @@ const Homepage = (props) => {
                 </g>
               </svg>
               {heroImages.length > 0 ? (
-                <Swiper
-                  modules={[Navigation, Pagination, Autoplay, EffectFade]}
-                  spaceBetween={0}
-                  slidesPerView={1}
-                  navigation
-                  pagination={{ clickable: true }}
-                  autoplay={{
-                    delay: 5000,
-                    disableOnInteraction: false,
-                  }}
-                  effect="fade"
-                  fadeEffect={{ crossFade: true }}
-                  loop={heroImages.length > 1}
-                  className="hero-swiper relative rounded-2xl shadow-[0_24px_60px_-20px_rgba(59,7,100,0.7)] w-full aspect-[4/3]"
-                >
-                  {heroImages.map((imageUrl, index) => {
-                    const img = (
-                      <img
-                        src={imageUrl}
-                        alt={`Nengoo, visuel ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                    );
-                    const link = resolveHeroLink(heroLinks[index]);
-                    return (
-                      <SwiperSlide key={index}>
-                        {!link ? img : link.internal ? (
-                          <Link to={link.href} className="block w-full h-full">{img}</Link>
-                        ) : (
-                          <a href={link.href} target="_blank" rel="noopener noreferrer" className="block w-full h-full">{img}</a>
-                        )}
-                      </SwiperSlide>
-                    );
-                  })}
-                </Swiper>
-              ) : (
+                <HeroCarousel
+                  images={heroImages}
+                  sources={heroSources}
+                  links={heroLinks}
+                  className="rounded-2xl shadow-[0_24px_60px_-20px_rgba(59,7,100,0.7)] w-full aspect-[4/3]"
+                />
+              ) : heroLoaded ? (
                 <img
-                  src="https://images.unsplash.com/photo-1550041499-4c5857d2b508"
+                  src="https://images.unsplash.com/photo-1550041499-4c5857d2b508?w=1000&fm=webp&q=75"
                   alt="Nengoo"
+                  width="1000"
+                  height="750"
                   className="relative rounded-2xl w-full aspect-[4/3] object-cover"
                 />
+              ) : (
+                <div className="relative rounded-2xl w-full aspect-[4/3] bg-white/10" aria-hidden="true" />
               )}
               <svg className="absolute z-10 -inset-x-[9%] -inset-y-[22%] w-[118%] h-[144%] pointer-events-none" viewBox="0 0 600 400" fill="none" aria-hidden="true">
                 <g transform="rotate(-12 300 200)">
@@ -491,12 +477,25 @@ const Homepage = (props) => {
           {loading ? (
             <ProductGridSkeleton label={t.loadingProducts} />
           ) : featuredProducts.length > 0 ? (
-            <ProductGridWithPromos
-              className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5"
-              products={featuredProducts}
-              language={language}
-              renderProduct={(product) => <ProductCard product={product} language={language} addToCart={addToCart} />}
-            />
+            <>
+              <ProductGridWithPromos
+                className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-5"
+                products={featuredProducts}
+                language={language}
+                renderProduct={(product) => <ProductCard product={product} language={language} addToCart={addToCart} />}
+              />
+              {hasMore && (
+                <div ref={moreRef} className="mt-6 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(n => n + PRODUCTS_STEP)}
+                    className="inline-flex items-center h-11 px-5 rounded-full border border-purple-700 text-purple-800 font-semibold hover:bg-purple-50"
+                  >
+                    {language === 'en' ? 'Show more products' : 'Voir plus de produits'}
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="py-14 px-6 bg-white rounded-xl border border-dashed border-gray-300 text-center">
               <h3 className="text-xl font-bold mb-2">{t.noProducts}</h3>
@@ -574,6 +573,8 @@ const Homepage = (props) => {
           )}
         </div>
       </section> */}
+
+      </main>
 
       <Footer language={language} />
     </div>

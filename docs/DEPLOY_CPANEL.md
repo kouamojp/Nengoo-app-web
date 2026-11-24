@@ -264,6 +264,10 @@ npm run build
 > ```
 >
 > `.htaccess` et `og-proxy.php` sont déjà dans `frontend/public/` et se retrouvent donc dans `build/`.
+>
+> `home.php` aussi : l'accueil (`/`) passe par lui (règle `RewriteRule ^$ home.php` du `.htaccess`) pour intégrer au HTML les réglages du carrousel et précharger sa première image (cache de 2 min dans le dossier temporaire PHP ; backend injoignable → `index.html` tel quel). Après un changement du carrousel dans l'admin, l'accueil peut donc mettre jusqu'à 2 minutes à le montrer.
+>
+> Images du carrousel : le backend crée tout seul leurs versions AVIF/WebP (400, 700, 1000 px) sous `uploads/variants/hero/` au premier affichage de l'accueil ou à l'enregistrement dans l'admin (Pillow ≥ 11.3 pour l'AVIF ; sans AVIF, WebP seul).
 
 Le résultat est dans `frontend/build/`.
 

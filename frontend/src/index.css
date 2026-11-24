@@ -205,18 +205,25 @@
   }
 
   /* Loading states */
+  /* Pulsation d'opacité (gérée par la carte graphique) : l'ancien dégradé
+     animé redessinait chaque bloc à chaque image, coûteux sur mobile */
   .loading-shimmer {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-    background-size: 200% 100%;
-    animation: shimmer 2s infinite;
+    background: #ececec;
+    animation: shimmer 1.6s ease-in-out infinite alternate;
   }
 
   @keyframes shimmer {
-    0% {
-      background-position: -200% 0;
+    from {
+      opacity: 1;
     }
-    100% {
-      background-position: 200% 0;
+    to {
+      opacity: 0.55;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loading-shimmer {
+      animation: none;
     }
   }
 

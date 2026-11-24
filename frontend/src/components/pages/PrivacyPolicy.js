@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../../lib/axiosAuth';
 import ReactMarkdown from 'react-markdown';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';

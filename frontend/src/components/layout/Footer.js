@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import { topLevelCategories, categoryName } from '../../lib/categories';
+import { afterHero } from '../../lib/heroGate';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -13,6 +14,7 @@ const Footer = ({ language }) => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
+        await afterHero(); // accueil : après la première image du carrousel
         // Catégories qui ont des produits seulement
         const response = await fetch(`${API_BASE_URL}/categories?hideEmpty=true`);
         if (!response.ok) {
@@ -35,8 +37,10 @@ const Footer = ({ language }) => {
         <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-10">
           <div className="max-w-xs">
             <img
-              src="/images/logo-nengoo-white.png"
+              src="/images/logo-nengoo-white-300.webp"
               alt="Nengoo"
+              width="300"
+              height="121"
               className="h-12 w-auto mb-4"
             />
             <p className="text-purple-200 leading-relaxed">

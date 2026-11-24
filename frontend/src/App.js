@@ -4,23 +4,23 @@ import './App.css';
 import ScrollToTop from './components/ui/ScrollToTop';
 import Toast from './components/ui/Toast';
 import Homepage from './components/pages/Homepage';
-import ProductCatalog from './components/pages/ProductCatalog';
-import ProductDetail from './components/pages/ProductDetail';
-import ShoppingCart from './components/cart/ShoppingCart';
-import Checkout from './components/cart/Checkout';
-import UserProfile from './components/pages/UserProfile';
-import About from './components/pages/About';
-import SearchResults from './components/pages/SearchResults';
-import SellerShop from './components/pages/SellerShop';
-import NotificationsPage from './components/pages/NotificationsPage';
-import PrivacyPolicy from './components/pages/PrivacyPolicy';
 import BottomNav from './components/layout/BottomNav';
 import AssistantWidget from './components/assistant/AssistantWidget';
 import { trackAddToCart } from './lib/analytics';
 import { isWhatsappOnly } from './lib/productRules';
 
-// Chargés à la demande : la plupart des visiteurs n'ouvrent jamais l'espace
-// vendeur ou admin, et la connexion embarque Firebase (lourd)
+// Chargés à la demande : seul l'accueil est dans le paquet principal (premier
+// affichage rapide) ; la connexion embarque Firebase (lourd)
+const ProductCatalog = lazy(() => import('./components/pages/ProductCatalog'));
+const ProductDetail = lazy(() => import('./components/pages/ProductDetail'));
+const ShoppingCart = lazy(() => import('./components/cart/ShoppingCart'));
+const Checkout = lazy(() => import('./components/cart/Checkout'));
+const UserProfile = lazy(() => import('./components/pages/UserProfile'));
+const About = lazy(() => import('./components/pages/About'));
+const SearchResults = lazy(() => import('./components/pages/SearchResults'));
+const SellerShop = lazy(() => import('./components/pages/SellerShop'));
+const NotificationsPage = lazy(() => import('./components/pages/NotificationsPage'));
+const PrivacyPolicy = lazy(() => import('./components/pages/PrivacyPolicy'));
 const SellerDashboard = lazy(() => import('./components/seller/SellerDashboard'));
 const Login = lazy(() => import('./components/auth/Login'));
 const Signup = lazy(() => import('./components/auth/Signup'));

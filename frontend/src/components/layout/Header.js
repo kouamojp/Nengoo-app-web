@@ -123,8 +123,10 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
         <div className="flex items-center gap-3 md:gap-8">
           <Link to="/" className="shrink-0 rounded-md" aria-label="Nengoo, accueil">
             <img
-              src="/images/logo-nengoo-white.png"
+              src="/images/logo-nengoo-white-300.webp"
               alt="Nengoo"
+              width="300"
+              height="121"
               className="h-8 md:h-11 w-auto"
             />
           </Link>

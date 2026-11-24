@@ -71,3 +71,47 @@ def test_make_variants():
     assert s3.copies[0]["CacheControl"] == CACHE_CONTROL and s3.copies[0]["ContentType"] == "image/jpeg"
     # Photo hébergée ailleurs : rien à faire
     assert make_variants(s3, SETTINGS, "https://example.com/a.jpg") == {}
+
+
+
+def test_make_hero_sources():
+    from image_variants import make_hero_sources
+    s3 = FakeS3()
+    result = make_hero_sources(s3, SETTINGS, URL)
+    base = "https://nengoo-bucket.s3.us-east-1.amazonaws.com/uploads/variants/hero"
+    assert result["webp"] == (f"{base}/w400/abc-IMG%201.webp 400w, {base}/w700/abc-IMG%201.webp 700w, "
+                              f"{base}/w1000/abc-IMG%201.webp 1000w")
+    assert result["src"] == f"{base}/w1000/abc-IMG%201.webp"
+    phone = Image.open(io.BytesIO(s3.objects["uploads/variants/hero/w700/abc-IMG 1.webp"]["Body"]))
+    assert phone.format == "WEBP" and phone.size == (700, 525)
+    if "avif" in result:  # Pillow avec AVIF
+        assert result["avif"].count(" 700w") == 1
+        assert s3.objects["uploads/variants/hero/w400/abc-IMG 1.avif"]["ContentType"] == "image/avif"
+    assert make_hero_sources(s3, SETTINGS, "https://example.com/a.jpg") == {}
+
+
+def test_hero_sources_follow_their_image():
+    from image_variants import hero_sources, known_hero_sources
+    a = {"webp": "a 400w", "src": "a"}
+    doc = {"heroImages": ["a", "b"], "heroSources": [a, {}]}
+    known = known_hero_sources(doc)
+    assert known == {"a": a}  # « b » n'a pas encore ses versions
+    # Nouvel ordre et nouvelle image : les versions suivent leur image
+    assert hero_sources(["c", "a"], known) == [{}, a]
+
+
+def test_hero_variants_missing(monkeypatch):
+    import image_variants
+    for key, value in {"AWS_ACCESS_KEY_ID": "k", "AWS_SECRET_ACCESS_KEY": "s",
+                       "AWS_REGION": "us-east-1", "S3_BUCKET_NAME": "nengoo-bucket"}.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(image_variants, "_hero_failed", set())
+    external = "https://images.unsplash.com/photo-1"
+    # Image externe : rien à créer ; image chez nous sans versions : à créer
+    assert not image_variants.hero_variants_missing({"heroImages": [external]})
+    assert image_variants.hero_variants_missing({"heroImages": [external, URL], "heroSources": [{}, {}]})
+    assert not image_variants.hero_variants_missing(
+        {"heroImages": [URL], "heroSources": [{"webp": "w 400w", "src": "w"}]})
+    # Échec déjà constaté : pas de nouvel essai à chaque visite
+    image_variants._hero_failed.add(URL)
+    assert not image_variants.hero_variants_missing({"heroImages": [URL]})
