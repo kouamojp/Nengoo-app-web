@@ -9,8 +9,8 @@ const urlsToCache = [
   '/login',
   '/seller',
   // Cache des images importantes
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
+  '/icons/icon-v2-192x192.png',
+  '/icons/icon-v2-512x512.png',
   // Cache des polices et assets essentiels
   '/static/media/',
 ];
@@ -110,8 +110,8 @@ self.addEventListener('sync', (event) => {
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'Nouvelle notification Nengoo',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
+    icon: '/icons/icon-v2-192x192.png',
+    badge: '/icons/icon-v2-72x72.png',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),

@@ -90,13 +90,10 @@
     <link rel="preconnect" href="https://backend.nengoo.com" crossorigin />
     <link rel="preconnect" href="https://nengoo-bucket.s3.us-east-1.amazonaws.com" />
     <!-- Icônes et métadonnées PWA -->
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="192x192"
-      href="%PUBLIC_URL%/favicon.png"
-    />
-    <link rel="shortcut icon" href="%PUBLIC_URL%/favicon.png" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" sizes="16x16 32x32 48x48" type="image/x-icon" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon-v2-32.png" sizes="32x32" type="image/png" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon-v2-48.png" sizes="48x48" type="image/png" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon-v2-192.png" sizes="192x192" type="image/png" />
     <meta name="theme-color" content="#6B21A8" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -215,59 +212,14 @@
         });
       }
 
-      // Gestion de l'installation PWA
-      let deferredPrompt;
-
+      // Installation de l'application : l'événement peut arriver avant l'accueil
+      // (autre page d'arrivée), il est gardé pour PWAInstallPrompt.js
       window.addEventListener("beforeinstallprompt", (e) => {
         e.preventDefault();
-        deferredPrompt = e;
-
-        // Afficher un bouton d'installation personnalisé
-        const installButton = document.createElement("button");
-        installButton.textContent = "📱 Installer Nengoo";
-        installButton.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #7C3AED;
-        color: white;
-        border: none;
-        padding: 12px 20px;
-        border-radius: 25px;
-        font-weight: bold;
-        box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
-        cursor: pointer;
-        z-index: 1000;
-        animation: bounce 2s infinite;
-      `;
-
-        // Animation CSS
-        const style = document.createElement("style");
-        style.textContent = `
-        @keyframes bounce {
-          0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-          40% { transform: translateY(-10px); }
-          60% { transform: translateY(-5px); }
-        }
-      `;
-        document.head.appendChild(style);
-
-        installButton.addEventListener("click", async () => {
-          installButton.style.display = "none";
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          deferredPrompt = null;
-        });
-
-        document.body.appendChild(installButton);
+        window.__nengooInstallPrompt = e;
       });
-
-      // Masquer le bouton après installation
-      window.addEventListener("appinstalled", (evt) => {
-        const installButton = document.querySelector("button");
-        if (installButton) {
-          installButton.remove();
-        }
+      window.addEventListener("appinstalled", () => {
+        window.__nengooInstallPrompt = null;
       });
     </script>
   </body>
