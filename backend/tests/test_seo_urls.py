@@ -102,6 +102,11 @@ def test_readable_addresses_and_redirects(monkeypatch):
             assert await server.ensure_seo_slugs() == {"sellers": 4, "products": 1}
             # Une seconde fois : rien à refaire
             assert await server.ensure_seo_slugs() == {"sellers": 0, "products": 0}
+            # Sans événement « startup » (Passenger + a2wsgi) : lancé par les requêtes
+            monkeypatch.setattr(server, "_seo_slugs_done", False)
+            monkeypatch.setattr(server, "_seo_slugs_lock", asyncio.Lock())
+            await server.seo_slugs_ready()
+            assert server._seo_slugs_done
 
             slugs = {s["id"]: s["slug"] async for s in db.sellers.find()}
             assert slugs == {"seller_d2208233": "auto-business-237", "seller_2": "auto-business-237-2",

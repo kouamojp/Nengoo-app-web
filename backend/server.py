@@ -7,6 +7,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import asyncio
 import re
 from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
@@ -195,6 +196,15 @@ def migrate_seller_data(seller_data: dict) -> dict:
         seller_data["region"] = seller_data.get("city", "Non spécifié")
     if "address" not in seller_data:
         seller_data["address"] = "Non spécifié"
+    # Comptes créés à la main (boutique de la plateforme) : champs manquants
+    # qui faisaient échouer la page de la boutique (erreur 500)
+    seller_data.setdefault("businessName", seller_data.get("name") or "Boutique")
+    seller_data.setdefault("name", seller_data["businessName"])
+    for key, default in (("whatsapp", ""), ("email", ""), ("description", ""), ("city", "")):
+        if seller_data.get(key) is None:
+            seller_data[key] = default
+    if not isinstance(seller_data.get("categories"), list):
+        seller_data["categories"] = []
     return seller_data
 
 # --- Security (Mock Authorization) ---
@@ -1210,6 +1220,30 @@ async def find_seller_by_id_or_slug(identifier: str) -> Optional[dict]:
             or await db.sellers.find_one({"previousSlugs": identifier}))
 
 
+_seo_slugs_lock = asyncio.Lock()
+_seo_slugs_done = False
+
+
+async def seo_slugs_ready() -> None:
+    """Lance ensure_seo_slugs une fois par processus, à la première requête qui
+    en a besoin. En production (Passenger + a2wsgi), les événements
+    « startup » de FastAPI ne sont jamais exécutés : on ne peut pas s'y fier."""
+    global _seo_slugs_done
+    if _seo_slugs_done:
+        return
+    async with _seo_slugs_lock:
+        if _seo_slugs_done:
+            return
+        try:
+            done = await ensure_seo_slugs()
+            if done["sellers"] or done["products"]:
+                logger.info("Adresses mises à jour : %s boutiques, %s produits", done["sellers"], done["products"])
+        except Exception as error:  # réessayé à la requête suivante
+            logger.warning("Adresses des boutiques et produits non mises à jour : %s", error)
+            return
+        _seo_slugs_done = True
+
+
 async def ensure_seo_slugs() -> dict:
     """Au démarrage : une adresse lisible pour chaque boutique, et le nom de la
     boutique retiré des slugs produits (l'ancien slug reste redirigé)."""
@@ -1744,6 +1778,7 @@ async def generate_sitemap():
     figurent pas (pages vides, marquées noindex). Les pages fixes n'ont pas de
     date plutôt qu'une date du jour qui ne dirait rien."""
     try:
+        await seo_slugs_ready()
         products = await db.products.find(
             {"status": "approved"},
             {"_id": 0, "id": 1, "slug": 1, "category": 1, "sellerId": 1, "updatedAt": 1, "createdAt": 1},
@@ -1829,6 +1864,7 @@ async def seo_page(path: str = Query(..., max_length=500)):
     """Contenu d'une page publique pour frontend/public/page.php (voir
     seo_pages.py) : 200 avec le contenu, 301 vers l'adresse actuelle (id,
     ancien slug, nom avec accents), ou 404."""
+    await seo_slugs_ready()
     parts = [p for p in path.split("?")[0].split("/") if p]
     if len(parts) != 2:
         return seo_pages.NOT_FOUND
@@ -2588,6 +2624,7 @@ async def create_seller(seller_data: SellerCreate, background_tasks: BackgroundT
 # Sur une liste, l'exclusion doit viser chaque élément ("__all__")
 @api_router.get("/sellers")
 async def list_sellers(request: Request):
+    await seo_slugs_ready()
     sellers_cursor = db.sellers.find()
     sellers = await sellers_cursor.to_list(1000)
     valid_sellers = []
@@ -2610,6 +2647,7 @@ async def list_sellers(request: Request):
 @api_router.get("/sellers/{seller_id}")
 async def get_seller(seller_id: str, request: Request):
     # Id, adresse de la boutique, ou ancienne adresse (avant un changement de nom)
+    await seo_slugs_ready()
     seller = await find_seller_by_id_or_slug(seller_id)
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
@@ -4605,12 +4643,7 @@ async def create_ad_indexes():
         await ensure_media_indexes()
     except Exception as error:
         logger.warning("Index de la médiathèque non créés : %s", error)
-    try:
-        done = await ensure_seo_slugs()
-        if done["sellers"] or done["products"]:
-            logger.info("Adresses mises à jour : %s boutiques, %s produits", done["sellers"], done["products"])
-    except Exception as error:
-        logger.warning("Adresses des boutiques et produits non mises à jour : %s", error)
+    await seo_slugs_ready()
 
 
 # --- OG / Social Preview SSR ---
