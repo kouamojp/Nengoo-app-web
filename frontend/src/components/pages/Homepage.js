@@ -18,6 +18,7 @@ import { topLevelCategories, categoryFamilyIds, categoryName } from '../../lib/c
 import { cardImage } from '../../lib/productImages';
 import { isAvailable } from '../../lib/productRules';
 import { afterHero, heroDone } from '../../lib/heroGate';
+import { categoryUrl } from '../../lib/slug';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -422,7 +423,7 @@ const Homepage = (props) => {
                 : visibleCategories.map(cat => (
                   <li key={cat.id} className="shrink-0 w-36 md:w-auto">
                     <Link
-                      to={`/catalog/${encodeURIComponent(cat.name)}`}
+                      to={categoryUrl(cat)}
                       className="flex flex-col h-full p-3 rounded-xl bg-white border border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-colors"
                     >
                       <span className="w-11 h-11 rounded-full bg-purple-100 flex items-center justify-center text-2xl overflow-hidden" aria-hidden="true">

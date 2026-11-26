@@ -9,6 +9,7 @@ import { SearchIcon, CartIcon, UserIcon, BellIcon, StoreIcon, LogoutIcon, SparkI
 import { openAssistant } from '../../lib/assistant';
 import { numberFormat } from '../../lib/numberFormat';
 import { imageFallback, NENGOO_IMAGE } from '../../lib/productImages';
+import { categoryUrl } from '../../lib/slug';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -167,7 +168,7 @@ const Header = ({ language, cartItems, searchQuery, setSearchQuery, user, setUse
                   {suggestions.categories.map(category => (
                     <Link
                       key={category.id}
-                      to={`/catalog/${encodeURIComponent(category.name)}`}
+                      to={categoryUrl(category)}
                       className="flex items-center gap-3 px-3 py-2 text-gray-900 hover:bg-purple-50"
                       onClick={() => {
                         setShowSuggestions(false);

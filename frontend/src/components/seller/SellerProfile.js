@@ -4,6 +4,7 @@ import { Field } from '../admin/AdminUI';
 import { CITIES as cameroonCities } from '../../lib/cities';
 import { RichText, RichTextEditor } from '../ui/RichText';
 import { numberFormat } from '../../lib/numberFormat';
+import { sellerUrl } from '../../lib/slug';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -146,7 +147,7 @@ const SellerProfile = (props) => {
             {logo}
             <div className="min-w-0">
               <p className="text-xl font-extrabold text-purple-950 truncate">{form.businessName}</p>
-              <a href={`/seller/${user.id}`} className="adm-link text-sm">Voir ma page boutique</a>
+              <a href={sellerUrl(user)} className="adm-link text-sm">Voir ma page boutique</a>
             </div>
           </div>
           <dl className="divide-y divide-gray-100">

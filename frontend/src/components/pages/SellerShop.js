@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import Header from '../layout/Header';
 import Footer from '../layout/Footer';
@@ -12,6 +12,7 @@ import { translations } from '../../lib/translations';
 import { cardImage } from '../../lib/productImages';
 import { isBlank, safeLink, toPlainText } from '../../lib/richText';
 import { isAvailable } from '../../lib/productRules';
+import { sellerUrl } from '../../lib/slug';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const SITE_URL = 'https://www.nengoo.com';
@@ -43,7 +44,9 @@ const Monogram = ({ seller, className }) => (
 );
 
 const SellerShop = (props) => {
+  // Adresse de la boutique (slug tiré de son nom), ou id des anciens liens
   const { id: sellerId } = useParams();
+  const navigate = useNavigate();
   const { language, addToCart } = props;
   const t = translations[language];
   const [seller, setSeller] = useState(null);
@@ -64,9 +67,13 @@ const SellerShop = (props) => {
         const sellerResponse = await fetch(`${API_BASE_URL}/sellers/${sellerId}`);
         if (!sellerResponse.ok) throw new Error('not found');
         const sellerData = await sellerResponse.json();
-        const productsResponse = await fetch(`${API_BASE_URL}/products?status=approved&seller_id=${sellerId}`);
+        const productsResponse = await fetch(`${API_BASE_URL}/products?status=approved&seller_id=${encodeURIComponent(sellerData.id)}`);
         const productsData = productsResponse.ok ? await productsResponse.json() : [];
         if (cancelled) return;
+        // Ancienne adresse (/seller/<id>) : on passe à l'adresse lisible
+        if (sellerData.slug && sellerData.slug !== sellerId) {
+          navigate(sellerUrl(sellerData), { replace: true });
+        }
         setSeller(sellerData);
         setProducts(
           productsData.map((p) => ({
@@ -91,7 +98,7 @@ const SellerShop = (props) => {
     return () => {
       cancelled = true;
     };
-  }, [sellerId, language]);
+  }, [sellerId, language, navigate]);
 
   const visibleProducts = useMemo(() => {
     const wanted = normalize(query.trim());
@@ -140,7 +147,7 @@ const SellerShop = (props) => {
   const hasDescription = !isBlank(seller.description);
   const isLong = descriptionText.length > LONG_DESCRIPTION;
   const facebook = safeLink(seller.socialMedia?.facebook);
-  const canonicalUrl = `${SITE_URL}/seller/${seller.id}`;
+  const canonicalUrl = `${SITE_URL}${sellerUrl(seller)}`;
   const metaDescription = (descriptionText || `Découvrez les produits de ${seller.businessName} sur Nengoo.`).slice(0, 160);
   const storeSchema = {
     '@context': 'https://schema.org',

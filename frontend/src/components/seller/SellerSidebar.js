@@ -16,6 +16,7 @@ import {
 } from "../ui/Icons";
 import { useSupportUnread } from "../../lib/support";
 import { useChatUnread } from "../../lib/chat";
+import { sellerUrl } from '../../lib/slug';
 
 // Sections de l'espace vendeur ; chacune a sa propre URL (lien direct, retour arrière)
 export const SELLER_SECTIONS = [
@@ -139,7 +140,7 @@ const SellerSidebar = ({
             {user?.businessName}
           </p>
           <Link
-            to={`/seller/${user?.id}`}
+            to={sellerUrl(user)}
             className="text-xs text-purple-200 hover:text-white underline underline-offset-2"
           >
             Voir ma boutique

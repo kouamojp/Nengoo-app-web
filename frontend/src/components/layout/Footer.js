@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { translations } from '../../lib/translations';
 import { topLevelCategories, categoryName } from '../../lib/categories';
 import { afterHero } from '../../lib/heroGate';
+import { categoryUrl } from '../../lib/slug';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -61,7 +62,7 @@ const Footer = ({ language }) => {
                 {topLevelCategories(categories).map(category => (
                   <li key={category.id}>
                     <Link
-                      to={`/catalog/${encodeURIComponent(category.name)}`}
+                      to={categoryUrl(category)}
                       className={linkClass}
                     >
                       {categoryName(category, language)}

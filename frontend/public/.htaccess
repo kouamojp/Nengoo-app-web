@@ -9,9 +9,12 @@ RewriteRule ^(.*)$ https://www.nengoo.com/$1 [L,R=301]
 # Sitemap généré par le backend
 RewriteRule ^sitemap\.xml$ og-proxy.php?type=sitemap [L,QSA]
 
-# Aperçus réseaux sociaux : robots → HTML Open Graph du backend
-RewriteCond %{HTTP_USER_AGENT} (facebookexternalhit|facebot|whatsapp|telegrambot|twitterbot|slackbot|linkedinbot|pinterestbot|discordbot|vkshare|googlebot|bingbot|yandexbot|duckduckbot|applebot|bot|crawler|spider|preview) [NC]
-RewriteRule ^product/([A-Za-z0-9_-]+)/?$ og-proxy.php?type=product&slug=$1 [L,QSA]
+# Fiches produit, boutiques et catégories : index.html avec le contenu, le
+# titre, les aperçus (Open Graph) et les données structurées déjà dedans,
+# pour tout le monde (page.php). Anciennes adresses : redirection 301.
+# Les sections de l'espace vendeur (/seller/orders…) restent l'application seule.
+RewriteCond %{REQUEST_URI} !^/seller/(products|media|orders|analytics|profile|messages|support|promos)/?$ [NC]
+RewriteRule ^(product|seller|catalog)/[^/]+/?$ page.php [L]
 
 # Accueil : index.html avec les réglages du carrousel intégrés (home.php),
 # pour que la première image se charge dès la lecture du HTML

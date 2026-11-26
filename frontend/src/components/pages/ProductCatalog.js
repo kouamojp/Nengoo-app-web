@@ -13,6 +13,7 @@ import { topLevelCategories, subcategoriesOf, categoryFamilyIds, categoryName, f
 import { cardImage } from '../../lib/productImages';
 import { numberFormat } from '../../lib/numberFormat';
 import { isAvailable } from '../../lib/productRules';
+import { categoryUrl, slugify } from '../../lib/slug';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 
@@ -132,18 +133,19 @@ const ProductCatalog = (props) => {
   }, [language, reloadKey]);
 
   const selectCategory = (name) => {
-    navigate(name === 'all' ? '/catalog' : `/catalog/${encodeURIComponent(name)}`);
+    navigate(name === 'all' ? '/catalog' : `/catalog/${slugify(name)}`);
   };
 
-  // L'URL porte le nom de la catégorie ; les produits référencent son id
-  // Nom approchant ou ancien nom d'une catégorie renommée : on redirige vers
-  // l'adresse actuelle (anciens liens et référencement conservés)
+  // L'URL porte le slug du nom de la catégorie (sans accents) ; les produits
+  // référencent son id. Nom avec accents, nom approchant ou ancien nom d'une
+  // catégorie renommée : on redirige vers l'adresse actuelle (anciens liens et
+  // référencement conservés)
   const selectedCategoryObj = selectedCategory === 'all' ? undefined : findCategoryByName(categories, selectedCategory);
   const selectedCategoryId = selectedCategoryObj?.id;
   const selectedLabel = selectedCategoryObj ? categoryName(selectedCategoryObj, language) : selectedCategory;
   useEffect(() => {
-    if (selectedCategoryObj && selectedCategoryObj.name !== selectedCategory) {
-      navigate(`/catalog/${encodeURIComponent(selectedCategoryObj.name)}`, { replace: true });
+    if (selectedCategoryObj && slugify(selectedCategoryObj.name) !== selectedCategory) {
+      navigate(categoryUrl(selectedCategoryObj), { replace: true });
     }
   }, [selectedCategoryObj, selectedCategory, navigate]);
   // Une catégorie principale montre aussi les produits de ses sous-catégories
@@ -245,7 +247,7 @@ const ProductCatalog = (props) => {
         <meta name="description" content={pageDescription} />
         <link rel="canonical" href={
           selectedCategory !== 'all'
-            ? `https://www.nengoo.com/catalog/${encodeURIComponent(selectedCategory)}`
+            ? `https://www.nengoo.com/catalog/${slugify(selectedCategoryObj?.name || selectedCategory)}`
             : 'https://www.nengoo.com/catalog'
         } />
       </Helmet>
@@ -256,7 +258,7 @@ const ProductCatalog = (props) => {
         <div className="mb-5 sm:mb-8">
           {selectedCategoryObj?.parentId && activeParent && (
             <Link
-              to={`/catalog/${encodeURIComponent(activeParent.name)}`}
+              to={categoryUrl(activeParent)}
               className="inline-block mb-1 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4"
             >
               {categoryName(activeParent, language)}

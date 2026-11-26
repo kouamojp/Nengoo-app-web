@@ -18,6 +18,7 @@ import { listImage, previewImage, cardImage, imageFallback, isLogoImage, NENGOO_
 import { numberFormat } from '../../lib/numberFormat';
 import { trackViewItem } from '../../lib/analytics';
 import { isAvailable, isMeal, isWhatsappOnly } from '../../lib/productRules';
+import { categoryUrl, sellerUrl } from '../../lib/slug';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://127.0.0.1:8001/api';
 const SITE_URL = 'https://www.nengoo.com';
@@ -146,6 +147,10 @@ const ProductDetail = (props) => {
         return;
       }
       const productData = await productResponse.json();
+      // Ancien slug ou id : on passe à l'adresse actuelle du produit
+      if (productData.slug && productData.slug !== idOrSlug) {
+        navigate(`/product/${productData.slug}`, { replace: true });
+      }
       setProduct(adaptProduct(productData, language));
       setSelectedImage(0);
       setQuantity(1);
@@ -364,12 +369,12 @@ const ProductDetail = (props) => {
   const ogImageUrl = getAbsoluteImageUrl(images[0]);
   // Les robots qui visitent cette URL reçoivent l'aperçu Open Graph du backend (voir .htaccess)
   const canonicalUrl = `${SITE_URL}/product/${product.slug || product.id}`;
-  const categoryUrl = category ? `/catalog/${encodeURIComponent(category.name)}` : '/catalog';
-  const parentCategoryUrl = parentCategory ? `/catalog/${encodeURIComponent(parentCategory.name)}` : null;
+  const categoryLink = categoryUrl(category);
+  const parentCategoryUrl = parentCategory ? categoryUrl(parentCategory) : null;
   // Fil d'Ariane : Catalogue › [catégorie principale ›] catégorie › produit
   const categoryCrumbs = [
     ...(parentCategory ? [{ name: categoryName(parentCategory, language), url: parentCategoryUrl }] : []),
-    ...(category ? [{ name: categoryName(category, language), url: categoryUrl }] : []),
+    ...(category ? [{ name: categoryName(category, language), url: categoryLink }] : []),
   ];
 
   const jsonLd = {
@@ -524,7 +529,7 @@ const ProductDetail = (props) => {
             {/* Infos et achat */}
             <div>
               {category && (
-                <Link to={categoryUrl} className="text-sm font-semibold text-purple-700 hover:underline underline-offset-4">
+                <Link to={categoryLink} className="text-sm font-semibold text-purple-700 hover:underline underline-offset-4">
                   {categoryName(category, language)}
                 </Link>
               )}
@@ -717,7 +722,7 @@ const ProductDetail = (props) => {
                       <InfoIcon className="w-4 h-4" />
                       {t.aboutShop}
                     </button>
-                    <Link to={`/seller/${seller.id}`} className="inline-flex items-center py-1.5 text-purple-800 hover:underline underline-offset-4">
+                    <Link to={sellerUrl(seller)} className="inline-flex items-center py-1.5 text-purple-800 hover:underline underline-offset-4">
                       {t.visitShop}
                     </Link>
                   </div>
@@ -809,7 +814,7 @@ const ProductDetail = (props) => {
               <div className="flex items-baseline justify-between gap-4 mb-5">
                 <h2 className="text-2xl font-extrabold">{t.relatedProducts}</h2>
                 {category && (
-                  <Link to={categoryUrl} className="shrink-0 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4">
+                  <Link to={categoryLink} className="shrink-0 text-sm font-semibold text-purple-700 hover:text-purple-900 hover:underline underline-offset-4">
                     {t.viewAll}
                   </Link>
                 )}

@@ -71,6 +71,7 @@ from category_tree import normalize_name, suggest_category_name
 from catalog_rules import CITIES, normalize_city, product_issues, whatsapp_digits
 from geocode import geocode, suggest as geocode_suggest, SuggestUnavailable
 from og_image import og_image_for
+import seo_pages
 import html as html_lib
 from promo import PromoError, compute_discounts as compute_promo_discounts, describe as promo_describe,     lines_by_seller as promo_lines_by_seller
 from product_search import normalize_query, search_products, search_products_detailed
@@ -404,6 +405,8 @@ class Product(BaseModel):
     # Logo de la boutique, ajouté aux réponses (non stocké) : image de
     # secours d'un produit sans photo, avant le logo Nengoo
     sellerLogo: Optional[str] = None
+    # Adresse de la boutique (/seller/<slug>), pour les liens vers sa page
+    sellerSlug: Optional[str] = None
     # Caractéristiques libres : {"Taille": "M", "Matière": "Coton"}
     specs: Dict[str, str] = {}
     # Versions WebP réduites, alignées sur images ('' = pas encore créée) :
@@ -474,6 +477,8 @@ class Seller(BaseModel):
     description: str
     status: str = "pending"
     type: str = "seller"
+    # Adresse de la boutique : /seller/<slug>, tirée du nom (seller_unique_slug)
+    slug: Optional[str] = None
     deliveryPrice: Optional[float] = None
     # Restaurant : peut publier des plats (coché à l'inscription, modifiable
     # ensuite par l'admin seulement)
@@ -1138,18 +1143,101 @@ import re
 import unicodedata
 
 def generate_slug(text: str) -> str:
-    text = unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode('utf-8')
-    text = re.sub(r'[^\w\s-]', '', text).lower().strip()
-    return re.sub(r'[-\s]+', '-', text)
+    """« Pompe à eau – Œuf » → « pompe-a-eau-oeuf » : sans accents ni ponctuation
+    (même règle que slugify dans frontend/src/lib/slug.js)."""
+    text = (text or "").replace("œ", "oe").replace("Œ", "Oe").replace("æ", "ae").replace("Æ", "Ae")
+    text = re.sub(r'[̀-ͯ]', '', unicodedata.normalize('NFD', text))
+    return re.sub(r'[^a-z0-9]+', '-', text.lower()).strip('-')
 
-async def get_unique_slug(name: str) -> str:
-    base_slug = generate_slug(name)
+
+def product_slug_base(name: str, seller_name: Optional[str] = None) -> str:
+    """Slug d'un produit, sans le nom de la boutique que certains vendeurs
+    ajoutent au début ou à la fin du nom (« Pompe à eau – AUTO-BUSINESS 237 ») :
+    la boutique a sa propre page, l'URL du produit ne doit nommer que le produit."""
+    base = generate_slug(name)
+    shop = generate_slug(seller_name or "")
+    if shop and base != shop:
+        if base.endswith("-" + shop):
+            base = base[: -len(shop) - 1]
+        elif base.startswith(shop + "-"):
+            base = base[len(shop) + 1:]
+    return base.strip("-") or "produit"
+
+
+async def get_unique_slug(name: str, seller_name: Optional[str] = None,
+                          product_id: Optional[str] = None) -> str:
+    """Slug libre : ni le slug actuel ni un ancien slug (encore redirigé) d'un
+    autre produit."""
+    base_slug = product_slug_base(name, seller_name)
     slug = base_slug
     counter = 1
-    while await db.products.find_one({"slug": slug}):
+    while await db.products.find_one({"$or": [{"slug": slug}, {"previousSlugs": slug}],
+                                      "id": {"$ne": product_id}}):
         slug = f"{base_slug}-{counter}"
         counter += 1
     return slug
+
+
+async def find_product_by_id_or_slug(identifier: str) -> Optional[dict]:
+    """Produit par id, slug, ou ancien slug (liens partagés avant un renommage)."""
+    return (await db.products.find_one({"id": identifier})
+            or await db.products.find_one({"slug": identifier})
+            or await db.products.find_one({"previousSlugs": identifier}))
+
+
+# Sections de l'espace vendeur (/seller/<section>, App.js) : une boutique ne
+# peut pas prendre ces adresses
+SELLER_RESERVED_SLUGS = {"products", "media", "orders", "analytics", "profile", "messages",
+                         "support", "promos", "dashboard", "login", "signup"}
+
+
+async def seller_unique_slug(business_name: str, seller_id: Optional[str] = None) -> str:
+    """Adresse de la boutique (/seller/<slug>) tirée de son nom."""
+    base = generate_slug(business_name) or "boutique"
+    if base in SELLER_RESERVED_SLUGS or base.startswith("seller-"):
+        base = f"boutique-{base}"
+    slug, counter = base, 2
+    while await db.sellers.find_one({"$or": [{"slug": slug}, {"previousSlugs": slug}],
+                                     "id": {"$ne": seller_id}}):
+        slug = f"{base}-{counter}"
+        counter += 1
+    return slug
+
+
+async def find_seller_by_id_or_slug(identifier: str) -> Optional[dict]:
+    return (await db.sellers.find_one({"id": identifier})
+            or await db.sellers.find_one({"slug": identifier})
+            or await db.sellers.find_one({"previousSlugs": identifier}))
+
+
+async def ensure_seo_slugs() -> dict:
+    """Au démarrage : une adresse lisible pour chaque boutique, et le nom de la
+    boutique retiré des slugs produits (l'ancien slug reste redirigé)."""
+    sellers_done = products_done = 0
+    names = {}
+    async for seller in db.sellers.find({}, {"_id": 0, "id": 1, "slug": 1, "businessName": 1}):
+        names[seller["id"]] = seller.get("businessName") or ""
+        if not seller.get("slug"):
+            slug = await seller_unique_slug(seller.get("businessName") or seller.get("id"), seller["id"])
+            await db.sellers.update_one({"id": seller["id"]}, {"$set": {"slug": slug}})
+            sellers_done += 1
+    async for product in db.products.find({}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "sellerId": 1, "sellerName": 1}):
+        shop = generate_slug(names.get(product.get("sellerId")) or product.get("sellerName") or "")
+        slug = product.get("slug") or ""
+        if not slug:  # produit sans adresse lisible (ancienne fiche)
+            new_slug = await get_unique_slug(product.get("name") or "", names.get(product.get("sellerId")), product["id"])
+            await db.products.update_one({"id": product["id"]}, {"$set": {"slug": new_slug}})
+            products_done += 1
+            continue
+        if not shop or not (slug.endswith("-" + shop) or slug.startswith(shop + "-")
+                            or re.search(rf"-{re.escape(shop)}-\d+$", slug)):
+            continue
+        new_slug = await get_unique_slug(product.get("name") or "", names.get(product.get("sellerId")) or product.get("sellerName"), product["id"])
+        if new_slug != slug:
+            await db.products.update_one({"id": product["id"]}, {"$set": {"slug": new_slug},
+                                                                "$addToSet": {"previousSlugs": slug}})
+            products_done += 1
+    return {"sellers": sellers_done, "products": products_done}
 
 # --- API Endpoints ---
 # ... (existing endpoints)
@@ -1517,13 +1605,14 @@ async def with_seller_details(products: List[dict]) -> List[dict]:
     if not seller_ids:
         return products
     sellers = await db.sellers.find(
-        {"id": {"$in": list(seller_ids)}}, {"_id": 0, "id": 1, "whatsapp": 1, "logoUrl": 1}
+        {"id": {"$in": list(seller_ids)}}, {"_id": 0, "id": 1, "whatsapp": 1, "logoUrl": 1, "slug": 1}
     ).to_list(None)
     by_id = {s["id"]: s for s in sellers}
     for p in products:
         seller = by_id.get(p.get("sellerId")) or {}
         p["sellerLogo"] = seller.get("logoUrl") or None
         p["sellerWhatsapp"] = seller.get("whatsapp") or None
+        p["sellerSlug"] = seller.get("slug") or None
     return products
 
 
@@ -1638,132 +1727,169 @@ async def get_max_product_price():
     logger.info("💰 [Backend] No products found, returning max price 0.0")
     return MaxPriceResponse(maxPrice=0.0)
 
+def _day(value) -> Optional[str]:
+    return value.strftime("%Y-%m-%d") if isinstance(value, datetime) else None
+
+
+def _family_ids(categories: List[dict], category_id: str) -> set:
+    return {category_id} | {c["id"] for c in categories if c.get("parentId") == category_id}
+
+
 @app.get("/sitemap.xml", response_class=Response)
 async def generate_sitemap():
-    """Generate dynamic XML sitemap for all products, categories, and sellers"""
+    """Sitemap : pages publiques avec leur vraie date de modification.
 
+    Une catégorie ou une boutique prend la date du dernier produit modifié
+    qu'elle contient ; les catégories et boutiques sans produit en ligne n'y
+    figurent pas (pages vides, marquées noindex). Les pages fixes n'ont pas de
+    date plutôt qu'une date du jour qui ne dirait rien."""
     try:
-        # Fetch all approved products
-        products_cursor = db.products.find({"status": "approved"})
-        products = await products_cursor.to_list(None)
+        products = await db.products.find(
+            {"status": "approved"},
+            {"_id": 0, "id": 1, "slug": 1, "category": 1, "sellerId": 1, "updatedAt": 1, "createdAt": 1},
+        ).to_list(None)
+        sellers = await db.sellers.find({"status": "approved"}, {"_id": 0, "id": 1, "slug": 1}).to_list(None)
+        categories = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1, "parentId": 1}).to_list(None)
 
-        # Fetch all approved sellers
-        sellers_cursor = db.sellers.find({"status": "approved"})
-        sellers = await sellers_cursor.to_list(None)
+        def changed(p):
+            return p.get("updatedAt") or p.get("createdAt")
 
-        # Fetch all categories
-        categories_cursor = db.categories.find()
-        categories = await categories_cursor.to_list(None)
+        latest = {}  # dernière modification par catégorie et par boutique
 
-        frontend_url = SITE_URL
-        current_date = datetime.utcnow().strftime("%Y-%m-%d")
+        def touch(key, value):
+            if isinstance(value, datetime) and (key not in latest or value > latest[key]):
+                latest[key] = value
 
-        # Build sitemap XML
-        xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
-        xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        by_id = {c["id"]: c for c in categories if c.get("id")}
+        for p in products:
+            touch(("seller", p.get("sellerId")), changed(p))
+            category = by_id.get(p.get("category"))
+            if category:
+                touch(("category", category["id"]), changed(p))
+                if category.get("parentId"):
+                    touch(("category", category["parentId"]), changed(p))
+        newest = _day(max((changed(p) for p in products if isinstance(changed(p), datetime)), default=None))
 
-        # Homepage
-        xml_content += f'''  <url>
-    <loc>{frontend_url}/</loc>
-    <lastmod>{current_date}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>1.0</priority>
-  </url>
-'''
+        urls = []
 
-        # Catalog page
-        xml_content += f'''  <url>
-    <loc>{frontend_url}/catalog</loc>
-    <lastmod>{current_date}</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-'''
+        def add(path, lastmod=None, changefreq="weekly", priority="0.6"):
+            entry = f"  <url>\n    <loc>{html.escape(SITE_URL + path)}</loc>\n"
+            if lastmod:
+                entry += f"    <lastmod>{lastmod}</lastmod>\n"
+            urls.append(entry + f"    <changefreq>{changefreq}</changefreq>\n    <priority>{priority}</priority>\n  </url>\n")
 
-        # About page
-        xml_content += f'''  <url>
-    <loc>{frontend_url}/about</loc>
-    <lastmod>{current_date}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-'''
+        add("/", newest, "daily", "1.0")
+        add("/catalog", newest, "daily", "0.9")
+        add("/pickup-points", None, "weekly", "0.6")
+        add("/about", None, "monthly", "0.5")
+        add("/privacy-policy", None, "yearly", "0.3")
 
-        # Privacy Policy page
-        xml_content += f'''  <url>
-    <loc>{frontend_url}/privacy-policy</loc>
-    <lastmod>{current_date}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-'''
-
-        # Pickup points page
-        xml_content += f'''  <url>
-    <loc>{frontend_url}/pickup-points</loc>
-    <lastmod>{current_date}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-'''
-
-        # Category pages
+        seen = set()
         for category in categories:
-            category_name = category.get('name', '')
-            if category_name:
-                # URL encode the category name
-                from urllib.parse import quote
-                encoded_name = quote(category_name)
-                xml_content += f'''  <url>
-    <loc>{frontend_url}/catalog/{encoded_name}</loc>
-    <lastmod>{current_date}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-'''
+            slug = generate_slug(category.get("name") or "")
+            key = ("category", category.get("id"))
+            if slug and key in latest and slug not in seen:
+                seen.add(slug)
+                add(f"/catalog/{slug}", _day(latest[key]), "weekly", "0.7" if category.get("parentId") else "0.8")
 
-        # Product pages
         for product in products:
-            slug = product.get('slug') or product.get('id')
-            if not slug:
-                continue
+            slug = product.get("slug") or product.get("id")
+            if slug:
+                add(f"/product/{slug}", _day(changed(product)), "weekly", "0.7")
 
-            # Get last modified date
-            updated = product.get('updatedAt', product.get('createdAt'))
-            if isinstance(updated, datetime):
-                lastmod = updated.strftime("%Y-%m-%d")
-            else:
-                lastmod = current_date
-
-            xml_content += f'''  <url>
-    <loc>{frontend_url}/product/{slug}</loc>
-    <lastmod>{lastmod}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-'''
-
-        # Seller shop pages
         for seller in sellers:
-            seller_id = seller.get('id')
-            if seller_id:
-                xml_content += f'''  <url>
-    <loc>{frontend_url}/seller/{seller_id}</loc>
-    <lastmod>{current_date}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-'''
+            key = ("seller", seller.get("id"))
+            if key in latest:
+                add(f"/seller/{seller.get('slug') or seller['id']}", _day(latest[key]), "weekly", "0.6")
 
-        xml_content += '</urlset>'
-
-        logging.info(f"✅ [SEO] Sitemap generated: {len(products)} products, {len(sellers)} sellers, {len(categories)} categories")
-
+        xml_content = ('<?xml version="1.0" encoding="UTF-8"?>\n'
+                       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                       + "".join(urls) + '</urlset>')
+        logging.info(f"✅ [SEO] Sitemap generated: {len(urls)} URLs")
         return Response(content=xml_content, media_type="application/xml")
 
     except Exception as e:
         logging.error(f"❌ [SEO] Error generating sitemap: {str(e)}")
         raise HTTPException(status_code=500, detail="Error generating sitemap")
+
+
+def _find_category(categories: List[dict], segment: str) -> Optional[dict]:
+    """Catégorie d'une adresse /catalog/<segment> : slug du nom (ou nom avec
+    accents des anciens liens), puis ancien nom d'une catégorie renommée."""
+    wanted = generate_slug(segment)
+    if not wanted:
+        return None
+    return (next((c for c in categories if generate_slug(c.get("name") or "") == wanted), None)
+            or next((c for c in categories
+                     if any(generate_slug(n) == wanted for n in c.get("formerNames") or [])), None))
+
+
+@api_router.get("/seo/page")
+async def seo_page(path: str = Query(..., max_length=500)):
+    """Contenu d'une page publique pour frontend/public/page.php (voir
+    seo_pages.py) : 200 avec le contenu, 301 vers l'adresse actuelle (id,
+    ancien slug, nom avec accents), ou 404."""
+    parts = [p for p in path.split("?")[0].split("/") if p]
+    if len(parts) != 2:
+        return seo_pages.NOT_FOUND
+    kind, segment = parts
+
+    if kind == "product":
+        product = await find_product_by_id_or_slug(segment)
+        if not product or product.get("status") != "approved":
+            return seo_pages.NOT_FOUND
+        if product.get("slug") and segment != product["slug"]:
+            return seo_pages.redirect(f"/product/{product['slug']}")
+        seller = await db.sellers.find_one({"id": product.get("sellerId")}, {"_id": 0, "password": 0})
+        categories = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1, "parentId": 1}).to_list(None)
+        by_id = {c["id"]: c for c in categories if c.get("id")}
+        crumbs = []
+        category = by_id.get(product.get("category"))
+        if category:
+            parent = by_id.get(category.get("parentId"))
+            for c in ([parent] if parent else []) + [category]:
+                crumbs.append((c["name"], f"{SITE_URL}/catalog/{generate_slug(c['name'])}"))
+        result = seo_pages.product_page(product, seller, crumbs, SITE_URL)
+        try:
+            og = await og_image_for(db, product)
+        except Exception:  # image d'aperçu pas encore prête : celle du produit
+            og = None
+        if og:
+            result["image"] = og["url"]
+        return result
+
+    if kind == "seller":
+        seller = await find_seller_by_id_or_slug(segment)
+        if not seller or seller.get("status") != "approved":
+            return seo_pages.NOT_FOUND
+        if seller.get("slug") and segment != seller["slug"]:
+            return seo_pages.redirect(f"/seller/{seller['slug']}")
+        products = await db.products.find(
+            {"status": "approved", "sellerId": seller["id"]},
+            {"_id": 0, "id": 1, "slug": 1, "name": 1, "price": 1, "promoPrice": 1},
+        ).sort("updatedAt", -1).to_list(None)
+        return seo_pages.seller_page(seller, products, SITE_URL)
+
+    if kind == "catalog":
+        categories = await db.categories.find({}, {"_id": 0}).to_list(None)
+        category = _find_category(categories, segment)
+        if not category:
+            return seo_pages.NOT_FOUND
+        canonical = generate_slug(category["name"])
+        if segment != canonical:
+            return seo_pages.redirect(f"/catalog/{canonical}")
+        parent = next((c for c in categories
+                       if category.get("parentId") and c.get("id") == category["parentId"]), None)
+        children = sorted((c for c in categories if c.get("parentId") == category["id"]),
+                          key=lambda c: (c.get("order") or 0, c.get("name") or ""))
+        products = await db.products.find(
+            {"status": "approved", "category": {"$in": list(_family_ids(categories, category["id"]))}},
+            {"_id": 0, "id": 1, "slug": 1, "name": 1, "price": 1, "promoPrice": 1},
+        ).sort("updatedAt", -1).to_list(None)
+        return seo_pages.category_page(category, parent, children, products, SITE_URL, generate_slug)
+
+    return seo_pages.NOT_FOUND
+
 
 @api_router.get("/og/product/{product_id}", response_class=HTMLResponse)
 async def get_product_og_tags(product_id: str):
@@ -1912,12 +2038,9 @@ async def debug_product_og_tags(product_id: str):
 
 @api_router.get("/products/{product_identifier}", response_model=Product)
 async def get_product(product_identifier: str):
-    # Try looking up by ID first
-    product = await db.products.find_one({"id": product_identifier})
-    if not product:
-        # If not found by ID, try looking up by slug
-        product = await db.products.find_one({"slug": product_identifier})
-        
+    # Id, slug, ou ancien slug (la page redirige alors vers l'adresse actuelle)
+    product = await find_product_by_id_or_slug(product_identifier)
+
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return Product(**(await with_seller_details([product]))[0])
@@ -1972,11 +2095,11 @@ async def create_product(product_data: ProductCreate, background_tasks: Backgrou
     if product_data.kind == "meal":
         await check_meal_allowed(seller_id_to_use)
     product_dict = service_fields(product_data.dict())
-    product_dict["slug"] = await get_unique_slug(product_data.name)
+    product_dict["slug"] = await get_unique_slug(product_data.name, seller_name_to_use)
     product = Product(**product_dict)
     product.sellerId = seller_id_to_use
     product.sellerName = seller_name_to_use
-    await db.products.insert_one(product.dict(exclude={"sellerWhatsapp", "sellerLogo"}))
+    await db.products.insert_one(product.dict(exclude={"sellerWhatsapp", "sellerLogo", "sellerSlug"}))
     # Versions réduites des photos, après la réponse
     background_tasks.add_task(refresh_product_variants, db, product.id)
     return product
@@ -2064,7 +2187,12 @@ async def update_product(product_id: str, product_data: ProductUpdate, backgroun
             # Nouveau slug seulement si le nom change vraiment : sinon le slug
             # actuel (déjà pris) deviendrait « nom-1 » et casserait les liens
             if update_data["name"].strip() != (current_product.get("name") or "").strip():
-                update_data["slug"] = await get_unique_slug(update_data["name"])
+                update_data["slug"] = await get_unique_slug(
+                    update_data["name"], current_product.get("sellerName"), product_id)
+                # L'ancienne adresse reste valable : elle redirige vers la nouvelle
+                if current_product.get("slug") and current_product["slug"] != update_data["slug"]:
+                    await db.products.update_one({"id": product_id},
+                                                 {"$addToSet": {"previousSlugs": current_product["slug"]}})
 
     new_images = False
     if "images" in update_data:
@@ -2437,6 +2565,7 @@ async def create_seller(seller_data: SellerCreate, background_tasks: BackgroundT
     seller_dict = seller_data.dict()
     seller_dict['password'] = hashed_password
     seller_dict['id'] = f"seller_{str(uuid.uuid4())[:8]}"
+    seller_dict['slug'] = await seller_unique_slug(seller_data.businessName, seller_dict['id'])
     
     # Auto-approve if created by an admin
     if role in ["super_admin", "admin", "moderator"]:
@@ -2480,9 +2609,11 @@ async def list_sellers(request: Request):
 
 @api_router.get("/sellers/{seller_id}")
 async def get_seller(seller_id: str, request: Request):
-    seller = await db.sellers.find_one({"id": seller_id})
+    # Id, adresse de la boutique, ou ancienne adresse (avant un changement de nom)
+    seller = await find_seller_by_id_or_slug(seller_id)
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
+    seller_id = seller["id"]
 
     # Migrate legacy seller data
     seller = migrate_seller_data(seller)
@@ -2688,6 +2819,16 @@ async def update_seller(
         if moved and not coords_edited:
             update_data.update(latitude=None, longitude=None)
         relocate = not has_coordinates({**current, **update_data})
+
+    # Boutique renommée : nouvelle adresse, l'ancienne reste redirigée
+    if (update_data.get("businessName") or "").strip():
+        current = await db.sellers.find_one({"id": seller_id}, {"slug": 1, "businessName": 1}) or {}
+        if update_data["businessName"].strip() != (current.get("businessName") or "").strip() or not current.get("slug"):
+            new_slug = await seller_unique_slug(update_data["businessName"], seller_id)
+            if new_slug != current.get("slug"):
+                update_data["slug"] = new_slug
+                if current.get("slug"):
+                    await db.sellers.update_one({"id": seller_id}, {"$addToSet": {"previousSlugs": current["slug"]}})
 
     await db.sellers.update_one({"id": seller_id}, {"$set": update_data})
     if relocate:
@@ -4271,7 +4412,7 @@ async def migrate_product_slugs():
     products = await products_cursor.to_list(1000)
     count = 0
     for p in products:
-        slug = await get_unique_slug(p["name"])
+        slug = await get_unique_slug(p["name"], p.get("sellerName"), p.get("id"))
         await db.products.update_one({"_id": p["_id"]}, {"$set": {"slug": slug}})
         count += 1
     return {"message": f"Successfully migrated {count} products."}
@@ -4464,6 +4605,12 @@ async def create_ad_indexes():
         await ensure_media_indexes()
     except Exception as error:
         logger.warning("Index de la médiathèque non créés : %s", error)
+    try:
+        done = await ensure_seo_slugs()
+        if done["sellers"] or done["products"]:
+            logger.info("Adresses mises à jour : %s boutiques, %s produits", done["sellers"], done["products"])
+    except Exception as error:
+        logger.warning("Adresses des boutiques et produits non mises à jour : %s", error)
 
 
 # --- OG / Social Preview SSR ---
@@ -4478,9 +4625,7 @@ def _escape_html(text: str) -> str:
 @api_router.get("/og/product/{id_or_slug}", response_class=HTMLResponse)
 async def product_og_preview(id_or_slug: str):
     """Renvoie une page HTML avec les Open Graph meta tags pour les crawlers sociaux."""
-    product = await db.products.find_one(
-        {"$or": [{"id": id_or_slug}, {"slug": id_or_slug}]}
-    )
+    product = await find_product_by_id_or_slug(id_or_slug)
 
     site_url = "https://www.nengoo.com"
     default_image = f"{site_url}/icons/logo-512x512.png"

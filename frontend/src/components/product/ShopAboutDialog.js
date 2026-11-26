@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { RichText } from '../ui/RichText';
 import { isBlank } from '../../lib/richText';
 import { PinIcon, WhatsAppIcon } from '../ui/Icons';
+import { sellerUrl } from '../../lib/slug';
 
 /** Présentation de la boutique, ouverte depuis la fiche produit. */
 const ShopAboutDialog = ({ seller, t, onClose, onWhatsApp }) => {
@@ -78,7 +79,7 @@ const ShopAboutDialog = ({ seller, t, onClose, onWhatsApp }) => {
 
         <div className="p-4 sm:px-6 border-t border-gray-100 grid sm:grid-cols-2 gap-2">
           <Link
-            to={`/seller/${seller.id}`}
+            to={sellerUrl(seller)}
             className="inline-flex items-center justify-center h-11 px-4 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-sm font-bold"
           >
             {t.visitShop}

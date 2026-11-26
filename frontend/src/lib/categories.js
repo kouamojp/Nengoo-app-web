@@ -1,3 +1,5 @@
+import { slugify } from './slug';
+
 // Hiérarchie des catégories : une catégorie principale peut avoir des
 // sous-catégories (champ parentId, un seul niveau). Un produit est rangé dans
 // l'une ou l'autre ; une catégorie principale montre aussi les produits de ses
@@ -31,12 +33,14 @@ export const normalizeCategoryName = (name) =>
     .join(' ');
 
 /**
- * Catégorie désignée par un nom d'URL (/catalog/<nom>) : nom exact, nom
- * approchant (accents, pluriel), ou ancien nom d'une catégorie renommée.
+ * Catégorie désignée par l'URL (/catalog/<slug>) : slug du nom, nom exact
+ * (anciens liens), nom approchant (accents, pluriel), ou ancien nom d'une
+ * catégorie renommée.
  */
 export const findCategoryByName = (categories, name) => {
   if (!name) return undefined;
-  const exact = categories.find((c) => c.name === name);
+  const exact = categories.find((c) => c.name === name)
+    || categories.find((c) => slugify(c.name) === name);
   if (exact) return exact;
   const wanted = normalizeCategoryName(name);
   return (
