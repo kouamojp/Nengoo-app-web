@@ -39,12 +39,33 @@ const CourierPage = () => {
   const act = async (orderId, action) => {
     setBusy(orderId);
     setMessages(m => ({ ...m, [orderId]: null }));
+    // Renvoyer « Je pars livrer » ou « Livrée » est sans risque : si l'action est
+    // déjà enregistrée (réponse perdue sur une coupure), le serveur la confirme
+    // sans rien refaire. Une tentative ratée, elle, n'est envoyée qu'une fois.
+    const send = () => fetch(`${API_BASE_URL}/courier/${encodeURIComponent(token)}/orders/${orderId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, code: codes[orderId] || null, note: notes[orderId] || null }),
+    });
+    const tries = action === 'failed' ? 1 : 3;
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     try {
-      const response = await fetch(`${API_BASE_URL}/courier/${encodeURIComponent(token)}/orders/${orderId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, code: codes[orderId] || null, note: notes[orderId] || null }),
-      });
+      let response = null;
+      for (let attempt = 0; attempt < tries; attempt += 1) {
+        if (attempt) await wait(1500 * attempt);
+        try {
+          response = await send();
+        } catch {
+          response = null; // réseau coupé : on réessaie
+          continue;
+        }
+        if (response.status !== 409) break; // 409 : validation encore en cours
+      }
+      if (!response) {
+        throw new Error(action === 'failed'
+          ? 'Connexion perdue : la tentative n\'a peut-être pas été notée. Rechargez la page pour vérifier avant de la renvoyer.'
+          : 'Connexion perdue. Vérifiez le réseau puis réessayez : si l\'action a déjà été enregistrée, elle sera simplement confirmée.');
+      }
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || 'Action impossible.');
       const done = { start: 'Livraison commencée : le client est prévenu.', delivered: 'Commande livrée. Merci !', failed: 'Tentative notée.' };
@@ -110,10 +131,10 @@ const CourierPage = () => {
               <div className="mt-4 pt-4 border-t border-gray-200 grid gap-2">
                 <label className="text-sm font-semibold" htmlFor={`code-${order.id}`}>Code donné par le client</label>
                 <div className="flex gap-2">
-                  <input id={`code-${order.id}`} inputMode="numeric" maxLength={4} value={codes[order.id] || ''}
-                    onChange={(e) => setCodes(c => ({ ...c, [order.id]: e.target.value.replace(/\D/g, '') }))}
-                    className="w-28 border border-gray-300 rounded-lg px-3 py-2 text-lg tracking-widest" />
-                  <button type="button" disabled={busy === order.id || (codes[order.id] || '').length !== 4} onClick={() => act(order.id, 'delivered')}
+                  <input id={`code-${order.id}`} inputMode="numeric" maxLength={6} value={codes[order.id] || ''}
+                    onChange={(e) => setCodes(c => ({ ...c, [order.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                    className="w-36 border border-gray-300 rounded-lg px-3 py-2 text-lg tracking-widest" />
+                  <button type="button" disabled={busy === order.id || (codes[order.id] || '').length !== 6} onClick={() => act(order.id, 'delivered')}
                     className="flex-1 px-4 py-2 rounded-lg bg-green-700 text-white font-semibold disabled:opacity-50">
                     Livrée
                   </button>

@@ -132,6 +132,16 @@ def test_quote_courier_and_proof(monkeypatch):
             assert saved["statusHistory"][-1]["by"] == "courier:Jean"
             assert (await server.courier_orders(courier.token))["orders"] == []
 
+            # Nouvel essai après une coupure réseau : livraison confirmée, rien refait
+            retry_tasks = BackgroundTasks()
+            again = await server.courier_update(courier.token, order.id,
+                                                server.CourierAction(action="delivered", code=order.deliveryCode),
+                                                request(), retry_tasks)
+            assert again["status"] == "delivered" and retry_tasks.tasks == []
+            after = await db.orders.find_one({"id": order.id})
+            assert after["statusHistory"] == saved["statusHistory"] and after["handedOverAt"] == saved["handedOverAt"]
+            assert "handoverClaimAt" not in after
+
             # Le client voit son code et son livreur dans le suivi
             tracked = await server.track_order(request(), orderId=order.id, phone="690000001")
             assert tracked["deliveryCode"] == order.deliveryCode and tracked["courierName"] == "Jean"
@@ -141,6 +151,24 @@ def test_quote_courier_and_proof(monkeypatch):
             await server.assign_courier(other.id, server.CourierAssignment(courierId=courier.id))
             with pytest.raises(HTTPException):
                 await server.delete_courier(courier.id)
+
+            # « Je pars livrer » renvoyé deux fois : un seul SMS au client
+            await server.courier_update(courier.token, other.id, server.CourierAction(action="start"), request(), tasks)
+            start_again = BackgroundTasks()
+            await server.courier_update(courier.token, other.id, server.CourierAction(action="start"), request(), start_again)
+            assert start_again.tasks == []
+
+            # Deux validations simultanées : une seule remise effective
+            first, second = BackgroundTasks(), BackgroundTasks()
+            results = await asyncio.gather(*(
+                server.courier_update(courier.token, other.id,
+                                      server.CourierAction(action="delivered", code=other.deliveryCode), request(), t)
+                for t in (first, second)), return_exceptions=True)
+            for result in results:
+                assert not isinstance(result, HTTPException) or result.status_code == 409
+            history = (await db.orders.find_one({"id": other.id}))["statusHistory"]
+            assert [h["status"] for h in history].count("delivered") == 1
+            assert min(len(first.tasks), len(second.tasks)) == 0
         finally:
             await client.drop_database(name)
 

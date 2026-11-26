@@ -3007,6 +3007,14 @@ async def confirm_handover(order_id: str, data: HandoverCode, request: Request, 
         raise HTTPException(status_code=403, detail="Seul le vendeur de la commande valide le code de retrait.")
     order = await db.orders.find_one({"id": order_id})
     current = normalize_status(order.get("status"))
+    if current == "delivered" and order.get("deliveryCode"):
+        # Nouvel essai après une coupure réseau : la remise est déjà faite, on la
+        # confirme sans rien refaire (ni historique, ni SMS, ni stock)
+        login_limiter.check("delivery-code", request, order_id)
+        if _same_code(data.code, order):
+            return _handover_view(order)
+        login_limiter.record_failure("delivery-code", request, order_id)
+        raise HTTPException(status_code=400, detail="Cette commande est déjà terminée.")
     if current in ("delivered", "cancelled", "refunded"):
         raise HTTPException(status_code=400, detail="Cette commande est déjà terminée.")
     if current == "payment_pending":
@@ -3021,23 +3029,61 @@ async def confirm_handover(order_id: str, data: HandoverCode, request: Request, 
         raise HTTPException(status_code=400, detail="Cette commande n'avait pas encore de code : il vient d'être envoyé au client par SMS. Demandez-le-lui.")
     # Même protection que pour le livreur : on ne devine pas un code par essais successifs
     login_limiter.check("delivery-code", request, order_id)
-    if "".join((data.code or "").split()) != order["deliveryCode"]:
+    if not _same_code(data.code, order):
         login_limiter.record_failure("delivery-code", request, order_id)
         raise HTTPException(status_code=400, detail="Code de retrait incorrect : demandez au client le code à 6 chiffres reçu à la commande.")
-    # Mêmes effets qu'un changement de statut (historique, SMS, stock, avis)
-    await update_order(order_id, OrderUpdate(status="delivered"), background_tasks, "admin", x_seller_id)
+    already = await _claim_handover(order_id)
+    if already:
+        return _handover_view(already)
+    try:
+        # Mêmes effets qu'un changement de statut (historique, SMS, stock, avis)
+        await update_order(order_id, OrderUpdate(status="delivered"), background_tasks, "admin", x_seller_id)
+    except Exception:
+        await _release_handover(order_id)
+        raise
     history = (await db.orders.find_one({"id": order_id}, {"statusHistory": 1})).get("statusHistory") or []
     changes = {"handedOverAt": datetime.utcnow(), "handedOverBy": "seller"}
     if order.get("pickupPointId"):
         changes["pickupStatus"] = "picked_up"
     if history and history[-1].get("status") == "delivered":
         changes[f"statusHistory.{len(history) - 1}.by"] = "seller"
-    await db.orders.update_one({"id": order_id}, {"$set": changes})
-    updated = await db.orders.find_one({"id": order_id})
-    updated["status"] = normalize_status(updated.get("status"))
-    updated["deliveryCode"] = None
-    updated.setdefault("pickupStatus", "pending")
-    return Order(**updated)
+    await db.orders.update_one({"id": order_id}, {"$set": changes, "$unset": {"handoverClaimAt": ""}})
+    return _handover_view(await db.orders.find_one({"id": order_id}))
+
+
+def _same_code(sent: Optional[str], order: dict) -> bool:
+    """Code de retrait saisi (espaces ignorés) : jamais vrai sans code sur la commande."""
+    expected = order.get("deliveryCode")
+    return bool(expected) and "".join((sent or "").split()) == expected
+
+
+async def _claim_handover(order_id: str) -> Optional[dict]:
+    """Une seule remise à la fois (double clic, nouvel essai pendant que la
+    première requête tourne encore). Un verrou abandonné expire après 2 minutes.
+    Renvoie None si la remise peut se faire, la commande si elle est déjà livrée."""
+    now = datetime.utcnow()
+    claim = await db.orders.update_one(
+        {"id": order_id, "$or": [{"handoverClaimAt": {"$exists": False}},
+                                 {"handoverClaimAt": {"$lt": now - timedelta(minutes=2)}}]},
+        {"$set": {"handoverClaimAt": now}})
+    if claim.modified_count:
+        return None
+    latest = await db.orders.find_one({"id": order_id})
+    if normalize_status(latest.get("status")) == "delivered":
+        return latest
+    raise HTTPException(status_code=409, detail="La remise est en cours de validation : patientez quelques secondes puis réessayez.")
+
+
+async def _release_handover(order_id: str):
+    await db.orders.update_one({"id": order_id}, {"$unset": {"handoverClaimAt": ""}})
+
+
+def _handover_view(order: dict) -> Order:
+    """Commande renvoyée au vendeur après la remise, sans le code de retrait."""
+    order["status"] = normalize_status(order.get("status"))
+    order["deliveryCode"] = None
+    order.setdefault("pickupStatus", "pending")
+    return Order(**order)
 
 @api_router.delete("/orders", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(super_admin_required)])
 async def bulk_delete_orders(request: BulkDeleteRequest):
@@ -3324,6 +3370,13 @@ async def courier_update(token: str, order_id: str, data: CourierAction, request
     if not order:
         raise HTTPException(status_code=404, detail="Cette commande ne vous est pas attribuée.")
     current = normalize_status(order.get("status"))
+    if data.action == "delivered" and current == "delivered" and order.get("deliveryCode"):
+        # Nouvel essai après une coupure réseau : la livraison est déjà faite, on la
+        # confirme sans rien refaire (ni historique, ni SMS, ni stock)
+        login_limiter.check("delivery-code", request, order_id)
+        if _same_code(data.code, order):
+            return _courier_view(order)
+        login_limiter.record_failure("delivery-code", request, order_id)
     if current in ("delivered", "cancelled", "refunded"):
         raise HTTPException(status_code=400, detail="Cette commande est déjà terminée.")
     if data.action == "failed":
@@ -3332,26 +3385,41 @@ async def courier_update(token: str, order_id: str, data: CourierAction, request
                                                       "$set": {"updatedAt": datetime.utcnow()}})
         return _courier_view(await db.orders.find_one({"id": order_id}))
     if data.action == "start":
+        if current == "out_for_delivery":
+            return _courier_view(order)  # déjà en route (nouvel essai) : rien à renvoyer au client
         new_status = "out_for_delivery"
     elif data.action == "delivered":
         # Preuve de remise : le code que seul le client connaît
         login_limiter.check("delivery-code", request, order_id)
-        if (data.code or "").strip() != (order.get("deliveryCode") or ""):
+        if not _same_code(data.code, order):
             login_limiter.record_failure("delivery-code", request, order_id)
-            raise HTTPException(status_code=400, detail="Code de livraison incorrect : demandez au client le code reçu à la commande.")
+            raise HTTPException(status_code=400, detail="Code de livraison incorrect : demandez au client le code à 6 chiffres reçu à la commande.")
         new_status = "delivered"
+        already = await _claim_handover(order_id)
+        if already:
+            return _courier_view(already)
     else:
         raise HTTPException(status_code=400, detail="Action inconnue.")
-    # Mêmes effets qu'un changement de statut par l'admin (historique, SMS, stock)
-    await update_order(order_id, OrderUpdate(status=new_status), background_tasks, "admin", None)
+    try:
+        # Mêmes effets qu'un changement de statut par l'admin (historique, SMS, stock)
+        await update_order(order_id, OrderUpdate(status=new_status), background_tasks, "admin", None)
+    except Exception:
+        if new_status == "delivered":
+            await _release_handover(order_id)
+        raise
     # L'historique attribue l'étape au livreur, pas à l'admin
     history = (await db.orders.find_one({"id": order_id}, {"statusHistory": 1})).get("statusHistory") or []
+    changes = {}
     if history and history[-1].get("status") == new_status:
-        await db.orders.update_one({"id": order_id},
-                                   {"$set": {f"statusHistory.{len(history) - 1}.by": f"courier:{courier['name']}"}})
+        changes[f"statusHistory.{len(history) - 1}.by"] = f"courier:{courier['name']}"
+    update = {}
     if new_status == "delivered":
-        await db.orders.update_one({"id": order_id}, {"$set": {
-            "handedOverAt": datetime.utcnow(), "handedOverBy": f"courier:{courier['name']}"}})
+        changes.update({"handedOverAt": datetime.utcnow(), "handedOverBy": f"courier:{courier['name']}"})
+        update["$unset"] = {"handoverClaimAt": ""}
+    if changes:
+        update["$set"] = changes
+    if update:
+        await db.orders.update_one({"id": order_id}, update)
     return _courier_view(await db.orders.find_one({"id": order_id}))
 
 

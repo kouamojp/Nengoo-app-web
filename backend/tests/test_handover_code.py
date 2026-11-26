@@ -75,8 +75,56 @@ def test_seller_validates_pickup_with_code(monkeypatch):
             saved = await db.orders.find_one({"id": order.id})
             assert saved["statusHistory"][-1]["by"] == "seller"
 
-            with pytest.raises(HTTPException):
-                await server.confirm_handover(order.id, server.HandoverCode(code=order.deliveryCode), request(), tasks, "s1")
+            # Nouvel essai après une coupure réseau : la livraison est confirmée,
+            # sans seconde remise ni second SMS
+            retry_tasks = BackgroundTasks()
+            again = await server.confirm_handover(order.id, server.HandoverCode(code=order.deliveryCode),
+                                                  request(), retry_tasks, "s1")
+            assert again.status == "delivered" and again.deliveryCode is None
+            assert again.handedOverAt == done.handedOverAt
+            assert retry_tasks.tasks == []
+            after = await db.orders.find_one({"id": order.id})
+            assert len(after["statusHistory"]) == len(saved["statusHistory"])
+            assert "handoverClaimAt" not in after
+
+            # Un mauvais code ne confirme pas une commande déjà remise
+            with pytest.raises(HTTPException) as err:
+                await server.confirm_handover(order.id, server.HandoverCode(code=wrong), request(), tasks, "s1")
+            assert "déjà terminée" in err.value.detail
+        finally:
+            await client.drop_database(name)
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.skipif(not _local_mongo(), reason="pas de MongoDB local")
+def test_simultaneous_handovers_count_once(monkeypatch):
+    from motor.motor_asyncio import AsyncIOMotorClient
+    name = f"nengoo_pytest_{uuid.uuid4().hex[:6]}"
+    login_limiter.reset()
+
+    async def scenario():
+        client = AsyncIOMotorClient("mongodb://127.0.0.1:27017")
+        db = client[name]
+        monkeypatch.setattr(server, "db", db)
+        try:
+            await db.sellers.insert_one({"id": "s1", "businessName": "Atelier"})
+            await db.products.insert_one({"id": "p1", "name": "Robe", "price": 10000, "stock": 5, "status": "approved",
+                                          "sellerId": "s1", "sellerName": "Atelier", "images": ["a.jpg"]})
+            [order] = await server.process_checkout(server.CheckoutRequest(
+                firstName="Awa", phone="+237690000001", paymentMethod="cashOnDelivery", deliveryOption="home",
+                address="Akwa", city="Douala", cartItems=[server.CheckoutProduct(id="p1", quantity=1)]), BackgroundTasks())
+            first, second = BackgroundTasks(), BackgroundTasks()
+            results = await asyncio.gather(
+                server.confirm_handover(order.id, server.HandoverCode(code=order.deliveryCode), request(), first, "s1"),
+                server.confirm_handover(order.id, server.HandoverCode(code=order.deliveryCode), request(), second, "s1"),
+                return_exceptions=True)
+            # Au plus une remise effective ; l'autre requête confirme ou demande de patienter
+            for result in results:
+                assert not isinstance(result, HTTPException) or result.status_code == 409
+            saved = await db.orders.find_one({"id": order.id})
+            assert [h["status"] for h in saved["statusHistory"]].count("delivered") == 1
+            assert min(len(first.tasks), len(second.tasks)) == 0
         finally:
             await client.drop_database(name)
 

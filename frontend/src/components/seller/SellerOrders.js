@@ -46,12 +46,29 @@ const HandoverForm = ({ order, user, onDone }) => {
     event.preventDefault();
     setSending(true);
     setError('');
+    // Renvoyer le même code est sans risque : si la remise est déjà enregistrée
+    // (réponse perdue sur une coupure), le serveur la confirme sans rien refaire.
+    const send = () => fetch(`${API_BASE_URL}/orders/${order.id}/handover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Seller-Id': user.id },
+      body: JSON.stringify({ code }),
+    });
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     try {
-      const response = await fetch(`${API_BASE_URL}/orders/${order.id}/handover`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Seller-Id': user.id },
-        body: JSON.stringify({ code }),
-      });
+      let response = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        if (attempt) await wait(1500 * attempt);
+        try {
+          response = await send();
+        } catch {
+          response = null; // réseau coupé : on réessaie
+          continue;
+        }
+        if (response.status !== 409) break; // 409 : validation encore en cours
+      }
+      if (!response) {
+        throw new Error('Connexion perdue. Vérifiez le réseau puis validez à nouveau le même code : si la remise a déjà été enregistrée, elle sera simplement confirmée.');
+      }
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.detail || 'La validation a échoué. Réessayez.');
       setCode('');
