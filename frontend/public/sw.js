@@ -45,6 +45,16 @@ self.addEventListener('activate', (event) => {
 
 // Interception des requêtes réseau
 self.addEventListener('fetch', (event) => {
+  // Seulement les lectures (GET) sur le site lui-même. Le reste (API, images
+  // externes, Google Analytics, extensions du navigateur…) part directement
+  // du navigateur : relancées ici, ces requêtes tombaient sous la règle
+  // connect-src de la CSP, et celles des extensions (chrome-extension://)
+  // faisaient échouer la mise en cache.
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.origin !== self.location.origin) {
+    return;
+  }
+
   // Stratégie Cache First pour les assets statiques
   if (event.request.url.includes('/static/') || 
       event.request.url.includes('/icons/') ||
