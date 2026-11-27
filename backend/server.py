@@ -55,7 +55,11 @@ db = client[os.environ['DB_NAME']]
 # Fixé dans le code : nengoo.com redirige vers www, une valeur sans www crée une boucle pour les robots.
 SITE_URL = "https://www.nengoo.com"
 
-app = FastAPI()
+IS_PRODUCTION = os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
+
+# Documentation de l'API (/docs, /redoc, /openapi.json) : seulement hors production,
+# elle donne la carte de toutes les routes, y compris celles des administrateurs
+app = FastAPI(**({"docs_url": None, "redoc_url": None, "openapi_url": None} if IS_PRODUCTION else {}))
 api_router = APIRouter(prefix="/api")
 
 # Identité par JWT (voir auth_tokens.py). Ajouté avant CORSMiddleware : les
@@ -96,13 +100,9 @@ async def duplicate_key_handler(_request, error):
     raise error
 
 
-IS_PRODUCTION = os.environ.get("ENVIRONMENT", "").strip().lower() == "production"
-
 origins = [
     "https://www.nengoo.com",
     "https://nengoo.com",
-    "https://nengoo-app-web.vercel.app",
-    "https://nengoo-app-web.onrender.com",
     # Capacitor mobile app origins
     "capacitor://localhost",
     "https://localhost",
@@ -130,11 +130,13 @@ if not IS_PRODUCTION:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    # Capacitor mobile partout ; localhost sur tout port hors production
-    allow_origin_regex=r"capacitor://.*" if IS_PRODUCTION else r"(http://localhost:\d+|capacitor://.*)",
+    # localhost sur tout port, seulement hors production
+    allow_origin_regex=None if IS_PRODUCTION else r"http://localhost:\d+",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With",
+                   "X-Seller-Id", "X-Buyer-Id", "X-User-Id", "X-User-Type", "User-Id", "User-Type",
+                   "Sender-Id", "Sender-Type", "X-Admin-Role", "X-Admin-Id", "X-App-Version", "X-Platform"],
 )
 
 # --- Utility Functions ---

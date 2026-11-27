@@ -9,6 +9,7 @@ Au-delà, la route répond 429 jusqu'à la fin de la fenêtre. Une connexion
 réussie remet à zéro le compteur du numéro. Les compteurs sont en mémoire,
 propres à chaque processus du serveur : un redémarrage les vide.
 """
+import ipaddress
 import re
 import time
 from collections import defaultdict, deque
@@ -23,13 +24,30 @@ MAX_PER_IP = 20
 _failures: dict = defaultdict(deque)
 
 
+def _is_proxy(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return addr.is_private or addr.is_loopback or addr.is_link_local
+
+
 def client_ip(request: Request) -> str:
-    # Derrière le proxy de l'hébergeur, l'IP du client est le premier
-    # élément de X-Forwarded-For
-    forwarded = request.headers.get("x-forwarded-for", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    """IP du client, impossible à choisir par le client lui-même.
+
+    Le client peut écrire ce qu'il veut dans X-Forwarded-For ; chaque proxy
+    ajoute l'adresse qu'il voit à la fin. Connexion directe (adresse publique) :
+    l'en-tête est ignoré. Derrière le proxy de l'hébergeur (adresse privée) :
+    on remonte l'en-tête depuis la fin et on prend la première adresse publique,
+    celle que notre proxy a vue."""
+    peer = request.client.host if request.client else ""
+    if peer and not _is_proxy(peer):
+        return peer
+    hops = [h.strip() for h in request.headers.get("x-forwarded-for", "").split(",") if h.strip()]
+    for hop in reversed(hops):
+        if not _is_proxy(hop):
+            return hop
+    return hops[0] if hops else (peer or "unknown")
 
 
 def _keys(scope: str, request: Request, identifier: Optional[str]):

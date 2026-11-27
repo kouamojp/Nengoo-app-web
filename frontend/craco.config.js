@@ -28,7 +28,12 @@ module.exports = {
     alias: {
       '@': path.resolve(__dirname, 'src'),
     },
-    configure: (webpackConfig) => {
+    configure: (webpackConfig, { env }) => {
+      // Pas de source maps (.map) publiées en production : elles livrent le
+      // code source lisible de l'application
+      if (env === 'production') {
+        webpackConfig.devtool = false;
+      }
 
       // Fix for ES modules in node_modules (is-plain-obj, unified, etc.)
       const oneOfRule = webpackConfig.module.rules.find(rule => rule.oneOf);

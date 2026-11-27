@@ -66,3 +66,17 @@ def test_window_expiry(monkeypatch):
     real = login_limiter.time.monotonic()
     monkeypatch.setattr(login_limiter.time, "monotonic", lambda: real + login_limiter.WINDOW_SECONDS + 1)
     login_limiter.check("seller", request(), "690703689")
+
+
+def test_forged_forwarded_for_does_not_change_the_ip():
+    def forged(fake):
+        # Le client écrit une fausse IP, le proxy ajoute la vraie (1.2.3.4)
+        return Request({
+            "type": "http",
+            "headers": [(b"x-forwarded-for", f"{fake}, 1.2.3.4".encode())],
+            "client": ("10.0.0.1", 1234),
+        })
+    assert login_limiter.client_ip(forged("8.8.8.8")) == "1.2.3.4"
+    direct = Request({"type": "http", "headers": [(b"x-forwarded-for", b"8.8.8.8")],
+                      "client": ("1.2.3.4", 1234)})
+    assert login_limiter.client_ip(direct) == "1.2.3.4"
